@@ -14,10 +14,9 @@ def report(datalogger, datestring):
     standard_wiki_report(datalogger, datestring, tsa, tsa_grouped)
 
 def main():
-    basedir = "/var/rrd/"
     project = "vicenter"
     tablename = "hostSystemNetworkStats"
-    datalogger = DataLogger(basedir, project, tablename)
+    datalogger = DataLogger(BASEDIR, project, tablename)
     datestring = get_last_business_day_datestring()
     # datestring = "2015-07-08"
     report(datalogger, datestring)

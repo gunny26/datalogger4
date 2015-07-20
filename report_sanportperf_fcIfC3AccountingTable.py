@@ -1,6 +1,6 @@
 #!/usr/bin/python
 import logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 from tilak_datalogger import DataLogger as DataLogger
 from commons import *
 
@@ -18,10 +18,9 @@ def report(datalogger, datestring):
     standard_wiki_report(datalogger, datestring, tsa, tsa_grouped)
 
 def main():
-    basedir = "/var/rrd/"
     project = "sanportperf"
     tablename = "fcIfC3AccountingTable"
-    datalogger = DataLogger(basedir, project, tablename)
+    datalogger = DataLogger(BASEDIR, project, tablename)
     datestring = get_last_business_day_datestring()
     report(datalogger, datestring)
 

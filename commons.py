@@ -9,6 +9,8 @@ from tilak_datalogger import DataLoggerHelper as dh
 from tilak_datalogger import TimeseriesArrayStats as TimeseriesArrayStats
 import tilak_wiki
 
+BASEDIR = "/var/rrd"
+
 def get_header(datalogger):
     wikitext = ""
     wikitext += "---+ %s %s Statistics\n" % (datalogger.get_project(), datalogger.get_tablename())
