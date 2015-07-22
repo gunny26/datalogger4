@@ -6,7 +6,7 @@ from commons import *
 
 def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
-    tsa = datalogger.read_day(datestring)
+    tsa = datalogger.read_tsa_full(datestring)
     tsa.sanitize()
     tsa_grouped = tsa.slice(("disk.read.average", "disk.write.average", 'disk.commands.summation'))
     standard_wiki_report(datalogger, datestring, tsa, tsa_grouped)

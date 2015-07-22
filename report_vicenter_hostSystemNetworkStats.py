@@ -7,7 +7,7 @@ from tilak_datalogger import DataLoggerHelper as dh
 from commons import *
 
 def report(datalogger, datestring):
-    tsa = datalogger.read_day(datestring)
+    tsa = datalogger.read_tsa_full(datestring)
     # sanitize data
     tsa.sanitize()
     tsa_grouped = tsa.slice((u'net.received.average', u'net.transmitted.average'))

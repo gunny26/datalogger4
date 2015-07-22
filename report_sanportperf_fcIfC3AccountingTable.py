@@ -6,7 +6,7 @@ from commons import *
 
 def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
-    tsa = datalogger.read_day(datestring)
+    tsa = datalogger.read_tsa_full(datestring)
     tsa.add_derive_col('fcIfC3InOctets', 'fcIfC3InOctets_d')
     tsa.add_derive_col('fcIfC3OutOctets', 'fcIfC3OutOctets_d')
     tsa.remove_col('fcIfC3InOctets')

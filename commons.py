@@ -134,7 +134,7 @@ def raw_keyfuncgen(datalogger, datestring):
         #logging.info(keys)
         newkeys = list(keys)
         #link = "<a href=http://srvmghomer.tilak.cc/rrd/static/%s_%s.html" % (project, tablename)
-        newkeys[0] = "<a href=http://srvmghomer.tilak.cc/rrd/static/develop3.html"
+        newkeys[0] = "<a href=http://srvmgdata1.tilak.cc/static/develop3.html"
         newkeys[0] += "?project=%s" % project
         newkeys[0] += "&tablename=%s" % tablename
         newkeys[0] += "&datestring=%s" % datestring
@@ -154,7 +154,7 @@ def ungrouped_keyfuncgen(datalogger, datestring):
     def keyfunc(keys):
         #logging.info(keys)
         newkeys = list(keys)
-        newkeys[0] = "<a href=http://srvmghomer.tilak.cc/rrd/static/develop3.html"
+        newkeys[0] = "<a href=http://srvmgdata1.tilak.cc/static/develop3.html"
         newkeys[0] += "?project=%s" % project
         newkeys[0] += "&tablename=%s" % tablename
         newkeys[0] += "&datestring=%s" % datestring
@@ -165,14 +165,14 @@ def ungrouped_keyfuncgen(datalogger, datestring):
         return(" ".join(newkeys))
     return(keyfunc)
 
-def standard_wiki_report(datalogger, datestring, tsa, tsa_grouped):
+def standard_wiki_report(datalogger, datestring, tsa, tsa_grouped, raw_stat_func="avg"):
     ws = tilak_wiki.TilakWikiSender()
     wikitext = ""
     wikitext += get_header(datalogger)
     wikitext += ws.get_proclaimer()
     wikitext += get_report_infos(datalogger, tsa)
     # RAW Data
-    wikitext += get_raw_stats(datalogger, tsa, stat_func="avg", keyfunc=raw_keyfuncgen(datalogger, datestring))
+    wikitext += get_raw_stats(datalogger, tsa, stat_func=raw_stat_func, keyfunc=raw_keyfuncgen(datalogger, datestring))
     # slice data to relevant columns
     # Un-Groupded Data
     wikitext += get_ungrouped_stats(datalogger, tsa_grouped, ungrouped_keyfuncgen(datalogger, datestring))

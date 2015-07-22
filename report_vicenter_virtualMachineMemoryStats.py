@@ -6,12 +6,16 @@ from tilak_datalogger import DataLogger as DataLogger
 from tilak_datalogger import DataLoggerHelper as dh
 from commons import *
 
+def calc_mem_to_granted_usage(data):
+    return data["mem.active.average"] / data["mem.granted.average"]
+
 def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
-    tsa = datalogger.read_day(datestring)
+    tsa = datalogger.read_tsa_full(datestring, force=False)
+    tsa.add_calc_col_full("mem.usage.pct", calc_mem_to_granted_usage)
     tsa.sanitize()
     tsa_grouped = tsa.slice(("mem.active.average",))
-    standard_wiki_report(datalogger, datestring, tsa, tsa_grouped)
+    standard_wiki_report(datalogger, datestring, tsa, tsa_grouped, raw_stat_func="max")
 
 def main():
     project = "vicenter"
