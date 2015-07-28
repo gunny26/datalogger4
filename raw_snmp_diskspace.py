@@ -63,15 +63,19 @@ def get_snmp_table(hostname, table_oid, community, index=False):
     return data
 
 def get_hrStorageTable(hostname, community):
-    # inject ifDescr to every row
     data = get_snmp_table(hostname, "HOST-RESOURCES-MIB::hrStorageTable" , community, index=False)
+    # do some data correction
     for row in data:
         try:
-            int(row["hrStorageAllocationFailures"])
+            int(row["hrStorageAllocationFailures"]) # not applicable for shared memory
         except ValueError:
             row["hrStorageAllocationFailures"] = "0"
+        try:
+            int(row["hrStorageUsed"]) # not applicable for shared Memory
+        except ValueError:
+            row["hrStorageUsed"] =  "0"
+        # remove " Bytes" suffix
         row["hrStorageAllocationUnits"] = row["hrStorageAllocationUnits"].split(" ")[0]
-
     return(data)
 
 def save_data(filename, data):
@@ -142,6 +146,8 @@ if __name__ == "__main__":
     # get switchnames from centreon database
     for row in centreon.getCentreonHostGroupMembersSnmp(nagios_group):
         hostname, community, version = row
+        if hostname[0:3] in ("vmw", "nss"):
+            continue
         if community is None:
             community = "tango97"
         worklist.put((hostname, community))
@@ -152,4 +158,4 @@ if __name__ == "__main__":
         t.daemon = True
         t.start()
     worklist.join()
-    logging.info("Duration to fetch all %s hosts %s s", q_size, time.time() - starttime)
+    logging.error("Duration to fetch all %s hosts %s s", q_size, time.time() - starttime)
