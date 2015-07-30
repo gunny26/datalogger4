@@ -15,8 +15,11 @@ def dateback(days):
 def worker(project, tablename, datestring, force):
     logging.error("reading raw data and creating caches for %s %s %s", project, tablename, datestring)
     datalogger = DataLogger(BASEDIR, project, tablename)
+    for cache in datalogger.get_tsa_caches(datestring):
+        print cache
+    return
     try:
-        tsa = datalogger.read_tsa_full(datestring)
+        tsa = datalogger.read_tsa_full(datestring, force)
     except StandardError:
         return
     tsa.sanitize()
@@ -51,28 +54,28 @@ def worker(project, tablename, datestring, force):
 
 def main():
     data = {
-        "haproxy" : [
-            "backend",
-            "frontend",
-            "server",
-            ],
+#        "haproxy" : [
+#            "backend",
+#            "frontend",
+#            "server",
+#            ],
 #        "ipstor" : [
 #            "vrsClientTable",
 #            ],
 #        "sanportperf" : [
 #            "fcIfC3AccountingTable",
 #           ],
-#        "vicenter" : [
+        "vicenter" : [
 #            "hostSystemCpuStats",
 #            "hostSystemDiskStats",
 #            #"hostSystemMemoryStats",
 #            "hostSystemNetworkStats",
-#            "virtualMachineCpuStats",
+            "virtualMachineCpuStats",
 #            "virtualMachineDatastoreStats",
 #            "virtualMachineDiskStats",
 #            "virtualMachineMemoryStats",
 #            "virtualMachineNetworkStats",
-#        ],
+        ],
     }
 #    group_funcs = {
 #        "sum" : lambda a: sum(a),
@@ -80,7 +83,7 @@ def main():
 #        "max" : lambda a: max(a),
 #        "avg" : lambda a: sum(a) / len(a),
 #        "len" : lambda a: len(a),
-#    }
+#    m
     force = False
     #datestring = get_last_business_day_datestring()
     for datestring in dateback(14):

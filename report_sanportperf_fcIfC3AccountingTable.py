@@ -7,14 +7,19 @@ from commons import *
 def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
     tsa = datalogger.read_tsa_full(datestring)
-    tsa.add_derive_col('fcIfC3InOctets', 'fcIfC3InOctets_d')
-    tsa.add_derive_col('fcIfC3OutOctets', 'fcIfC3OutOctets_d')
+    tsa.add_per_s_col('fcIfC3InOctets', 'fcIfC3InOctets_s')
+    tsa.add_per_s_col('fcIfC3OutOctets', 'fcIfC3OutOctets_s')
+    tsa.add_per_s_col('fcIfC3InFrames', 'fcIfC3InFrames_s')
+    tsa.add_per_s_col('fcIfC3OutFrames', 'fcIfC3OutFrames_s')
+    tsa.remove_col('index')
     tsa.remove_col('fcIfC3InOctets')
     tsa.remove_col('fcIfC3OutOctets')
+    tsa.remove_col('fcIfC3InFrames')
+    tsa.remove_col('fcIfC3OutFrames')
     # get rid of unusable data
     tsa.sanitize()
     # for grouped reports, reduce number of cols
-    tsa_grouped = tsa.slice(('fcIfC3InOctets_d', 'fcIfC3OutOctets_d'))
+    tsa_grouped = tsa.slice(('fcIfC3InOctets_s', 'fcIfC3OutOctets_s'))
     standard_wiki_report(datalogger, datestring, tsa, tsa_grouped)
 
 def main():

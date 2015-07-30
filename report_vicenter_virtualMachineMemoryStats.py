@@ -1,9 +1,9 @@
 #!/usr/bin/python
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(levelname)s %(filename)s:%(funcName)s:%(lineno)s %(message)s')
-import tilak_wiki
+#import tilak_wiki
 from tilak_datalogger import DataLogger as DataLogger
-from tilak_datalogger import DataLoggerHelper as dh
+#from tilak_datalogger import DataLoggerHelper as dh
 from commons import *
 
 def calc_mem_to_granted_usage(data):
