@@ -8,7 +8,8 @@ from commons import *
 
 def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
-    tsa = datalogger.read_tsa_full(datestring)
+    #tsa1 = datalogger.read_tsa_full(datestring, force=True)
+    tsa = datalogger.load_tsa(datestring, cleancache=False)
     tsa.add_per_s_col('vrsclKBRead64', 'vrsclKBRead64_s')
     tsa.add_per_s_col('vrsclKBWritten64', 'vrsclKBWritten64_s')
     tsa.add_per_s_col('vrsclSCSIReadCmd', 'vrsclSCSIReadCmd_s')

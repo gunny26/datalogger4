@@ -8,7 +8,7 @@ from commons import *
 
 def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
-    tsa = datalogger.read_tsa_full(datestring)
+    tsa = datalogger.load_tsa(datestring)
     tsastat = datalogger.read_tsastat_full(datestring)
     # sanitize data
     tsa.sanitize()

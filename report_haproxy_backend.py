@@ -6,7 +6,7 @@ from commons import *
 
 def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
-    tsa = datalogger.read_tsa_full(datestring, force=False, timedelta=0)
+    tsa = datalogger.load_tsa(datestring)
     # sanitize data
     tsa.sanitize()
     tsa.add_per_s_col('bin', 'bin_s')

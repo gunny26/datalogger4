@@ -165,7 +165,7 @@ def ungrouped_keyfuncgen(datalogger, datestring):
         return(" ".join(newkeys))
     return(keyfunc)
 
-def standard_wiki_report(datalogger, datestring, tsa, tsa_grouped, raw_stat_func="avg"):
+def standard_wiki_report(datalogger, datestring, tsa, tsa_grouped, raw_stat_func="avg", wikiname=None):
     ws = tilak_wiki.TilakWikiSender()
     wikitext = ""
     wikitext += get_header(datalogger)
@@ -180,7 +180,21 @@ def standard_wiki_report(datalogger, datestring, tsa, tsa_grouped, raw_stat_func
     wikitext += get_grouped_stats(datalogger, tsa_grouped, keyfunc=lambda a: a)
     # Totals
     wikitext += get_total_stats(datalogger, tsa_grouped, keyfunc=lambda a: a)
-    ws.send("Systembetrieb",  datalogger.get_wikiname(), wikitext)
+    if wikiname is None:
+        wikiname = datalogger.get_wikiname()
+    ws.send("Systembetrieb", wikiname, wikitext)
+
+def simple_wiki_report(datalogger, datestring, tsa, raw_stat_func="avg", wikiname=None):
+    ws = tilak_wiki.TilakWikiSender()
+    wikitext = ""
+    wikitext += get_header(datalogger)
+    wikitext += ws.get_proclaimer()
+    wikitext += get_report_infos(datalogger, tsa)
+    # RAW Data
+    wikitext += get_raw_stats(datalogger, tsa, stat_func=raw_stat_func, keyfunc=raw_keyfuncgen(datalogger, datestring))
+    if wikiname is None:
+        wikiname = datalogger.get_wikiname()
+    ws.send("Systembetrieb", wikiname, wikitext)
 
 def dump_tsa(datalogger, datestring, tsa, global_cachedir):
     """

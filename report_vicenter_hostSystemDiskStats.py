@@ -7,7 +7,7 @@ from commons import *
 
 def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
-    tsa = datalogger.read_tsa_full(datestring)
+    tsa = datalogger.load_tsa(datestring)
     # sanitize data
     tsa.sanitize()
     #tsa_grouped = tsa.slice(("disk.totalWriteLatency.average", "disk.totalReadLatency.average"))

@@ -11,7 +11,7 @@ def calc_mem_to_granted_usage(data):
 
 def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
-    tsa = datalogger.read_tsa_full(datestring, force=False)
+    tsa = datalogger.load_tsa(datestring)
     tsa.add_calc_col_full("mem.usage.pct", calc_mem_to_granted_usage)
     tsa.sanitize()
     tsa_grouped = tsa.slice(("mem.active.average",))

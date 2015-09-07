@@ -8,7 +8,7 @@ from commons import *
 
 def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
-    tsa = datalogger.read_tsa_full(datestring)
+    tsa = datalogger.load_tsa(datestring)
     tsa = tsa.get_group_by_tsa(("hostname", "vrsrdVirResourceID"), group_func=lambda a: sum(a))
     tsa.add_per_s_col('vrsrdKBRead64', 'vrsrdKBRead64_s')
     tsa.add_per_s_col('vrsrdKBWritten64', 'vrsrdKBWritten64_s')
