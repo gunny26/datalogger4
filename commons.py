@@ -13,7 +13,7 @@ BASEDIR = "/var/rrd"
 
 def get_header(datalogger):
     wikitext = ""
-    wikitext += "---+ %s %s Statistics\n" % (datalogger.get_project(), datalogger.get_tablename())
+    wikitext += "---+ %s %s Statistics\n" % (datalogger.project, datalogger.tablename)
     wikitext += "%TOC%\n"
     return(wikitext)
 
@@ -22,14 +22,14 @@ def get_report_infos(datalogger, tsa):
     wikitext += "---++ Informations\n"
     wikitext += "| earliest timestamp found | %s |\n"  % datetime.datetime.fromtimestamp(tsa.get_first_ts())
     wikitext += "| latest timestamp found | %s |\n"  % datetime.datetime.fromtimestamp(tsa.get_last_ts())
-    wikitext += "| Project | %s |\n" % datalogger.get_project()
-    wikitext += "| Tablename | %s |\n" % datalogger.get_tablename()
+    wikitext += "| Project | %s |\n" % datalogger.project
+    wikitext += "| Tablename | %s |\n" % datalogger.tablename
     wikitext += "| Number of unique keys found | %s |\n" % len(tsa)
     return(wikitext)
 
 def get_raw_stats(datalogger, tsa, stat_func, keyfunc):
     wikitext = ""
-    wikitext += "---++ %s Statistics ungroupd\n" % datalogger.get_tablename()
+    wikitext += "---++ %s Statistics ungroupd\n" % datalogger.tablename
     wikitext += "Table of data ungrouped and aggrated by %s over time.\n" % stat_func
     wikitext += get_wiki_table(tsa, stat_func, keyfunc)
     return wikitext
@@ -39,7 +39,7 @@ def get_ungrouped_stats(datalogger, tsa, keyfunc):
     wikitext += "---+ Ungrouped-Data Statistics\n"
     wikitext += "Here are some statistical breakdowns for every index combination\n"
     for value_key in tsa.get_value_keys():
-        wikitext += "---++ %s Statistics of %s\n" % (datalogger.get_tablename(), value_key)
+        wikitext += "---++ %s Statistics of %s\n" % (datalogger.tablename, value_key)
         tsa_stats = TimeseriesArrayStats(tsa)
         stat_dict = tsa_stats.get_stats(value_key)
         wikitext += get_wiki_dict_table(stat_dict, keyfunc)
@@ -52,7 +52,7 @@ def get_grouped_stats(datalogger, tsa, keyfunc):
     for subkey in tsa.get_index_keys():
         wikitext += "---++ Grouped by %s\n" % subkey
         for value_key in tsa.get_value_keys():
-            wikitext += "---+++ %s Statistics of %s grouped by %s\n" % (datalogger.get_tablename(), value_key, subkey)
+            wikitext += "---+++ %s Statistics of %s grouped by %s\n" % (datalogger.tablename, value_key, subkey)
             wikitext += "This table is grouped by %s field using %s\n" % (subkey, "lambda a: sum(a)")
             grouped_tsa = tsa.get_group_by_tsa((subkey,), group_func=lambda a: sum(a))
             tsa_stats = TimeseriesArrayStats(grouped_tsa)
@@ -63,7 +63,7 @@ def get_total_stats(datalogger, tsa, keyfunc):
     wikitext = ""
     wikitext += "---+ Total-Data Statistics\n"
     for value_key in tsa.get_value_keys():
-        wikitext += "---++ %s Total Statistics of %s\n" % (datalogger.get_tablename(), value_key)
+        wikitext += "---++ %s Total Statistics of %s\n" % (datalogger.tablename, value_key)
         wikitext += "This table is a summation of all data for field using %s\n" % "lambda a: sum(a)"
         grouped_tsa = tsa.get_group_by_tsa((), group_func=lambda a: sum(a))
         tsa_stats = TimeseriesArrayStats(grouped_tsa)
@@ -128,8 +128,8 @@ def raw_keyfuncgen(datalogger, datestring):
     """
     generic keyfunc generator for raw tables
     """
-    project = datalogger.get_project()
-    tablename = datalogger.get_tablename()
+    project = datalogger.project
+    tablename = datalogger.tablename
     def keyfunc(keys):
         #logging.info(keys)
         newkeys = list(keys)
@@ -149,8 +149,8 @@ def ungrouped_keyfuncgen(datalogger, datestring):
     """
     get a tuple of index_keys and returns one string
     """
-    project = datalogger.get_project()
-    tablename = datalogger.get_tablename()
+    project = datalogger.project
+    tablename = datalogger.tablename
     def keyfunc(keys):
         #logging.info(keys)
         newkeys = list(keys)
@@ -200,8 +200,8 @@ def dump_tsa(datalogger, datestring, tsa, global_cachedir):
     """
     use uniceod everywhere
     """
-    project = u"%s" % datalogger.get_project()
-    tablename = u"%s" % datalogger.get_tablename()
+    project = u"%s" % datalogger.project
+    tablename = u"%s" % datalogger.tablename
     for key in tsa.keys():
         md5 = hashlib.md5()
         md5.update(str((project, tablename, key, u"%s" % datestring)))
