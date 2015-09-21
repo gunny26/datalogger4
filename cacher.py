@@ -54,7 +54,8 @@ def worker():
         logging.info("working on %s, %s, %s", datestring, project, tablename)
         datalogger = DataLogger(BASEDIR, project, tablename)
         try:
-            report(datalogger, datestring)
+            datalogger[datestring]
+            #report(datalogger, datestring)
         except StandardError as exc:
             logging.error("Error on %s, %s, %s", datestring, project, tablename)
         queue.task_done()
@@ -64,10 +65,11 @@ if __name__ == "__main__":
     for project in DataLogger.get_projects(BASEDIR):
         for tablename in DataLogger.get_tablenames(BASEDIR, project):
             datalogger = DataLogger(BASEDIR, project, tablename)
-            for datestring in datewalker("2015-08-01", get_last_business_day_datestring()):
+            for datestring in datewalker("2015-04-01", "2015-05-01"):
                 queue.put((project, tablename, datestring))
-    for threadid in range(16):
+    for threadid in range(32):
         t = threading.Thread(target=worker)
         t.daemon = True
         t.start()
     queue.join()
+    logging.info("Ending")
