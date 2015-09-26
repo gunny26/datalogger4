@@ -47,11 +47,10 @@ def table_by_index(tsa_stat, key):
     print "\n".join(outbuffer)
 
 def main():
-    project = "vicenter"
-    tablename = "virtualMachineDatastoreStats"
+    project = "nagios"
     for tablename in DataLogger.get_tablenames(BASEDIR, project):
         datalogger = DataLogger(BASEDIR, project, tablename)
-        for datestring in datewalker("2015-04-01", "2015-09-20"):
+        for datestring in datewalker("2015-04-01", "2015-09-23"):
             print datestring, tablename
             try:
                 caches = datalogger.get_caches(datestring)

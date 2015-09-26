@@ -1,34 +1,14 @@
 #!/usr/bin/python
+from __future__ import print_function
 import cProfile
+import copy
+import sys
+import gc
 import logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 from tilak_datalogger import DataLogger as DataLogger
 from tilak_datalogger import TimeseriesArray as TimeseriesArray
 from commons import *
-
-def calc_hrStorageSizeUsage(data):
-    try:
-        return 100 * data[u"hrStorageUsed"] / data[u"hrStorageSize"]
-    except ZeroDivisionError:
-        return(-1)
-
-def calc_hrStorageSizeKb(data):
-    try:
-        return data[u"hrStorageSize"] * data[u"hrStorageAllocationUnits"] / 1024
-    except ZeroDivisionError:
-        return(-1)
-
-def calc_hrStorageUsedKb(data):
-    try:
-        return data[u"hrStorageUsed"] * data[u"hrStorageAllocationUnits"] / 1024
-    except ZeroDivisionError:
-        return(-1)
-
-def calc_hrStorageFreeKb(data):
-    try:
-        return (data[u"hrStorageSize"] - data[u"hrStorageUsed"]) * data[u"hrStorageAllocationUnits"] / 1024
-    except ZeroDivisionError:
-        return(-1)
 
 def get_slot_timeline(datestring, slotlength):
     start_ts, stop_ts = datalogger.get_ts_for_datestring(datestring)
@@ -55,22 +35,32 @@ def dump_and_align(tsa, slotlength):
     dump timeseries with aligned timestamps
     """
     align_timestamp = gen_align_timestamp(datestring, slotlength)
-    ts_keyname = tsa.get_ts_key()
-    for row in tsa.dump():
-        row[ts_keyname] = align_timestamp(row[ts_keyname])
-        yield row
+    ts_keyname = tsa.ts_key
+    for row in tsa.export():
+        before = row[ts_keyname]
+        newrow = copy.copy(row)
+        newrow[ts_keyname] = align_timestamp(before)
+        #print "correcting %f -> %f" % (before, row[ts_keyname])
+        yield newrow
 
 def read_tsa_full_aligned(datestring, slotlength):
-    tsa = datalogger.read_tsa_full(datestring, force=True)
-    print tsa.index_keys, tsa.value_keys, tsa.ts_key
-    tsa2 = TimeseriesArray(tuple(tsa.index_keys), list(tsa.value_keys), str(tsa.ts_key))
-    print "old times"
-    print sorted(tsa[tsa.keys()[0]].get_times())
+    """
+    align, timestamp fileds to given timeline with predefined slotlength
+    used to aggregate this data afterwards
+    """
+    tsa = datalogger.load_tsa(datestring)
+    key = tsa.keys()[0]
+    tsa2 = TimeseriesArray(tsa.index_keys, tsa.value_keys, tsa.ts_key)
+    print(key)
+    print("old times")
+    print(tsa[key])
     for data in dump_and_align(tsa, slotlength):
         tsa2.add(data)
-    print "new times"
-    print sorted(tsa2[tsa2.keys()[0]].get_times())
-    assert tsa != tsa2
+    print("new times")
+    print(gc.get_referrers(tsa))
+    print(gc.get_referrers(tsa2))
+    print(tsa2[key]["ts"])
+    assert tsa[key] == tsa2[key]
     assert all(key in tsa2.keys() for key in tsa.keys())
     assert len(tsa) == len(tsa2)
     return tsa2
@@ -78,12 +68,11 @@ def read_tsa_full_aligned(datestring, slotlength):
 def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
     tsa = read_tsa_full_aligned(datestring, 600)
-    keys = tsa.keys()
-    for slottime in get_slot_timeline(datestring, 600):
-        print slottime, slottime in tsa[keys[0]].get_times()
+    #keys = tsa.keys()
+    #for slottime in get_slot_timeline(datestring, 600):
+    #    print(slottime)
         #print tuple((tsa[key].get_single_value(slottime, 'hrStorageAllocationFailures') for key in keys))
-
-    return
+    #return
 
 
 def main():
