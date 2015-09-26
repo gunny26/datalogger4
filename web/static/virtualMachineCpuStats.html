@@ -1,0 +1,78 @@
+<html>
+<head>
+<!--jquery itself-->
+<script type="text/javascript" src="jquery-2.1.3.js"></script>
+<!--highcharts graphics engine-->
+<script src="http://code.highcharts.com/highcharts.js"></script>
+<script src="http://code.highcharts.com/modules/exporting.js"></script>
+<script src="datalogger_graphs.js"></script>
+</head>
+<body>
+<script>
+$(document).ready(function(){
+    // set some meaningful default values
+    $("#project").val("vicenter");
+    $("#tablename").val("virtualMachineCpuStats");
+    $("#servername").val("srvpralki1.tilak.cc");
+    $("#instance").val("0")
+    $("#datestring").val("2015-05-31")
+    var searchkeys = $(location).attr('search').slice(1).split("&")
+    searchkeys.forEach(function (data) {
+        console.log(data);
+        var key = data.split("=")[0];
+        var value = data.split("=")[1];
+        console.log("Key  : " + key);
+        console.log("Value: " + value);
+        $("#" + key).val(value);
+    });
+    console.log("search parameter:" + searchkeys);
+    $("#clickme").click(function() {
+        alert("hadler for .click() called,keyids=" + $("#keyids").val());
+    });
+    $("#getData").click(function() {
+        $("#container").val("fetching data from webservice, this could last for up to 2 minutes");
+        getData();
+    });
+});
+
+function getData() {
+    var project = $("#project").val();
+    var tablename = $("#tablename").val();
+    var datestring = $("#datestring").val();
+    var servername = $("#servername").val();
+    var instance = $("#instance").val()
+    var url = "http://srvmghomer.tilak.cc/datalogger/RawData/getVicenterTimeseries/" + tablename + "/" + datestring + "/" + servername + "/" +instance;
+    var idle = [];
+    var ready = [];
+    var system = [];
+    var used = [];
+    var wait = [];
+    console.log("Getting Data from url " + url);
+    document.body.style.cursor = "wait";
+    $.getJSON(url).then(function(data) {
+        // data is already javascript not json
+        // use only item 3 in array, and convert to int
+        data.forEach(function(row) {
+            var ts = new Date((parseInt(row[0]) + 7200) * 1000); //has to be new and multiplied by 1000
+            idle.push([ts, parseInt(row[1])]);
+            ready.push([ts, parseInt(row[2])]);
+            system.push([ts, parseInt(row[3])]);
+            used.push([ts, parseInt(row[4])]);
+            wait.push([ts, parseInt(row[5])]);
+        })
+        draw_virtualMachineCpuStats("#container", servername, instance, idle, ready, system, used, wait);
+    });
+    document.body.style.cursor = "default";
+}
+
+</script>
+<h1>CPU Statistics</h1>
+<div>Project    : <input id="project" type=text value="vicenter"></div>
+<div>Tablename  : <input id="tablename" type=text value=""></div>
+<div>Servername : <input id="servername" type=text value=""></div>
+<div>Instance   : <input id="instance" type=text value=""></div>
+<div>Datestring : <input id="datestring" type="text"></div>
+<div id="getData">click here to fetch data</div>
+<div id="container" style="min-width: 310px; height: 400px; margin: 0 auto">There will be data after you clicked fetch</div>
+</body>
+</html>

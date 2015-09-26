@@ -1,0 +1,244 @@
+<html>
+<head>
+<!--jquery itself-->
+<script type="text/javascript" src="jquery-2.1.3.js"></script>
+<!--highcharts graphics engine-->
+<script src="http://code.highcharts.com/highcharts.js"></script>
+<script src="http://code.highcharts.com/modules/exporting.js"></script>
+</head>
+<body>
+<script>
+$(document).ready(function(){
+    // set some meaningful default values
+    $("#project").val("vicenter");
+    $("#tablename").val("virtualMachineDatastoreStats");
+    $("#servername").val("srvpralki1.tilak.cc");
+    $("#instance").val("5305cfcc-8b500331-071a-0025b511004f")
+    $("#datestring").val("2015-05-31")
+    var searchkeys = $(location).attr('search').slice(1).split("&")
+    searchkeys.forEach(function (data) {
+        console.log(data);
+        var key = data.split("=")[0];
+        var value = data.split("=")[1];
+        console.log("Key  : " + key);
+        console.log("Value: " + value);
+        $("#" + key).val(value);
+    });
+    console.log("search parameter:" + searchkeys);
+    $("#clickme").click(function() {
+        alert("hadler for .click() called,keyids=" + $("#keyids").val());
+    });
+    $("#getData").click(function() {
+        getData();
+    });
+});
+
+function draw_latency(hostname, instance, readLatency, writeLatency) {
+    $('#container').highcharts({
+        chart: {
+            type: 'spline'
+        },
+        title: {
+            text: 'Latency of ' + hostname + " on " + instance
+        },
+        subtitle: {
+            text: 'Read and Write latency for datastore'
+        },
+        xAxis: {
+            type: 'datetime',
+            dateTimeLabelFormats: { // don't display the dummy year
+                month: '%e. %b',
+                year: '%b'
+            },
+            title: {
+                text: 'Date'
+            }
+        },
+        yAxis: {
+            title: {
+                text: 'ms'
+            },
+            min: 0
+        },
+        tooltip: {
+            headerFormat: '<b>{series.name}</b><br>',
+            pointFormat: '{point.x:%e. %b}: {point.y:.2f} m'
+        },
+
+        plotOptions: {
+            spline: {
+                marker: {
+                    enabled: false
+                }
+            }
+        },
+
+        series: [{
+            name: 'datastore.totalReadLatency.average',
+            // Define the data points. All series have a dummy year
+            // of 1970/71 in order to be compared on the same x axis. Note
+            // that in JavaScript, months start at 0 for January, 1 for February etc.
+            data: readLatency,
+        },
+        {
+            name: 'datastore.totalWriteLatency.average',
+            data: writeLatency,
+        }]
+    });
+}
+
+function draw_iops(hostname, instance, series1, series2) {
+    $('#iops').highcharts({
+        chart: {
+            type: 'spline'
+        },
+        title: {
+            text: 'IO Operations of ' + hostname + " on " + instance 
+        },
+        subtitle: {
+            text: 'Read and Write operations of datastore'
+        },
+        xAxis: {
+            type: 'datetime',
+            dateTimeLabelFormats: { // don't display the dummy year
+                month: '%e. %b',
+                year: '%b'
+            },
+            title: {
+                text: 'Date'
+            }
+        },
+        yAxis: {
+            title: {
+                text: 'IO Operations'
+            },
+            min: 0
+        },
+        tooltip: {
+            headerFormat: '<b>{series.name}</b><br>',
+            pointFormat: '{point.x:%e. %b}: {point.y:.2f} m'
+        },
+
+        plotOptions: {
+            spline: {
+                marker: {
+                    enabled: false
+                }
+            }
+        },
+
+        series: [{
+            name: 'datastore.numberReadAveraged.average',
+            // Define the data points. All series have a dummy year
+            // of 1970/71 in order to be compared on the same x axis. Note
+            // that in JavaScript, months start at 0 for January, 1 for February etc.
+            data: series1,
+        },
+        {
+            name: 'datastore.numberWriteAveraged.average',
+            data: series2,
+        }]
+    });
+}
+
+function draw_transfer(hostname, instance, series1, series2) {
+    $('#transfer').highcharts({
+        chart: {
+            type: 'spline'
+        },
+        title: {
+            text: 'IO Transfer Rate of ' + hostname + " on " + instance 
+        },
+        subtitle: {
+            text: 'Read and Write transferrate of datastore'
+        },
+        xAxis: {
+            type: 'datetime',
+            dateTimeLabelFormats: { // don't display the dummy year
+                month: '%e. %b',
+                year: '%b'
+            },
+            title: {
+                text: 'Date'
+            }
+        },
+        yAxis: {
+            title: {
+                text: 'Transfer rate kB/s'
+            },
+            min: 0
+        },
+        tooltip: {
+            headerFormat: '<b>{series.name}</b><br>',
+            pointFormat: '{point.x:%e. %b}: {point.y:.2f} m'
+        },
+
+        plotOptions: {
+            spline: {
+                marker: {
+                    enabled: false
+                }
+            }
+        },
+
+        series: [{
+            name: 'datastore.read.average',
+            // Define the data points. All series have a dummy year
+            // of 1970/71 in order to be compared on the same x axis. Note
+            // that in JavaScript, months start at 0 for January, 1 for February etc.
+            data: series1,
+        },
+        {
+            name: 'datastore.write.average',
+            data: series2,
+        }]
+    });
+}
+
+function getData() {
+    var project = $("#project").val();
+    var tablename = $("#tablename").val();
+    var datestring = $("#datestring").val();
+    var servername = $("#servername").val();
+    var instance = $("#instance").val()
+    var url = "http://srvmghomer.tilak.cc/datalogger/RawData/getVicenterTimeseries/" + tablename + "/" + datestring + "/" + servername + "/" +instance;
+    var readLatency = [];
+    var writeLatency = [];
+    var read = [];
+    var write = [];
+    var readkb = [];
+    var writekb = [];
+    console.log("Getting Data from url " + url);
+    $.getJSON(url).then(function(data) {
+        document.body.style.cursor = "wait";
+        // data is already javascript not json
+        // use only item 3 in array, and convert to int
+        data.forEach(function(row) {
+            var ts = new Date((parseInt(row[0]) + 7200) * 1000); //has to be new and multiplied by 1000
+            readkb.push([ts, parseInt(row[1])]);
+            writekb.push([ts, parseInt(row[2])]);
+            read.push([ts, parseInt(row[3])]);
+            readLatency.push([ts, parseInt(row[4])]);
+            writeLatency.push([ts, parseInt(row[5])]);
+            write.push([ts, parseInt(row[6])]);
+        })
+        draw_latency(servername, instance, readLatency, writeLatency);
+        draw_iops(servername, instance, read, write);
+        draw_transfer(servername, instance, readkb, writekb);
+        document.body.style.cursor = "default";
+    });
+}
+
+</script>
+<h1>Datastore Statistics</h1>
+<div>Project    : <input id="project" type=text value="vicenter"></div>
+<div>Tablename  : <input id="tablename" type=text value=""></div>
+<div>Servername : <input id="servername" type=text value=""></div>
+<div>Instance   : <input id="instance" type=text value=""></div>
+<div>Datestring : <input id="datestring" type="text"></div>
+<div id="getData">click here to fetch data</div>
+<div id="container" style="min-width: 310px; height: 400px; margin: 0 auto">There will be data after you clicked fetch</div>
+<div id="iops" style="min-width: 310px; height: 400px; margin: 0 auto">There will be data after you clicked fetch</div>
+<div id="transfer" style="min-width: 310px; height: 400px; margin: 0 auto">There will be data after you clicked fetch</div>
+</body>
+</html>
