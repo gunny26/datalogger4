@@ -475,19 +475,26 @@ class DataLoggerWeb(object):
         try:
             filehandle = gzip.open(filename, "wb")
             x = web.input(myfile={})
+            logging.info(x.keys())
             logging.info("Storing data to %s", filename)
-            filehandle.write(x["myfile"].file.read())
+            if "filedata" in x: # curl type
+                filehandle.write(x["filedata"])
+            else: # requests or urllib3 type
+                filehandle.write(x["myfile"].file.read())
             filehandle.close()
         except StandardError as exc:
             logging.exception(exc)
             os.unlink(filename)
+            logging.info("Error while saving received data to")
             return "Error while saving received data to"
         try:
             tsa = datalogger[str(datestring)] # read received data
         except StandardError as exc:
             logging.exception(exc)
             os.unlink(filename)
+            logging.info("Invalid data in uploaded file, see apache error log for details, uploaded file not stored")
             return "Invalid data in uploaded file, see apache error log for details, uploaded file not stored"
+        logging.ingo("File stored")
         return "File stored"
 
 
