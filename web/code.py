@@ -10,7 +10,7 @@ import time
 import base64
 import gzip
 # own modules
-from tilak_datalogger import DataLogger as DataLogger
+from datalogger import DataLogger as DataLogger
 
 urls = (
     "/(.*)", "DataLoggerWeb",

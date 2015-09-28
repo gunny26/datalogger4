@@ -12,7 +12,7 @@ args = {'name': 'datalogger',
         'license': 'LGPLv2',
         'packages': ['datalogger'],
         # Make packages in root dir appear in pywbem module
-        'package_dir': {'datalogger': ''},
+        'package_dir': {'datalogger': 'datalogger'},
         # Make extensions in root dir appear in pywbem module
         'ext_package': 'datalogger',
 #        'ext_modules' : cythonize('*.pyx'),

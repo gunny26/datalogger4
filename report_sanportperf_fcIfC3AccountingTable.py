@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import logging
 logging.basicConfig(level=logging.INFO)
-from tilak_datalogger import DataLogger as DataLogger
+from datalogger import DataLogger as DataLogger
 from commons import *
 
 def report(datalogger, datestring):

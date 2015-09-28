@@ -2,7 +2,7 @@
 import sys
 import logging
 import importlib
-from tilak_datalogger import DataLogger as DataLogger
+from datalogger import DataLogger as DataLogger
 from commons import *
 
 projects = None

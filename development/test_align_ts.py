@@ -6,8 +6,8 @@ import sys
 import gc
 import logging
 logging.basicConfig(level=logging.INFO)
-from tilak_datalogger import DataLogger as DataLogger
-from tilak_datalogger import TimeseriesArray as TimeseriesArray
+from datalogger import DataLogger as DataLogger
+from datalogger import TimeseriesArray as TimeseriesArray
 from commons import *
 
 def get_slot_timeline(datestring, slotlength):

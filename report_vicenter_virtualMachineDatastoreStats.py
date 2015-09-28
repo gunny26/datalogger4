@@ -6,7 +6,7 @@ import os
 import cProfile
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(levelname)s %(filename)s:%(funcName)s:%(lineno)s %(message)s')
-from tilak_datalogger import DataLogger as DataLogger
+from datalogger import DataLogger as DataLogger
 from commons import *
 
 def report(datalogger, datestring):

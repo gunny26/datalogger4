@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import logging
 logging.basicConfig(level=logging.DEBUG)
-from tilak_datalogger import DataLogger as DataLogger
+from datalogger import DataLogger as DataLogger
 from commons import *
 
 def calc_hrStorageSizeUsage(data):

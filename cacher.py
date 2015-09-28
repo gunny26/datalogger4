@@ -5,9 +5,9 @@ logging.basicConfig(level=logging.INFO)
 import datetime
 import threading
 import Queue
-from tilak_datalogger import DataLogger as DataLogger
-from tilak_datalogger import TimeseriesArray as TimeseriesArray
-from tilak_datalogger import TimeseriesArrayStats as TimeseriesArrayStats
+from datalogger import DataLogger as DataLogger
+from datalogger import TimeseriesArray as TimeseriesArray
+from datalogger import TimeseriesArrayStats as TimeseriesArrayStats
 from commons import *
 
 def datestring_to_date(datestring):
