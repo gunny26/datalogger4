@@ -350,7 +350,8 @@ class DataLoggerWeb(object):
             new_key = tuple((key_dict[key] for key in group_by))
             logging.info("key after grouping would be %s", new_key)
             logging.info("grouping tsa by %s", group_by)
-            new_tsa = tsa.get_group_by_tsa(group_by, group_func=lambda a: sum(a))
+            new_tsa = datalogger.group_by(datestring, tsa, group_by, group_func=lambda a, b: a + b)
+            #new_tsa = tsa.get_group_by_tsa(group_by, group_func=lambda a: sum(a))
             tsa = new_tsa
             data = tsa[new_key].dump_dict()
         else:
@@ -494,7 +495,7 @@ class DataLoggerWeb(object):
             os.unlink(filename)
             logging.info("Invalid data in uploaded file, see apache error log for details, uploaded file not stored")
             return "Invalid data in uploaded file, see apache error log for details, uploaded file not stored"
-        logging.ingo("File stored")
+        logging.info("File stored")
         return "File stored"
 
 

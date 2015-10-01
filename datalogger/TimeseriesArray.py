@@ -194,6 +194,40 @@ class TimeseriesArray(object):
             #logging.exception(exc)
             logging.error("some value_keys or ts_keyname are not numeric and float convertible, skipping this dataset: %s", data)
 
+    def group_add(self, data, group_func):
+        """
+        data must have following keys
+        <ts_keyname> <index_keys> <value_keys>
+        if there are additional keys, these will be ignored
+
+        All index_keys are converted to unicode
+        All value_keys are converted to float
+        ts_keyname is converted to float
+        """
+        #assert self.__ts_key in data # timestamp key has to be in dict
+        #assert (type(data[self.__ts_key]) == int) or (type(data[self.__ts_key]) == float) # timestamp should be int
+        #assert all((value_key in data for value_key in self.__value_keys)) # test if all keys are available
+        # create key from data
+        try:
+            key = tuple([unicode(data[key]) for key in self.__index_keys])
+        except KeyError:
+            #logging.exception(exc)
+            logging.error("there are index_keys missing in this dataset %s, skipping this dataset", data.keys())
+            return
+        # if this key is new, create empty Timeseries object
+        if key not in self.__data:
+            self.__data[key] = Timeseries(self.__value_keys)
+        # add data to this timeseries object
+        try:
+            # timestamp and values has to be converted to float
+            self.__data[key].group_add(float(data[self.__ts_key]), tuple((float(data[key]) for key in self.__value_keys)), group_func)
+        except KeyError as exc:
+            #logging.exception(exc)
+            logging.error("there is some key missing in %s, should be %s and %s, skipping this dataset, skipping this dataset", data.keys(), self.__ts_key, self.__value_keys)
+        except ValueError as exc:
+            #logging.exception(exc)
+            logging.error("some value_keys or ts_keyname are not numeric and float convertible, skipping this dataset: %s", data)
+
     def append(self, key, timeserie):
         """
         key <str> key to store this timeseries in dict
@@ -349,207 +383,207 @@ class TimeseriesArray(object):
             ret_data.data[key] = value.slice(colnames)
         return ret_data
 
-    def get_group_by_tsa(self, subkeys, group_func):
-        """
-        subkeys <tuple> tuple of index_keys, must be subset of self.headers
-        group_func <func> function to use for aggragation, eg. lambda a: sum(<tuple>)
-
-        return grouped TimeseriesArray from self
-
-        returns <TimeseriesArray>
-        """
-        # TODO: make sure this object can be aggrgated
-        # have alle series, the same row, the same column width and so
-        # on
-        new_tsa = None
-        data = None
-        if len(subkeys) > 0:
-            for subkey in subkeys:
-                try:
-                    assert subkey in self.__index_keys
-                except AssertionError as exc:
-                    logging.error("subkey %s not in headers list of this TimeseriesArray %s", subkey, self.__index_keys)
-                    raise exc
-            new_tsa = TimeseriesArray(subkeys, self.__value_keys, self.__ts_key)
-            data = self.__inflate_keys(subkeys)
-        else:
-            logging.debug("__total__ aggregation of all timeseries objects into one single Timeseries")
-            new_tsa = TimeseriesArray(("__total__", ), self.__value_keys, self.__ts_key)
-            data = {
-                ("__total__", ) : tuple((timeseries for timeseries in self.__data.values()))
-            }
+#    def get_group_by_tsa(self, subkeys, group_func):
+#        """
+#        subkeys <tuple> tuple of index_keys, must be subset of self.headers
+#        group_func <func> function to use for aggragation, eg. lambda a: sum(<tuple>)
+#
+#        return grouped TimeseriesArray from self
+#
+#        returns <TimeseriesArray>
+#        """
+#        # TODO: make sure this object can be aggrgated
+#        # have alle series, the same row, the same column width and so
+#        # on
+#        new_tsa = None
+#        data = None
+#        if len(subkeys) > 0:
+#            for subkey in subkeys:
+#                try:
+#                    assert subkey in self.__index_keys
+#                except AssertionError as exc:
+#                    logging.error("subkey %s not in headers list of this TimeseriesArray %s", subkey, self.__index_keys)
+#                    raise exc
+#            new_tsa = TimeseriesArray(subkeys, self.__value_keys, self.__ts_key)
+#            data = self.__inflate_keys(subkeys)
+#        else:
+#            logging.debug("__total__ aggregation of all timeseries objects into one single Timeseries")
+#            new_tsa = TimeseriesArray(("__total__", ), self.__value_keys, self.__ts_key)
+#            data = {
+#                ("__total__", ) : tuple((timeseries for timeseries in self.__data.values()))
+#            }
         # make sure every timeserie under each subkey has the same
         # length
-        for subkey in data:
-            try:
-                assert all((len(data[subkey][index]) == len(data[subkey][0]) for index in range(len(data[subkey]))))
-            except AssertionError:
-                raise StandardError("UnusableDataError Data is not groupable, datalength of timeseries differ")
-        self.__aggregate_timeseries(new_tsa, data, group_func)
-        return new_tsa
+#        for subkey in data:
+#            try:
+#                assert all((len(data[subkey][index]) == len(data[subkey][0]) for index in range(len(data[subkey]))))
+#            except AssertionError:
+#                raise StandardError("UnusableDataError Data is not groupable, datalength of timeseries differ")
+#        self.__aggregate_timeseries(new_tsa, data, group_func)
+#        return new_tsa
 
-    def get_grouped_tsa(self, subkeys, group_func_name):
-        """
-        subkeys <tuple> tuple of index_keys, must be subset of self.headers
-        group_func_name <str> specifies wich function should be use to aggregate data
+#    def get_grouped_tsa(self, subkeys, group_func_name):
+#        """
+#        subkeys <tuple> tuple of index_keys, must be subset of self.headers
+#        group_func_name <str> specifies wich function should be use to aggregate data
+#
+#        return grouped TimeseriesArray from self
+#
+#        returns <TimeseriesArray>
+#        """
+#        assert group_func_name in self.group_funcs.keys()
+#        # TODO: make sure this object can be aggrgated
+#        # have alle series, the same row, the same column width and so
+#        # on
+#        new_tsa = None
+#        data = None
+#        if len(subkeys) > 0:
+#            for subkey in subkeys:
+#                try:
+#                    assert subkey in self.__index_keys
+#                except AssertionError as exc:
+#                    logging.error("subkey %s not in headers list of this TimeseriesArray %s", subkey, self.__index_keys)
+#                    raise exc
+#            new_tsa = TimeseriesArray(subkeys, self.__value_keys, self.__ts_key)
+#            data = self.__inflate_keys(subkeys)
+#        else:
+#            logging.debug("__total__ aggregation of all timeseries objects into one single Timeseries")
+#            new_tsa = TimeseriesArray(("__total__", ), self.__value_keys, self.__ts_key)
+#            data = {
+#                ("__total__", ) : tuple((timeseries for timeseries in self.__data.values()))
+#            }
+#        # make sure every timeserie under each subkey has the same
+#        # length
+#        for subkey in data:
+#            try:
+#                assert all((len(data[subkey][index]) == len(data[subkey][0]) for index in range(len(data[subkey]))))
+#            except AssertionError:
+#                raise StandardError("UnusableDataError Data is not groupable, datalength of timeseries differ")
+#        self.__aggregate_timeseries(new_tsa, data, self.group_funcs[group_func_name])
+#        return new_tsa
 
-        return grouped TimeseriesArray from self
+#    def __inflate_keys(self, subkeys):
+#        """
+#        subkeys <tuple> has to be a subset of self.headers
+#        group_by_func <func> to aggregate a series of values
+#        drift_range <float> amount of time in s
+#
+#        group given data by subkey, and use group_func to aggregate data
+#
+#        so this is a timeseries, there could be a tiny gap of timestamp
+#        on grouping values, following rules apply to this behaviour
+#
+#        the first timestamp counts
+#        timestamps in rnge of +/- drift_range count as the same timestamp
+#        """
+#        # aggregate multiple n-Timeseries for unique keys, to a subset
+#        # of the unique key. the list of timeseries object has to be
+#        # aggregated afterwards, to get a new TimeseriesArray
+#        # inflate keys
+#        ret_data = {}
+#        for key, timeseries in self.__data.items():
+#            #logging.debug("working on timeseries for key %s", key)
+#            index_dict = self.get_index_dict(key)
+#            #logging.debug("index keys of this timeseries object %s", index_dict)
+#            new_key_values = []
+#            for index_key, index_value in index_dict.items():
+#                if index_key in subkeys:
+#                    new_key_values.append(index_value)
+#            new_key_values = tuple(new_key_values)
+#            #logging.debug("created new subkey %s", new_key_values)
+#            # add up timeseries to list of this key
+#            if new_key_values in ret_data:
+#                ret_data[new_key_values].append(timeseries)
+#            else:
+#                ret_data[new_key_values] = [timeseries, ]
+#        # aggregate timeseries objects with group_by_func
+#        return ret_data
 
-        returns <TimeseriesArray>
-        """
-        assert group_func_name in self.group_funcs.keys()
-        # TODO: make sure this object can be aggrgated
-        # have alle series, the same row, the same column width and so
-        # on
-        new_tsa = None
-        data = None
-        if len(subkeys) > 0:
-            for subkey in subkeys:
-                try:
-                    assert subkey in self.__index_keys
-                except AssertionError as exc:
-                    logging.error("subkey %s not in headers list of this TimeseriesArray %s", subkey, self.__index_keys)
-                    raise exc
-            new_tsa = TimeseriesArray(subkeys, self.__value_keys, self.__ts_key)
-            data = self.__inflate_keys(subkeys)
-        else:
-            logging.debug("__total__ aggregation of all timeseries objects into one single Timeseries")
-            new_tsa = TimeseriesArray(("__total__", ), self.__value_keys, self.__ts_key)
-            data = {
-                ("__total__", ) : tuple((timeseries for timeseries in self.__data.values()))
-            }
-        # make sure every timeserie under each subkey has the same
-        # length
-        for subkey in data:
-            try:
-                assert all((len(data[subkey][index]) == len(data[subkey][0]) for index in range(len(data[subkey]))))
-            except AssertionError:
-                raise StandardError("UnusableDataError Data is not groupable, datalength of timeseries differ")
-        self.__aggregate_timeseries(new_tsa, data, self.group_funcs[group_func_name])
-        return new_tsa
-
-    def __inflate_keys(self, subkeys):
-        """
-        subkeys <tuple> has to be a subset of self.headers
-        group_by_func <func> to aggregate a series of values
-        drift_range <float> amount of time in s
-
-        group given data by subkey, and use group_func to aggregate data
-
-        so this is a timeseries, there could be a tiny gap of timestamp
-        on grouping values, following rules apply to this behaviour
-
-        the first timestamp counts
-        timestamps in rnge of +/- drift_range count as the same timestamp
-        """
-        # aggregate multiple n-Timeseries for unique keys, to a subset
-        # of the unique key. the list of timeseries object has to be
-        # aggregated afterwards, to get a new TimeseriesArray
-        # inflate keys
-        ret_data = {}
-        for key, timeseries in self.__data.items():
-            #logging.debug("working on timeseries for key %s", key)
-            index_dict = self.get_index_dict(key)
-            #logging.debug("index keys of this timeseries object %s", index_dict)
-            new_key_values = []
-            for index_key, index_value in index_dict.items():
-                if index_key in subkeys:
-                    new_key_values.append(index_value)
-            new_key_values = tuple(new_key_values)
-            #logging.debug("created new subkey %s", new_key_values)
-            # add up timeseries to list of this key
-            if new_key_values in ret_data:
-                ret_data[new_key_values].append(timeseries)
-            else:
-                ret_data[new_key_values] = [timeseries, ]
-        # aggregate timeseries objects with group_by_func
-        return ret_data
-
-    @staticmethod
-    def __aggregate_timeseries(tsa, data, group_func):
-        """
-        tsa <TimeseriesArray> usually empty
-        data <dict> { tuple of timeseries }  data structure as returned by __inflate_keys
-        group_func <func> function which takes tuple and returns single value
-
-        this method aggregates data into tsa and uses group_func to aggragte timeseries objects
-
-        modifies given tsa object
-        """
-        new_value_keys = list(tsa.value_keys) # TODO create new list, not reference
-        new_value_keys.append("group_count")
-        for subkey in data.keys():
-            #logging.debug("working on subkey %s, there are %s timeseries to aggregate", subkey, len(data[subkey]))
-            cols = len(data[subkey][0][0]) # as much columns
-            #logging.debug("there are %d columns in every timeseries", cols)
-            rows = len(data[subkey][0])
-            #logging.debug("there are %d rows in every timeseries", rows)
-            timeserie = Timeseries(new_value_keys)
-            for rownum in range(rows):
-                # define new array, beginning with ts from first timeseries,
-                # first row
-                row_ts = data[subkey][0][rownum][0]
-                rowdata = []
-                for colnum in range(1, cols):
-                    try:
-                        series = tuple((ts[rownum][colnum] for ts in data[subkey]))
-                        rowdata.append(group_func(series))
-                    except IndexError as exc:
-                        logging.exception(exc)
-                        logging.error("Timeseries Format Error, series must be skipped")
-                if len(rowdata) > 0:
-                    rowdata.append(len(data[subkey]))
-                    timeserie.add(row_ts, tuple(rowdata))
-            assert len(rowdata) == len(new_value_keys)
-            tsa.append(subkey, timeserie)
-
-    def sanitize(self, drift=0.05):
-        """
-        parameters:
-
-        drift <float> defaults to 0.05 and means 5% drift from mean values are allowed
-
-        checks if data is in accurate shape to be grouped
-        - data has to start at nearly the same timestamp
-        - data has to end at nearly the same timestamp
-        - Timeseries has to be the same length
-        - the time interval between two consecutive values has to be
-          nearly the same
-
-        when i speak from nearly, it means +/- about <drift>%
-        """
-        avg_len = numpy.median(tuple((len(timeseries) for timeseries in self.__data.values())))
-        std_len = numpy.std(tuple((len(timeseries) for timeseries in self.__data.values())))
-        logging.info("Average length of stored timeseries: %s", avg_len)
-        logging.info("Standard deviation of length       : %s (should be near 0.0)", std_len)
-        for key, timeseries in self.__data.items():
-            if not len(timeseries) == int(avg_len):
-                logging.info(" timeseries with key %s with len %s has not the average data length of %s", key, len(timeseries), avg_len)
-                logging.error("deleting key %s: data length difference to high", key)
-                del self.__data[key]
-        avg_start_ts = numpy.mean(tuple((timeseries[0][0] for timeseries in self.__data.values())))
-        logging.info("average start_ts of all timeseries: %s", avg_start_ts)
-        for key, timeseries in self.__data.items():
-            if not is_near(timeseries[0][0], avg_start_ts, drift):
-                logging.info("%s start_ts of %s differs more than 5 percent", key, timeseries[0][0])
-                logging.error("deleting key %s: start_ts difference to high", key)
-                del self.__data[key]
-        avg_stop_ts = numpy.mean(tuple((timeseries[-1][0] for timeseries in self.__data.values())))
-        logging.info("average stop_ts of all timeseries: %s", avg_stop_ts)
-        for key, timeseries in self.__data.items():
-            if not is_near(timeseries[-1][0], avg_stop_ts, drift):
-                logging.info("%s stop_ts of %s differs more than 5 percent", key, timeseries[-1][0])
-                logging.error("deleting key %s: stop_ts difference to high", key)
-                del self.__data[key]
-        avg_interval = sum((timeseries.get_interval() for timeseries in self.__data.values())) / len(self.__data)
-        std_interval = numpy.std(tuple((timeseries.get_interval() for timeseries in self.__data.values())))
-        logging.info("Average interval stored timeseries : %s", avg_interval)
-        logging.info("Standard deviation of interval     : %s (should be near 0.0)", std_interval)
-        for key, timeseries in self.__data.items():
-            if not is_near(timeseries.get_interval(), avg_interval, drift):
-                logging.info(" timeseries with key %s with interval %s has not the average data interval of %s", key, timeseries.get_interval(), avg_interval)
-                logging.error("deleting key %s: interval difference to high", key)
-                del self.__data[key]
+#    @staticmethod
+#    def __aggregate_timeseries(tsa, data, group_func):
+#        """
+#        tsa <TimeseriesArray> usually empty
+#        data <dict> { tuple of timeseries }  data structure as returned by __inflate_keys
+#        group_func <func> function which takes tuple and returns single value
+#
+#        this method aggregates data into tsa and uses group_func to aggragte timeseries objects
+#
+#        modifies given tsa object
+#        """
+#        new_value_keys = list(tsa.value_keys) # TODO create new list, not reference
+#        new_value_keys.append("group_count")
+#        for subkey in data.keys():
+#            #logging.debug("working on subkey %s, there are %s timeseries to aggregate", subkey, len(data[subkey]))
+#            cols = len(data[subkey][0][0]) # as much columns
+#            #logging.debug("there are %d columns in every timeseries", cols)
+#            rows = len(data[subkey][0])
+#            #logging.debug("there are %d rows in every timeseries", rows)
+#            timeserie = Timeseries(new_value_keys)
+#            for rownum in range(rows):
+#                # define new array, beginning with ts from first timeseries,
+#                # first row
+#                row_ts = data[subkey][0][rownum][0]
+#                rowdata = []
+#                for colnum in range(1, cols):
+#                    try:
+#                        series = tuple((ts[rownum][colnum] for ts in data[subkey]))
+#                        rowdata.append(group_func(series))
+#                    except IndexError as exc:
+#                        logging.exception(exc)
+#                        logging.error("Timeseries Format Error, series must be skipped")
+#                if len(rowdata) > 0:
+#                    rowdata.append(len(data[subkey]))
+#                    timeserie.add(row_ts, tuple(rowdata))
+#            assert len(rowdata) == len(new_value_keys)
+#            tsa.append(subkey, timeserie)
+#
+#    def sanitize(self, drift=0.05):
+#        """
+#        parameters:
+#
+#        drift <float> defaults to 0.05 and means 5% drift from mean values are allowed
+#
+#        checks if data is in accurate shape to be grouped
+#        - data has to start at nearly the same timestamp
+#        - data has to end at nearly the same timestamp
+#        - Timeseries has to be the same length
+#        - the time interval between two consecutive values has to be
+#          nearly the same
+#
+#        when i speak from nearly, it means +/- about <drift>%
+#        """
+#        avg_len = numpy.median(tuple((len(timeseries) for timeseries in self.__data.values())))
+#        std_len = numpy.std(tuple((len(timeseries) for timeseries in self.__data.values())))
+#        logging.info("Average length of stored timeseries: %s", avg_len)
+#        logging.info("Standard deviation of length       : %s (should be near 0.0)", std_len)
+#        for key, timeseries in self.__data.items():
+#            if not len(timeseries) == int(avg_len):
+#                logging.info(" timeseries with key %s with len %s has not the average data length of %s", key, len(timeseries), avg_len)
+#                logging.error("deleting key %s: data length difference to high", key)
+#                del self.__data[key]
+#        avg_start_ts = numpy.mean(tuple((timeseries[0][0] for timeseries in self.__data.values())))
+#        logging.info("average start_ts of all timeseries: %s", avg_start_ts)
+#        for key, timeseries in self.__data.items():
+#            if not is_near(timeseries[0][0], avg_start_ts, drift):
+#                logging.info("%s start_ts of %s differs more than 5 percent", key, timeseries[0][0])
+#                logging.error("deleting key %s: start_ts difference to high", key)
+#                del self.__data[key]
+#        avg_stop_ts = numpy.mean(tuple((timeseries[-1][0] for timeseries in self.__data.values())))
+#        logging.info("average stop_ts of all timeseries: %s", avg_stop_ts)
+#        for key, timeseries in self.__data.items():
+#            if not is_near(timeseries[-1][0], avg_stop_ts, drift):
+#                logging.info("%s stop_ts of %s differs more than 5 percent", key, timeseries[-1][0])
+#                logging.error("deleting key %s: stop_ts difference to high", key)
+#                del self.__data[key]
+#        avg_interval = sum((timeseries.get_interval() for timeseries in self.__data.values())) / len(self.__data)
+#        std_interval = numpy.std(tuple((timeseries.get_interval() for timeseries in self.__data.values())))
+#        logging.info("Average interval stored timeseries : %s", avg_interval)
+#        logging.info("Standard deviation of interval     : %s (should be near 0.0)", std_interval)
+#        for key, timeseries in self.__data.items():
+#            if not is_near(timeseries.get_interval(), avg_interval, drift):
+#                logging.info(" timeseries with key %s with interval %s has not the average data interval of %s", key, timeseries.get_interval(), avg_interval)
+#                logging.error("deleting key %s: interval difference to high", key)
+#                del self.__data[key]
 
     def export(self):
         """

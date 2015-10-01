@@ -42,8 +42,6 @@ def report(datalogger, datestring):
             del(tsa[key])
     tsa.add_calc_col_full("hrStorageSizeUsage", calc_hrStorageSizeUsage)
     tsa.add_per_s_col("hrStorageUsed", "hrStorageUsed_s")
-    # get rid of unusable data
-    tsa.sanitize()
     # for grouped reports, reduce number of cols
     tsa_grouped = tsa.slice(('hrStorageUsed_s', ))
     standard_wiki_report(datalogger, datestring, tsa, tsa_grouped)
@@ -66,8 +64,6 @@ def report_ram(datalogger, datestring):
     tsa.remove_col(u"hrStorageSize")
     tsa.remove_col(u"hrStorageUsed")
     tsa.remove_col(u"hrStorageAllocationUnits")
-    # get rid of unusable data
-    tsa.sanitize()
     # for grouped reports, reduce number of cols
     tsa_grouped = tsa.slice(('hrStorageFreeKb', ))
     standard_wiki_report(datalogger, datestring, tsa, tsa_grouped, wikiname="DataLoggerReportHrStorageTableRAM")

@@ -334,11 +334,7 @@ function draw_longtime(canvas, title, data, max) {
             text: title 
         },
         xAxis: {
-            type: 'date',
-            dateTimeLabelFormats: { // don't display the dummy year
-                month: '%e. %b',
-                year: '%b'
-            },
+            type: 'category',
             title: {
                 text: 'Date'
             }

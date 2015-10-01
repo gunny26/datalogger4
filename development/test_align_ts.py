@@ -8,40 +8,77 @@ import logging
 logging.basicConfig(level=logging.INFO)
 from datalogger import DataLogger as DataLogger
 from datalogger import TimeseriesArray as TimeseriesArray
+from datalogger import Timeseries as Timeseries
 from commons import *
 
-def get_slot_timeline(datestring, slotlength):
-    start_ts, stop_ts = datalogger.get_ts_for_datestring(datestring)
-    timeline = []
-    while start_ts < stop_ts:
-        timeline.append(start_ts)
-        start_ts += slotlength
-    return tuple(timeline)
+#def __get_slot_timeline(datestring, slotlength):
+#    start_ts, stop_ts = datalogger.get_ts_for_datestring(datestring)
+#    start_ts = start_ts
+#    stop_ts = stop_ts
+#    timeline = []
+#    while start_ts < stop_ts:
+#        timeline.append(start_ts)
+#        start_ts += slotlength
+#    return tuple(timeline)
 
-def gen_align_timestamp(datestring, slotlength):
-    """
-    generator for align_timestamp
-    performance boost about 100% over old fashioned way
-    """
-    start_ts, stop_ts = datalogger.get_ts_for_datestring(datestring)
-    def align_timestamp(timestamp):
-        nearest_slot = round((timestamp-start_ts) / slotlength)
-        nearest_timestamp = start_ts + nearest_slot * slotlength
-        return int(nearest_timestamp)
-    return align_timestamp
+#def __gen_align_timestamp(datestring, slotlength):
+#    """
+#    generator for align_timestamp
+#    performance boost about 100% over old fashioned way
+#    """
+#    start_ts, stop_ts = datalogger.get_ts_for_datestring(datestring)
+#    def align_timestamp(timestamp):
+#        nearest_slot = round((timestamp - start_ts) / slotlength)
+#        nearest_timestamp = int(start_ts + nearest_slot * slotlength)
+#        return nearest_timestamp
+#    return align_timestamp
 
-def dump_and_align(tsa, slotlength):
+#def __dump_and_align(tsa, slotlength):
+#    """
+#    dump timeseries with aligned timestamps
+#    """
+#    align_timestamp = __gen_align_timestamp(datestring, slotlength)
+#    ts_keyname = tsa.ts_key
+#    for data in tsa.export():
+#        # correct timestamp
+#        data[ts_keyname] = align_timestamp(data[ts_keyname])
+#        yield data
+
+def group_by_local(tsa, datestring, subkeys, group_func, slotlength):
     """
-    dump timeseries with aligned timestamps
+    group given tsa by subkeys, and use group_func to aggregate data
+    first all Timeseries will be aligned in time, got get proper points in time
+
+    parameters:
+    tsa <TimeseriesArray>
+    subkey <tuple> could also be empty, to aggregate everything
+    group_func <func>
+    slotlength <int>
+
+    returns:
+    <TimeseriesArray>
     """
-    align_timestamp = gen_align_timestamp(datestring, slotlength)
+    starttime = time.time()
+    # intermediated tsa
+    tsa2 = TimeseriesArray(index_keys=subkeys, value_keys=tsa.value_keys, ts_key=tsa.ts_key)
+    start_ts, stop_ts = datalogger.get_ts_for_datestring(datestring)
+    #align_timestamp = __gen_align_timestamp(datestring, slotlength)
     ts_keyname = tsa.ts_key
-    for row in tsa.export():
-        before = row[ts_keyname]
-        newrow = copy.copy(row)
-        newrow[ts_keyname] = align_timestamp(before)
-        #print "correcting %f -> %f" % (before, row[ts_keyname])
-        yield newrow
+    for data in tsa.export():
+        # align timestamo
+        nearest_slot = round((data[ts_keyname] - start_ts) / slotlength)
+        data[ts_keyname] = int(start_ts + nearest_slot * slotlength)
+        #data[ts_keyname] = align_timestamp(data[ts_keyname])
+        tsa2.group_add(data, group_func)
+    print("Duration : %f" % (time.time() - starttime))
+    #print("standardized Timeseries")
+    #print(tsa2[tsa2.keys()[0]])
+    #print("Grouping into one single timeseries")
+    # group by hostname
+    #tsa3 = TimeseriesArray(index_keys=subkeys, value_keys=tsa.value_keys, ts_key=tsa.ts_key)
+    #for data in tsa2.export():
+    #    tsa3.group_add(data, group_func)
+    return tsa2
 
 def read_tsa_full_aligned(datestring, slotlength):
     """
@@ -49,40 +86,24 @@ def read_tsa_full_aligned(datestring, slotlength):
     used to aggregate this data afterwards
     """
     tsa = datalogger.load_tsa(datestring)
+    # strip down to only one timeseries
+    #for key in tsa.keys()[1:]:
+    #    del tsa[key]
     key = tsa.keys()[0]
-    tsa2 = TimeseriesArray(tsa.index_keys, tsa.value_keys, tsa.ts_key)
     print(key)
-    print("old times")
+    print("original Timeseries")
     print(tsa[key])
-    for data in dump_and_align(tsa, slotlength):
-        tsa2.add(data)
-    print("new times")
-    print(gc.get_referrers(tsa))
-    print(gc.get_referrers(tsa2))
-    print(tsa2[key]["ts"])
-    assert tsa[key] == tsa2[key]
-    assert all(key in tsa2.keys() for key in tsa.keys())
-    assert len(tsa) == len(tsa2)
-    return tsa2
-
-def report(datalogger, datestring):
-    # get data, from datalogger, or dataloggerhelper
-    tsa = read_tsa_full_aligned(datestring, 600)
-    #keys = tsa.keys()
-    #for slottime in get_slot_timeline(datestring, 600):
-    #    print(slottime)
-        #print tuple((tsa[key].get_single_value(slottime, 'hrStorageAllocationFailures') for key in keys))
-    #return
-
+    tsa3 = datalogger.group_by(datestring, tsa, (), lambda a,b: (a + b) / 2, slotlength)
+    print(tsa3.keys()[0])
+    print(tsa3[tsa3.keys()[0]])
 
 def main():
-    report(datalogger, datestring)
-    #report_ram(datalogger, datestring)
+    read_tsa_full_aligned(datestring, slotlength=600)
 
 if __name__ == "__main__":
     project = "snmp"
     tablename = "hrStorageTable"
     datalogger = DataLogger(BASEDIR, project, tablename)
     datestring = get_last_business_day_datestring()
-    #main()
-    cProfile.run("main()")
+    main()
+    #cProfile.run("main()")

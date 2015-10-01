@@ -206,7 +206,7 @@ function getData() {
     ticker("Fetching data, this could last for some time, if this is the first request");
     $.getJSON(url).then(function(data) {
         console.log("Drawing to actual_container = #" + actual_container);
-        title = "Datum :"+datestring+"<br>, Project:"+project+", Tablename: "+tablename+"<br>, key:" + keys + ", values:" + JSON.stringify(selected);
+        title = project + "/" + tablename + "<br>" + datestring + "<br>Filters " + keys + "<br>Values " + JSON.stringify(selected);
         draw_longtime(actual_container, title, data, yAxisMax);
         ticker("Got data, finished, maybe you select another one?");
     });

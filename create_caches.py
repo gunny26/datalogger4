@@ -41,7 +41,6 @@ def worker():
                 continue
             worklist.task_done()
             continue
-            tsa.sanitize()
             tsastat = TimeseriesArrayStats(tsa)
             logging.error("creating grouped caches")
             # group by every index_keyname, use sum group function

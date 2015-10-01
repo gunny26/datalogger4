@@ -7,8 +7,6 @@ from commons import *
 def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
     tsa = datalogger.load_tsa(datestring)
-    # sanitize data
-    tsa.sanitize()
     tsa_grouped = tsa.slice(('cpu.used.summation', ))
     standard_wiki_report(datalogger, datestring, tsa, tsa_grouped)
 

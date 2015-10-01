@@ -105,6 +105,7 @@ class DataLogger(object):
         self.__value_keynames = tuple(meta["value_keynames"])
         self.__index_keynames = tuple(meta["index_keynames"])
         self.__blacklist = tuple(meta["blacklist"])
+        self.__interval = meta["interval"]
         # make some assertions
         # every index_keyname has to be in headers
         assert all((key in self.__headers for key in self.__index_keynames))
@@ -330,17 +331,11 @@ class DataLogger(object):
 
         you can use the return values to simple call reading function as <func>(*<tuple>)
         """
-        try:
-            self.__get_raw_filename(datestring) # raises exception if no file was found
-        except DataLoggerRawFileMissing:
-            raise
-        except StandardError as exc:
-            logging.exception(exc)
-            raise StandardError("No RAW Input File, so no caches")
         caches = {
             "tsa" : {
                 "pattern" : "tsa_*.json",
                 "keys" : {},
+                "raw" : None,
             },
             "ts" : {
                 "pattern" : "ts_*.csv.gz",
@@ -355,6 +350,13 @@ class DataLogger(object):
                 "keys" : {},
             }
         }
+        try:
+            caches["tsa"]["raw"] = self.__get_raw_filename(datestring) # raises exception if no file was found
+        except DataLoggerRawFileMissing:
+            return caches
+        except StandardError as exc:
+            logging.exception(exc)
+            raise
         for cachetype in caches.keys():
             file_pattern = os.path.join(self.__get_cachedir(datestring), caches[cachetype]["pattern"])
             for abs_filename in glob.glob(file_pattern):
@@ -553,6 +555,32 @@ class DataLogger(object):
                 raise exc
         return tsa
     read_day = load_tsa_raw
+
+    def group_by(self, datestring, tsa, subkeys, group_func):
+        """
+        group given tsa by subkeys, and use group_func to aggregate data
+        first all Timeseries will be aligned in time, to get proper points in timeline
+
+        parameters:
+        tsa <TimeseriesArray>
+        subkey <tuple> could also be empty, to aggregate everything
+        group_func <func> like lambda a,b : (a+b)/2 to get averages
+        slotlength <int> interval in seconds to correct every timeseries to
+
+        returns:
+        <TimeseriesArray>
+        """
+        # intermediated tsa
+        tsa2 = TimeseriesArray(index_keys=subkeys, value_keys=tsa.value_keys, ts_key=tsa.ts_key)
+        start_ts, _ = self.get_ts_for_datestring(datestring)
+        ts_keyname = tsa.ts_key
+        for data in tsa.export():
+            # align timestamp
+            nearest_slot = round((data[ts_keyname] - start_ts) / self.__interval)
+            data[ts_keyname] = int(start_ts + nearest_slot * self.__interval)
+            #data[ts_keyname] = align_timestamp(data[ts_keyname])
+            tsa2.group_add(data, group_func)
+        return tsa2
 
     def get_wikiname(self):
         """

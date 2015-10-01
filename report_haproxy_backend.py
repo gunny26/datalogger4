@@ -7,8 +7,6 @@ from commons import *
 def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
     tsa = datalogger.load_tsa(datestring)
-    # sanitize data
-    tsa.sanitize()
     tsa.add_per_s_col('bin', 'bin_s')
     tsa.add_per_s_col('bout', 'bout_s')
     tsa.remove_col('bin')

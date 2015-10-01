@@ -9,7 +9,6 @@ from commons import *
 def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
     tsa = datalogger.load_tsa(datestring)
-    tsa.sanitize()
     tsa_grouped = tsa.slice(('net.received.average', 'net.transmitted.average'))
     standard_wiki_report(datalogger, datestring, tsa, tsa_grouped)
 

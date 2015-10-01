@@ -20,8 +20,8 @@ def get_header(datalogger):
 def get_report_infos(datalogger, tsa):
     wikitext = ""
     wikitext += "---++ Informations\n"
-    wikitext += "| earliest timestamp found | %s |\n"  % datetime.datetime.fromtimestamp(tsa.get_first_ts())
-    wikitext += "| latest timestamp found | %s |\n"  % datetime.datetime.fromtimestamp(tsa.get_last_ts())
+    #wikitext += "| earliest timestamp found | %s |\n"  % datetime.datetime.fromtimestamp(tsa.get_first_ts())
+    #wikitext += "| latest timestamp found | %s |\n"  % datetime.datetime.fromtimestamp(tsa.get_last_ts())
     wikitext += "| Project | %s |\n" % datalogger.project
     wikitext += "| Tablename | %s |\n" % datalogger.tablename
     wikitext += "| Number of unique keys found | %s |\n" % len(tsa)
@@ -38,34 +38,36 @@ def get_ungrouped_stats(datalogger, tsa, keyfunc):
     wikitext = ""
     wikitext += "---+ Ungrouped-Data Statistics\n"
     wikitext += "Here are some statistical breakdowns for every index combination\n"
-    for value_key in tsa.get_value_keys():
+    for value_key in tsa.value_keys:
         wikitext += "---++ %s Statistics of %s\n" % (datalogger.tablename, value_key)
         tsa_stats = TimeseriesArrayStats(tsa)
         stat_dict = tsa_stats.get_stats(value_key)
         wikitext += get_wiki_dict_table(stat_dict, keyfunc)
     return(wikitext)
 
-def get_grouped_stats(datalogger, tsa, keyfunc):
+def get_grouped_stats(datalogger, datestring, tsa, keyfunc):
     wikitext = ""
     wikitext += "---+ Grouped-Data Statistics\n"
     wikitext += "These statistics are grouped by some index_key, in sql something like select sum(value_key) from ... group by index_key\n"
-    for subkey in tsa.get_index_keys():
+    for subkey in tsa.index_keys:
         wikitext += "---++ Grouped by %s\n" % subkey
-        for value_key in tsa.get_value_keys():
+        for value_key in tsa.value_keys:
             wikitext += "---+++ %s Statistics of %s grouped by %s\n" % (datalogger.tablename, value_key, subkey)
             wikitext += "This table is grouped by %s field using %s\n" % (subkey, "lambda a: sum(a)")
-            grouped_tsa = tsa.get_group_by_tsa((subkey,), group_func=lambda a: sum(a))
+            #grouped_tsa = tsa.get_group_by_tsa((subkey,), group_func=lambda a: sum(a))
+            grouped_tsa = datalogger.group_by(datestring, tsa, (subkey,), group_func=lambda a, b : a + b)
             tsa_stats = TimeseriesArrayStats(grouped_tsa)
             wikitext += get_wiki_dict_table(tsa_stats.get_stats(value_key), keyfunc)
     return(wikitext)
 
-def get_total_stats(datalogger, tsa, keyfunc):
+def get_total_stats(datalogger, datestring, tsa, keyfunc):
     wikitext = ""
     wikitext += "---+ Total-Data Statistics\n"
-    for value_key in tsa.get_value_keys():
+    for value_key in tsa.value_keys:
         wikitext += "---++ %s Total Statistics of %s\n" % (datalogger.tablename, value_key)
         wikitext += "This table is a summation of all data for field using %s\n" % "lambda a: sum(a)"
-        grouped_tsa = tsa.get_group_by_tsa((), group_func=lambda a: sum(a))
+        # grouped_tsa = tsa.get_group_by_tsa((), group_func=lambda a: sum(a))
+        grouped_tsa = datalogger.group_by(datestring, tsa, (), group_func=lambda a,b : a + b)
         tsa_stats = TimeseriesArrayStats(grouped_tsa)
         wikitext += get_wiki_dict_table(tsa_stats.get_stats(value_key), keyfunc)
     return(wikitext)
@@ -79,12 +81,12 @@ def get_wiki_table(tsa, time_func, keyfunc):
     """
     wikitext = ""
     firstrow = True
-    index_keys = tsa.get_index_keys()
+    index_keys = tsa.index_keys
     tsa_stat = TimeseriesArrayStats(tsa)
     for key in tsa.keys():
         if len(tsa[key]) == 0: # skip empty timeseries objects
             continue
-        fields = sorted(tsa[key].get_headers()) # get exact this order of fields
+        fields = sorted(tsa[key].headers) # get exact this order of fields
         if firstrow is True:
             wikitext += "| " + " | ".join(("*%s*" % value for value in index_keys)) + " | " + " | ".join(("*%s*" % field for field in fields)) + " |\n"
             firstrow = False
@@ -177,9 +179,9 @@ def standard_wiki_report(datalogger, datestring, tsa, tsa_grouped, raw_stat_func
     # Un-Groupded Data
     wikitext += get_ungrouped_stats(datalogger, tsa_grouped, ungrouped_keyfuncgen(datalogger, datestring))
     # grouped Data
-    wikitext += get_grouped_stats(datalogger, tsa_grouped, keyfunc=lambda a: a)
+    wikitext += get_grouped_stats(datalogger, datestring, tsa_grouped, keyfunc=lambda a: a)
     # Totals
-    wikitext += get_total_stats(datalogger, tsa_grouped, keyfunc=lambda a: a)
+    wikitext += get_total_stats(datalogger, datestring, tsa_grouped, keyfunc=lambda a: a)
     if wikiname is None:
         wikiname = datalogger.get_wikiname()
     ws.send("Systembetrieb", wikiname, wikitext)

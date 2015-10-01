@@ -16,8 +16,6 @@ def report(datalogger, datestring):
     tsa.remove_col('fcIfC3OutOctets')
     tsa.remove_col('fcIfC3InFrames')
     tsa.remove_col('fcIfC3OutFrames')
-    # get rid of unusable data
-    tsa.sanitize()
     # for grouped reports, reduce number of cols
     tsa_grouped = tsa.slice(('fcIfC3InOctets_s', 'fcIfC3OutOctets_s'))
     standard_wiki_report(datalogger, datestring, tsa, tsa_grouped)

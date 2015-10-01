@@ -9,8 +9,6 @@ from commons import *
 def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
     tsa = datalogger.load_tsa(datestring)
-    # sanitize data
-    tsa.sanitize()
     tsa.add_per_s_col('req_tot', 'req_tot_s')
     tsa.remove_col('req_tot')
     tsa_grouped = tsa.slice(("req_tot_s", ))

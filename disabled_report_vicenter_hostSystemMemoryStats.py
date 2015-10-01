@@ -8,8 +8,6 @@ from commons import *
 
 def report(datalogger, datestring):
     tsa = datalogger.load_tsa(datestring)
-    # sanitize data
-    tsa.sanitize()
     tsa_grouped = tsa.slice(('mem.active.average', ))
     standard_wiki_report(datalogger, datestring, tsa, tsa_grouped)
 

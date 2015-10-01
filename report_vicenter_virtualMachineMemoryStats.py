@@ -13,7 +13,6 @@ def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
     tsa = datalogger.load_tsa(datestring)
     tsa.add_calc_col_full("mem.usage.pct", calc_mem_to_granted_usage)
-    tsa.sanitize()
     tsa_grouped = tsa.slice(("mem.active.average",))
     standard_wiki_report(datalogger, datestring, tsa, tsa_grouped, raw_stat_func="max")
 

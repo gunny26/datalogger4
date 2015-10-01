@@ -18,7 +18,6 @@ def report(datalogger, datestring):
     tsa.remove_col('vrsclKBWritten64')
     tsa.remove_col('vrsclSCSIReadCmd')
     tsa.remove_col('vrsclSCSIWriteCmd')
-    tsa.sanitize()
     tsa_grouped = tsa.slice(('vrsclKBRead64_s', 'vrsclKBWritten64_s'))
     standard_wiki_report(datalogger, datestring, tsa, tsa_grouped)
 

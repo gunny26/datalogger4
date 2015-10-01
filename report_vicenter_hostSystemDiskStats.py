@@ -9,7 +9,7 @@ def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
     tsa = datalogger.load_tsa(datestring)
     # sanitize data
-    tsa.sanitize()
+    #tsa.sanitize()
     #tsa_grouped = tsa.slice(("disk.totalWriteLatency.average", "disk.totalReadLatency.average"))
     tsa_grouped = tsa.slice(("disk.deviceWriteLatency.average", "disk.deviceReadLatency.average"))
     standard_wiki_report(datalogger, datestring, tsa, tsa_grouped)

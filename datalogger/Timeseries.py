@@ -29,6 +29,8 @@ class Timeseries(object):
         """
         self.__ts_keyname = unicode(ts_keyname)
         self.__headers = list([unicode(value) for value in headers]) # also the number of columns
+        self.__index = 0
+        self.__ts_index = {}
         # define new data
         self.data = []
 
@@ -115,7 +117,9 @@ class Timeseries(object):
         self[<int>row, <int>col] -> returns self.data[row][colnum] -> <float>
         self[<int>row, colname] -> returns self.data[row][index of colname in self.colnames] -> <float>
         """
-        if type(key) == tuple:
+        if isinstance(key, int):
+            return self.data[key]
+        elif isinstance(key, tuple):
             row, col = key
             rownum = None
             colnum = None
@@ -138,17 +142,16 @@ class Timeseries(object):
             return self.data[rownum][colnum]
         # if key is float
         elif isinstance(key, float):
-            for row in self.data:
-                if row[0] == key:
-                    return row
-            raise KeyError("Timstamp %f not found in dataset" % key)
+            try:
+                return self.data[self.__ts_index[key]]
+            except KeyError:
+                raise KeyError("Timstamp %f not found in dataset" % key)
         # if key is text
         elif isinstance(key, basestring):
             colnum = self.colnames.index(key)
             return tuple((row[colnum] for row in self.data))
         else:
-            raise KeyError("%s of type %s is no valid key", key, type(key))
-        return self.data[key]
+            raise KeyError("%s of type %s is no valid key" % (key, type(key)))
 
     def __str__headers(self, delimiter="\t"):
         """generates and returns column names string"""
@@ -193,6 +196,8 @@ class Timeseries(object):
         suppress_non_steady_ts <bool> show messages, if timestamp is not steadily increasing, or not
         """
         try:
+            assert isinstance(timestamp, float)
+            assert all((isinstance(value, float) for value in values))
             assert len(values) == len(self.__headers)
         except AssertionError as exc:
             raise DataFormatError("Values %s are not the same length as format specification %s" % (values, self.__headers))
@@ -204,12 +209,48 @@ class Timeseries(object):
         except AssertionError as exc:
             if not suppress_non_steady_ts:
                 logging.debug("timestamp %s is not steadily increasing, ignoring this dataset, last_ts=%s", timestamp, self.data[-1][0])
+        self.__add(timestamp, values)
+
+    def __add(self, timestamp, values):
         try:
-            self.data.append(array.array("f", (timestamp, ) + values))
+            #logging.error("timstamp : %s", timestamp)
+            row = [timestamp,  ] + list(values)
+            #logging.error("data_list : %s", ["%s(%s)" % (item, str(type(item))) for item in row])
+            #data = array.array("f")
+            #data.fromlist(data_list)
+            #logging.error("Data to append: %s", data)
+            self.data.append(row)
+            self.__ts_index[timestamp] = self.__index
+            self.__index += 1
         except TypeError as exc:
             logging.exception(exc)
             logging.error("ts : %s, values: %s", timestamp, values)
             raise DataFormatError("TypeError: some values are not of type <float>")
+
+    def group_add(self, timestamp, values, group_func):
+        """
+        function to add new data, and if data exists, aggregate existing data with new ones
+        if there is no existing data for this timestamp, simply call add()
+
+        parameters:
+        timestamp <float>
+        values <tuple> of <floats>
+        group_func <func> will be called with existing and new values
+        suppress_non_steady_ts <bool> if non steady timestamps will be reported
+
+        returns:
+        None
+        """
+        assert isinstance(timestamp, float)
+        if timestamp not in self.__ts_index:
+            #logging.error("first data")
+            self.__add(timestamp, values)
+        else:
+            timestamp = self.data[self.__ts_index[timestamp]][0]
+            old_data = self.data[self.__ts_index[timestamp]][1:]
+            #logging.error("timestamp %s aggregating new data %s to existing %s", timestamp, values, old_data)
+            new_data = tuple((group_func(old_data[index], float(values[index])) for index in range(len(values))))
+            self.data[self.__ts_index[timestamp]] = (timestamp, ) + new_data
 
     def __get_colnum(self, colname):
         """

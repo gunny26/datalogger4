@@ -9,7 +9,7 @@ from commons import *
 def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
     tsa = datalogger.load_tsa(datestring)
-    tsa = tsa.get_group_by_tsa(("hostname", "vrsrdVirResourceID"), group_func=lambda a: sum(a))
+    #tsa = tsa.get_group_by_tsa(("hostname", "vrsrdVirResourceID"), group_func=lambda a: sum(a))
     tsa.add_per_s_col('vrsrdKBRead64', 'vrsrdKBRead64_s')
     tsa.add_per_s_col('vrsrdKBWritten64', 'vrsrdKBWritten64_s')
     tsa.add_per_s_col('vrsrdSCSIReadCmd', 'vrsrdSCSIReadCmd_s')
@@ -18,7 +18,6 @@ def report(datalogger, datestring):
     tsa.remove_col('vrsrdKBWritten64')
     tsa.remove_col('vrsrdSCSIReadCmd')
     tsa.remove_col('vrsrdSCSIWriteCmd')
-    tsa.sanitize()
     #tsa.get_group_by_tsa((subkey,), group_func=lambda a: sum(a))
     tsa_grouped = tsa.slice(('vrsrdSCSIReadCmd_s', 'vrsrdSCSIWriteCmd_s'))
     standard_wiki_report(datalogger, datestring, tsa, tsa_grouped)

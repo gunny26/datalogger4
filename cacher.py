@@ -53,6 +53,9 @@ def worker():
         (project, tablename, datestring) = queue.get()
         logging.info("working on %s, %s, %s", datestring, project, tablename)
         datalogger = DataLogger(BASEDIR, project, tablename)
+        caches = datalogger.get_caches(datestring)
+        if caches["tsa"]["raw"] is None:
+            logging.info("Skipping, no input file available")
         try:
             datalogger[datestring]
             #report(datalogger, datestring)
@@ -65,7 +68,7 @@ if __name__ == "__main__":
     for project in DataLogger.get_projects(BASEDIR):
         for tablename in DataLogger.get_tablenames(BASEDIR, project):
             datalogger = DataLogger(BASEDIR, project, tablename)
-            for datestring in datewalker("2015-04-01", "2015-05-01"):
+            for datestring in datewalker("2015-09-29", "2015-09-30"):
                 queue.put((project, tablename, datestring))
     for threadid in range(32):
         t = threading.Thread(target=worker)
