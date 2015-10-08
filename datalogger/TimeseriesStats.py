@@ -10,7 +10,7 @@ def mean(data):
     n = len(data)
     if n < 1:
         raise ValueError('mean requires at least one data point')
-    return sum(data)/n # in Python 2 use sum(data)/float(n)
+    return sum(data)/float(n) # in Python 2 use sum(data)/float(n)
 
 def _ss(data):
     """Return sum of square deviations of sequence data."""
@@ -59,7 +59,7 @@ class TimeseriesStats(object):
         u"count" : lambda series: len(series),
         u"first" : lambda series: series[0],
         u"last" : lambda series: series[-1],
-        u"mean" : lambda series: geometric_mean(series),
+        u"mean" : lambda series: mean(series),
     }
 
     def __init__(self, timeseries):
@@ -126,6 +126,31 @@ class TimeseriesStats(object):
 
     def __getitem__(self, index):
         return self.__stats[index]
+
+    def __str__(self):
+        outbuffer = []
+        headers = [u"key", ] + self.stat_funcs.keys()
+        outbuffer.append("\t".join(headers))
+        for key in self.__stats.keys():
+            row = (key, ) + tuple(("%02f" % self.stats[key][funcname] for funcname in self.stat_funcs.keys()))
+            outbuffer.append("\t".join(row))
+        return "\n".join(outbuffer)
+
+    def htmltable(self):
+        outbuffer = []
+        outbuffer.append("<table>")
+        outbuffer.append("<tr><th>")
+        headers = [u"key", ] + self.stat_funcs.keys()
+        outbuffer.append("</th><th>".join(headers))
+        outbuffer.append("</th></tr>")
+        for key in self.__stats.keys():
+            row = (key, ) + tuple(("%0.2f" % self.stats[key][funcname] for funcname in self.stat_funcs.keys()))
+            outbuffer.append("<tr><td>")
+            outbuffer.append("</td><td>".join(row))
+            outbuffer.append("</td></tr>")
+        outbuffer.append("</table>")
+        return "\n".join(outbuffer)
+
 
     def keys(self):
         return self.__stats.keys()

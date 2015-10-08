@@ -344,6 +344,7 @@ class DataLoggerWeb(object):
         #logging.info(tsa.get_value_keys())
         # grouping stuff if necessary
         data = None # holds finally calculated data
+        stats = None
         if len(group_by) > 0:
             logging.info("generating new key for left possible keys in grouped tsa")
             key_dict = dict(zip(datalogger.index_keynames, keys))
@@ -354,14 +355,20 @@ class DataLoggerWeb(object):
             #new_tsa = tsa.get_group_by_tsa(group_by, group_func=lambda a: sum(a))
             tsa = new_tsa
             data = tsa[new_key].dump_dict()
+            stats = tsa[new_key].stats.htmltable()
         else:
             data = tsa[keys].dump_dict()
-        result = [] # holds return data
+            stats = tsa[keys].stats.htmltable()
+        result = {
+                "stats" : stats,
+                "data" : [],
+                }
+        # holds return data
         logging.info("data keys : %s", data[data.keys()[0]].keys())
         for value_key in value_keys:
             # ist important to sort by timestamp, to not confuse
             # highcharts
-            result.append(
+            result["data"].append(
                 {
                     "name" : value_key,
                     "data" : tuple(((ts * 1000, row_dict[value_key]) for ts, row_dict in sorted(data.items())))

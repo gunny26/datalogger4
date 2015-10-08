@@ -3,6 +3,7 @@
 """Module for class Timeseries"""
 #import array
 import logging
+from TimeseriesStats import TimeseriesStats as TimeseriesStats
 
 def datatype_percent(times, series):
     """
@@ -194,6 +195,11 @@ class Timeseries(object):
     def stop_ts(self):
         """return last recorded timestamp"""
         return self.data[-1][0]
+
+    @property
+    def stats(self):
+        """return TimeseriesStats"""
+        return TimeseriesStats(self)
 
     @property
     def interval(self):
