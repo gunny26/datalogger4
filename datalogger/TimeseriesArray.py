@@ -8,9 +8,10 @@ import base64
 import json
 import os
 import gzip
-import numpy
+#import numpy
 # own modules
 from Timeseries import Timeseries as Timeseries
+from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 
 
 def is_near(value, target_value, pct=0.05):
@@ -141,6 +142,12 @@ class TimeseriesArray(object):
     def ts_key(self):
         """keyname of timestamp"""
         return self.__ts_key
+
+    @property
+    def stats(self):
+        """return TimeseriesArrayStats from self"""
+        return TimeseriesArrayStats(self)
+
 
 #    @ts_key.setter
 #    def ts_key(self, value):

@@ -7,7 +7,10 @@ import cPickle
 import hashlib
 from datalogger import DataLoggerHelper as dh
 from datalogger import TimeseriesArrayStats as TimeseriesArrayStats
-import tilak_wiki
+try:
+    import tilak_wiki
+except ImportError:
+    pass
 
 BASEDIR = "/var/rrd"
 

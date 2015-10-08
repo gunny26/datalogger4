@@ -441,6 +441,9 @@ class DataLogger(object):
             tsa = self.load_tsa_raw(datestring, timedelta)
             tsa.dump_split(cachedir) # save full data
             tsa = TimeseriesArray.load_split(cachedir, self.__index_keynames, filterkeys)
+            # also generate statistics, so its done
+            tsastats = TimeseriesArrayStats(tsa) # generate full Stats
+            tsastats.dump(cachedir) # save
             return tsa
         if not os.path.isfile(cachefilename):
             logging.info("cachefile %s does not exist, fallback read from raw", cachefilename)
@@ -487,7 +490,7 @@ class DataLogger(object):
             """
             fallback method to use, if reading from cache data is not possible
             """
-            tsa = self.load_tsa(datestring=datestring, filterkeys=None, timedelta=timedelta) # load full tsa
+            tsa = self.load_tsa(datestring=datestring, filterkeys=None, timedelta=timedelta) # load full tsa, and generate statistics
             tsastats = TimeseriesArrayStats(tsa) # generate full Stats
             tsastats.dump(cachedir) # save
             tsastats = TimeseriesArrayStats.load(cachedir, self.__index_keynames, filterkeys=filterkeys) # read specific

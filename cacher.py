@@ -68,7 +68,7 @@ if __name__ == "__main__":
     for project in DataLogger.get_projects(BASEDIR):
         for tablename in DataLogger.get_tablenames(BASEDIR, project):
             datalogger = DataLogger(BASEDIR, project, tablename)
-            for datestring in datewalker("2015-09-29", "2015-09-30"):
+            for datestring in datewalker("2015-10-01", "2015-10-07"):
                 queue.put((project, tablename, datestring))
     for threadid in range(32):
         t = threading.Thread(target=worker)

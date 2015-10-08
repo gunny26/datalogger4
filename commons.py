@@ -5,9 +5,12 @@ import logging
 import os
 import cPickle
 import hashlib
-from tilak_datalogger import DataLoggerHelper as dh
-from tilak_datalogger import TimeseriesArrayStats as TimeseriesArrayStats
-import tilak_wiki
+from datalogger import DataLoggerHelper as dh
+from datalogger import TimeseriesArrayStats as TimeseriesArrayStats
+try:
+    import tilak_wiki
+except ImportError:
+    pass
 
 BASEDIR = "/var/rrd"
 

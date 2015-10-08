@@ -1,9 +1,47 @@
 #!/usr/bin/python
-import numpy
+#import numpy
 import json
 #from scipy import stats
 import logging
 
+
+def mean(data):
+    """Return the sample arithmetic mean of data."""
+    n = len(data)
+    if n < 1:
+        raise ValueError('mean requires at least one data point')
+    return sum(data)/n # in Python 2 use sum(data)/float(n)
+
+def _ss(data):
+    """Return sum of square deviations of sequence data."""
+    c = mean(data)
+    ss = sum((x-c)**2 for x in data)
+    return ss
+
+def pstdev(data):
+    """Calculates the population standard deviation."""
+    n = len(data)
+    if n < 2:
+        raise ValueError('variance requires at least two data points')
+    ss = _ss(data)
+    pvar = ss/n # the population variance
+    return pvar**0.5
+
+def median(data):
+    """Calculate median value of list"""
+    half = len(data) // 2
+    data.sort()
+    if not len(data) % 2:
+        return (data[half - 1] + data[half]) / 2.0
+    return data[half]
+
+def geometric_mean(nums):
+    '''
+        Return the geometric average of nums
+        @param    list    nums    List of nums to avg
+        @return   float   Geometric avg of nums
+    '''
+    return (reduce(lambda x, y: x*y, nums))**(1.0/len(nums))
 
 class TimeseriesStats(object):
     """
@@ -12,16 +50,16 @@ class TimeseriesStats(object):
     separated to cache statistics in own files
     """
     stat_funcs = {
-        u"min" : lambda series: numpy.min(series),
-        u"max" : lambda series: numpy.max(series),
-        u"avg" : lambda series: numpy.average(series),
-        u"sum" : lambda series: numpy.sum(series),
-        u"std" : lambda series: numpy.std(series),
-        u"median" : lambda series: numpy.median(series),
+        u"min" : lambda series: min(series),
+        u"max" : lambda series: max(series),
+        u"avg" : lambda series: mean(series),
+        u"sum" : lambda series: sum(series),
+        u"std" : lambda series: pstdev(series),
+        u"median" : lambda series: median(list(series)),
         u"count" : lambda series: len(series),
         u"first" : lambda series: series[0],
         u"last" : lambda series: series[-1],
-        u"mean" : lambda series: numpy.mean(series),
+        u"mean" : lambda series: geometric_mean(series),
     }
 
     def __init__(self, timeseries):

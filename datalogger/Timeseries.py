@@ -1,12 +1,138 @@
 #!/usr/bin/python
 # pylint: disable=line-too-long
 """Module for class Timeseries"""
-import array
+#import array
 import logging
+
+def datatype_percent(times, series):
+    """
+    returns series converted to datatype percent
+
+    ever value is calculated as percentage of max value in series
+
+    parameters:
+    series <tuple> of <float>
+
+    returns:
+    <tuple> of <float> percent between 0.0 and 1.0
+    """
+    max_value = max(series)
+    try:
+        new_series = tuple((value/max_value for value in series))
+        return new_series
+    except ZeroDivisionError:
+        return (0.0,) * len(series)
+
+def datatype_derive(times, series):
+    """
+    returns series converted to datatype derive
+    store only differeces between two subsequent values
+
+    parameters:
+    series <tuple> of <float>
+
+    returns:
+    <tuple> of <float>
+    """
+    new_series = [0.0, ]
+    for index in range(1, len(series)):
+        new_series.append(series[index] - series[index - 1])
+    return new_series
+
+def __datatype_counter(series, max_value):
+    """
+    generic counter datatype with parameterized max_value,
+    could be either 2^32, 2^64 or something completely different
+    do not use directly, use counter32, counter64 instead
+
+    parameters:
+    series <tuple> of <float>
+
+    returns:
+    <tuple> of <float>
+    """
+    new_series = [0.0, ]
+    for index in range(1, len(series)):
+        derive = series[index] - series[index - 1]
+        if derive < 0: # overflow detected
+            derive = max_value - series[index - 1] + series[index]
+        new_series.append(derive)
+    return new_series
+
+def datatype_counter32(times, series):
+    """
+    returns series converted to datatype counter32
+    counter32 will steadily increase until overflow at 2^32 occurs
+    stores only differences between to subsequent values
+
+    parameters:
+    series <tuple> of <float>
+
+    returns:
+    <tuple> of <float>
+    """
+    return __datatype_counter(series, 2^32)
+
+def datatype_counter64(times, series):
+    """
+    returns series converted to datatype counter64
+    counter64 will steadily increase until overflow at 2^64 occurs
+    stores only differences between to subsequent values
+
+    parameters:
+    series <tuple> of <float>
+
+    returns:
+    <tuple> of <float>
+    """
+    return __datatype_counter(series, 2^64)
+
+def datatype_persecond(times, series):
+    """
+    for counter which are steadily increasing, but will reset after restart
+    of some part of this system
+    eg. haproxy statistics counter which increases until restart, then begin by 0
+    There is naturally some data missing, from last value to next value after reset
+
+    parameters:
+    series <tuple> of <tuple>(ts:<float>, value:<float>)
+
+    returns:
+    <tuple> of <float>
+    """
+    new_series = [0.0, ]
+    for index in range(1, len(series)):
+        duration = times[index] - times[index - 1]
+        derive = (series[index] - series[index - 1])/duration
+        new_series.append(derive)
+    return new_series
+
+def datatype_counterreset(times, series):
+    """
+    for counter which are steadily increasing, but will reset after restart
+    of some part of this system
+    eg. haproxy statistics counter which increases until restart, then begin by 0
+    There is naturally some data missing, from last value to next value after reset
+
+    parameters:
+    series <tuple> of <tuple>(ts:<float>, value:<float>)
+
+    returns:
+    <tuple> of <float>
+    """
+    new_series = [0.0, ]
+    for index in range(1, len(series)):
+        derive = series[index] - series[index - 1]
+        if derive < 0.0:
+            derive = series[index]
+        new_series.append(derive)
+    return new_series
+
 
 class DataFormatError(StandardError):
     """raised if format does not match"""
     pass
+
 
 class Timeseries(object):
     """
@@ -432,6 +558,39 @@ class Timeseries(object):
             ret_data.add(row[0], tuple((row[self.__get_colnum(colname)] for colname in colnames)))
         return ret_data
 
+    def convert(self, colname, datatype, newcolname=None):
+        """
+        add derived column to colname
+        ts colname
+        t1 value1
+        t2 value2
+        ...
+
+        add these
+
+        ts colname colname_d
+        t1 value1  0
+        t2 value2  value2-value1
+        t3 value3  value3-value2
+        """
+        datatype_mapper = {
+            "derive" : datatype_derive,
+            "counter32" : datatype_counter32,
+            "counter64" : datatype_counter64,
+            "counterreset" : datatype_counterreset,
+            "percent" : datatype_percent,
+            "persecond" : datatype_persecond,
+        }
+        colnum = self.__get_colnum(colname)
+        times = [row[0] for row in self.data]
+        series = [row[colnum] for row in self.data]
+        newseries = datatype_mapper[datatype](times, series)
+        if newcolname is None: # ovrewrite existing column
+            self.remove_col(colname)
+            self.append(colname, newseries)
+        else:
+            self.append(newcolname, newseries)
+
     def add_derive_col(self, colname, colname_d):
         """
         add derived column to colname
@@ -547,6 +706,23 @@ class Timeseries(object):
         assert colnum <= len(self.data[0])
         for row in self.data:
             row.pop(colnum)
+
+    def append(self, colname, series):
+        """
+        append given series to internal data structure and give it the name colname
+
+        parameters:
+        colanme <str> must not be in headers
+        series <tuple> of <floats> must be the same length as existing data
+
+        returns:
+        None
+        """
+        assert colname not in self.__headers
+        assert len(series) == len(self.data)
+        for index in range(len(self.data)):
+            self.data[index].append(series[index])
+        self.__headers.append(colname)
 
     def dump(self, filehandle):
         """
