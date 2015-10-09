@@ -296,6 +296,12 @@ class TimeseriesArray(object):
                 logging.exception(exc)
         return ret_data
 
+    def convert(self, colname, datatype, newcolname=None):
+        """
+        call convert method of every stored Timeseries, with given parameter
+        """
+        [timeseries.convert(colname, datatype, newcolname) for timeseries in self.__data.values()]
+
     def add_derive_col(self, colname, newcolname):
         """
         add one to key to every Timeseries, for this specific colname

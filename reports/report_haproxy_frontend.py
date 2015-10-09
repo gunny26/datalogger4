@@ -9,9 +9,10 @@ from commons import *
 def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
     tsa = datalogger.load_tsa(datestring)
-    tsa.add_per_s_col('req_tot', 'req_tot_s')
-    tsa.remove_col('req_tot')
-    tsa_grouped = tsa.slice(("req_tot_s", ))
+    tsa.convert('req_tot', "persecond")
+    tsa.convert('bin', "counterreset")
+    tsa.convert('bout', "counterreset")
+    tsa_grouped = tsa.slice(("req_tot", ))
     standard_wiki_report(datalogger, datestring, tsa, tsa_grouped)
 
 def main():

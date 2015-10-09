@@ -5,6 +5,23 @@ table {
     width: 100%;
 }
 
+h1 {
+    font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
+    font-size: 1.3em;
+    background-color: #A7C942;
+    color: #ffffff;
+    margin: 10px;
+}
+
+h2 {
+    font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
+    font-size: 1.2em;
+    background-color: #A7C942;
+    color: #ffffff;
+    margin: 5px;
+}
+
+
 #stats {
     font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
     width: 100%;
