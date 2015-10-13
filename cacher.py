@@ -3,8 +3,8 @@ import cProfile
 import logging
 logging.basicConfig(level=logging.INFO)
 import datetime
-import threading
-import Queue
+import multiprocessing
+#import Queue
 from datalogger import DataLogger as DataLogger
 from datalogger import TimeseriesArray as TimeseriesArray
 from datalogger import TimeseriesArrayStats as TimeseriesArrayStats
@@ -61,18 +61,18 @@ def worker():
             #report(datalogger, datestring)
         except StandardError as exc:
             logging.error("Error on %s, %s, %s", datestring, project, tablename)
-        queue.task_done()
+        #queue.task_done()
 
-queue = Queue.Queue()
+queue = multiprocessing.Queue()
 if __name__ == "__main__":
     for project in DataLogger.get_projects(BASEDIR):
         for tablename in DataLogger.get_tablenames(BASEDIR, project):
             datalogger = DataLogger(BASEDIR, project, tablename)
-            for datestring in datewalker("2015-04-01", "2015-10-07"):
+            for datestring in datewalker("2015-09-01", "2015-10-01"):
                 queue.put((project, tablename, datestring))
-    for threadid in range(32):
-        t = threading.Thread(target=worker)
-        t.daemon = True
+    for threadid in range(16):
+        t = multiprocessing.Process(target=worker)
+        #t.daemon = True
         t.start()
     queue.join()
     logging.info("Ending")

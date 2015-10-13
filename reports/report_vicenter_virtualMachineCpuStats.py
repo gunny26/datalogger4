@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/pypy
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(levelname)s %(filename)s:%(funcName)s:%(lineno)s %(message)s')
 from datalogger import DataLogger as DataLogger
@@ -15,7 +15,6 @@ def main():
     tablename = "virtualMachineCpuStats"
     datalogger = DataLogger(BASEDIR, project, tablename)
     datestring = get_last_business_day_datestring()
-    # datastring = "2015-07-01"
     report(datalogger, datestring)
 
 if __name__ == "__main__":
