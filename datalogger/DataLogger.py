@@ -16,6 +16,7 @@ import base64
 # own modules
 from TimeseriesArray import TimeseriesArray as TimeseriesArray
 from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
+from Quantilles import QuantillesArray as QuantillesArray
 
 DEBUG = False
 
@@ -514,6 +515,28 @@ class DataLogger(object):
             logging.error("EOFError while reading from %s, using fallback", cachefilename)
             os.unlink(cachefilename)
             return fallback()
+
+    def load_quantilles(self, datestring):
+        """
+        retuns quantilles for this specific tsa, either load cache version,
+        or recreate from tsa
+
+        parameters:
+        datestring <str>
+
+        returns:
+        <QuantillesArray>
+        """
+        cachedir = self.__get_cachedir(datestring)
+        cachefilename = os.path.join(cachedir, "quantilles.json")
+        qa = None
+        if os.path.isfile(cachefilename):
+            qa = QuantillesArray.load(open(cachefilename, "rb"))
+        else:
+            tsa = self.load_tsa(datestring)
+            qa = QuantillesArray(tsa)
+            qa.dump(open(cachefilename, "wb"))
+        return qa
 
     @staticmethod
     def __decode_filename(filename):

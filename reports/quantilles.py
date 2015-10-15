@@ -9,27 +9,11 @@ from datalogger import QuantillesArray as QuantillesArray
 from commons import *
 
 def report(datalogger, datestring):
-    # get data, from datalogger, or dataloggerhelper
-    print "Loading data"
-    tsa = datalogger.load_tsa(datestring)
-    print "calculating quantilles"
-    # tsa_test = tsa.slice(("cpu.used.summation", ))
-    starttime = time.time()
-    qa = QuantillesArray(tsa)
-    print "Duration Quantilles: %f" % (time.time()-starttime)
-    starttime = time.time()
-    qa.dump(open("/tmp/test_quantilles.json", "wb"))
-    print "Duration dump: %f" % (time.time()-starttime)
-    starttime = time.time()
-    qa2 = QuantillesArray.load(open("/tmp/test_quantilles.json", "rb"))
-    print "Duration load: %f" % (time.time()-starttime)
-    assert qa == qa2
-    qa3 = datalogger.load_quantilles(datestring)
-    assert qa3 == qa
+    qa = datalogger.load_quantilles(datestring)
     print "Output"
-    print qa2[("srvarthur1.tilak.cc","0")]
+    print qa[("srvarthur1.tilak.cc","0")]
     #quantilles = Quantilles(tsa, "cpu.used.summation", maxx=None)
-    quantilles = qa2["cpu.used.summation"]
+    quantilles = qa["cpu.used.summation"]
     #quantilles = Quantilles(tsa, "datastore.read.average", maxx=None)
     quantilles.sort(2)
     print "most demanding CPU Cores"
