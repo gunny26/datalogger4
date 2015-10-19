@@ -5,8 +5,8 @@ import logging
 import os
 import cPickle
 import hashlib
-from tilak_datalogger import DataLoggerHelper as dh
-from tilak_datalogger import TimeseriesArrayStats as TimeseriesArrayStats
+from datalogger import DataLoggerHelper as dh
+from datalogger import TimeseriesArrayStats as TimeseriesArrayStats
 import tilak_wiki
 
 BASEDIR = "/var/rrd"

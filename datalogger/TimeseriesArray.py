@@ -8,7 +8,7 @@ import base64
 import json
 import os
 import gzip
-#import numpy
+# import numpy
 # own modules
 from Timeseries import Timeseries as Timeseries
 from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats

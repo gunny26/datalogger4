@@ -5,7 +5,6 @@ import json
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(levelname)s %(filename)s:%(funcName)s:%(lineno)s %(message)s')
 from datalogger import DataLogger as DataLogger
-from datalogger import CorrelationMatrixArray as CorrelationMatrixArray
 from commons import *
 
 def get_mse(series1, series2):
@@ -66,8 +65,29 @@ def get_mse_sorted_norm(series1, series2):
     mse /= len(series1)
     return mse
 
+def get_mse_sorted_norm_missing(series1, series2):
+    """
+    sorted and normalized
+    """
+    mse = 0.0
+    max_v = max(series1)
+    if max_v == 0.0:
+        # difference is equa series2
+        return sum((value * value for value in series2))/len(series1)
+    s1 = tuple((value/max_v for value in sorted(series1, reverse=True)))
+    s2 = tuple((value/max_v for value in sorted(series2, reverse=True)))
+    assert abs(len(s1) - len(s2)) / max(len(s1), len(s2)) < 0.1 # not more than 10% length difference
+    for index, data1 in enumerate(s1):
+        try:
+            diff = (data1 - s2[index])
+            mse += diff * diff
+        except IndexError:
+            break
+    mse /= len(series1)
+    return mse
 
-class CorrelationMatrixArray_local(object):
+
+class CorrelationMatrixArray(object):
 
     def __init__(self, tsa):
         self.__data = {}
@@ -104,10 +124,10 @@ class CorrelationMatrixArray_local(object):
         return cma
 
 
-class CorrelationMatrix_local(object):
+class CorrelationMatrixTime(object):
 
-    def __init__(self, tsa, value_key):
-        self.__data = self.__get_correlation_matrix(tsa, value_key)
+    def __init__(self, tsa1, tsa2, value_key):
+        self.__data = self.__get_correlation_matrix(tsa1, tsa2, value_key)
 
     @property
     def data(self):
@@ -123,34 +143,35 @@ class CorrelationMatrix_local(object):
         return False
 
     def __getitem__(self, key):
-        if isinstance(key, basestring):
-            return self.__data[key]
-        if isinstance(key, tuple):
-            return self.__data[key[0]][key[1]]
+        return self.__data[key]
 
     def keys(self):
         return self.__data.keys()
 
+    def values(self):
+        return self.__data.values()
+
+    def items(self):
+        return self.__data.items()
+
     @staticmethod
-    def __get_correlation_matrix(tsa, value_key):
+    def __get_correlation_matrix(tsa1, tsa2, value_key):
         """
         search for corelating series in all other series available
         """
         print "Searching for correlation in value_key %s)" % value_key
         matrix = {}
-        keylist = tsa.keys()[:20]
+        keylist = tsa1.keys()
         for key in keylist:
-            series = tsa[key][value_key]
-            matrix[key] = {}
-            for otherkey in keylist:
-                if otherkey not in matrix:
-                    matrix[otherkey] = {}
-                other = tsa[otherkey][value_key]
-                if len(series) == len(other):
-                    matrix[key][otherkey] = get_mse_sorted_norm(series, other)
-                    matrix[otherkey][key] = matrix[key][otherkey]
-                else:
-                    print "skipping, dataseries are not of same length"
+            other = None
+            try:
+                other = tsa2[key][value_key]
+            except KeyError:
+                print "key %s is not in older tsa, skipping" % str(key)
+                continue
+            series = tsa1[key][value_key]
+            matrix[key] = get_mse_sorted_norm_missing(series, other)
+            print key, matrix[key]
         return matrix
 
     def dumps(self):
@@ -162,31 +183,20 @@ class CorrelationMatrix_local(object):
         cm.__data = eval(json.loads(data))
         return cm
 
-
 def report(datalogger, datestring):
     # get data, from datalogger, or dataloggerhelper
+    print "loading data"
     starttime = time.time()
-    tsa = datalogger.load_tsa(datestring)
+    tsa1 = datalogger.load_tsa("2015-10-13")
+    tsa2 = datalogger.load_tsa("2015-10-06")
     print "Duration load %f" % (time.time() - starttime)
     starttime = time.time()
-    tsa3 = datalogger.group_by(datestring, tsa, ("hostname", ), lambda a,b: (a + b) / 2)
-    print "Duration group_by %f" % (time.time() - starttime)
-    starttime = time.time()
-    # tsa_test = tsa.slice(("cpu.used.summation", ))
-    cma = CorrelationMatrixArray(tsa3)
-    print "Duration CorrelationMatrix %f" % (time.time() - starttime)
-    starttime = time.time()
-    cma.dump(open("/tmp/correlation.json", "wb"))
-    cma2 = cma.load(open("/tmp/correlation.json", "rb"))
-    assert cma == cma2
-    cma3 = datalogger.load_correlationmatrix(datestring)
-    # matrix = get_correlating(tsa3, "cpu.used.summation")
-    matrix = cma3["cpu.used.summation"]
-    for key in matrix.keys():
-        print str(key) + "\t" + "\t".join(("%0.2f" % matrix[key, otherkey] for otherkey in matrix.keys()))
+    cm = CorrelationMatrixTime(tsa1, tsa2, "cpu.used.summation")
+    for key, coefficient in sorted(cm, key=lambda items: items[1]):
+        print key, coefficient
 
 def main():
-    project = "vdi"
+    project = "vicenter"
     tablename = "virtualMachineCpuStats"
     datalogger = DataLogger(BASEDIR, project, tablename)
     datestring = get_last_business_day_datestring()

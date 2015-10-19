@@ -17,6 +17,7 @@ import base64
 from TimeseriesArray import TimeseriesArray as TimeseriesArray
 from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 from Quantilles import QuantillesArray as QuantillesArray
+from CorrelationMatrix import CorrelationMatrixArray as CorrelationMatrixArray
 
 DEBUG = False
 
@@ -538,6 +539,28 @@ class DataLogger(object):
             qa.dump(open(cachefilename, "wb"))
         return qa
 
+    def load_correlationmatrix(self, datestring):
+        """
+        retuns quantilles for this specific tsa, either load cache version,
+        or recreate from tsa
+
+        parameters:
+        datestring <str>
+
+        returns:
+        <QuantillesArray>
+        """
+        cachedir = self.__get_cachedir(datestring)
+        cachefilename = os.path.join(cachedir, "correlationmatrix.json")
+        cma = None
+        if os.path.isfile(cachefilename):
+            cma = CorrelationMatrixArray.load(open(cachefilename, "rb"))
+        else:
+            tsa = self.load_tsa(datestring)
+            cma = CorrelationMatrixArray(tsa)
+            cma.dump(open(cachefilename, "wb"))
+        return cma
+
     @staticmethod
     def __decode_filename(filename):
         """
@@ -747,3 +770,17 @@ class DataLogger(object):
         """return available tablenames for projects, defined in datalogger.json"""
         data = json.load(open(os.path.join(basedir, "datalogger.json"), "rb"))
         return data[unicode(project)].keys()
+
+    @staticmethod
+    def get_yesterday_datestring():
+        return datetime.date.fromtimestamp(time.time() - 60 * 60 * 24).isoformat()
+
+    @staticmethod
+    def get_last_business_day_datestring():
+        """
+        returns last businessday datestring, ignoring Feiertage
+        """
+        last_business_day = datetime.date.today()
+        shift = datetime.timedelta(max(1,(last_business_day.weekday() + 6) % 7 - 3))
+        last_business_day = last_business_day - shift
+        return last_business_day.isoformat()

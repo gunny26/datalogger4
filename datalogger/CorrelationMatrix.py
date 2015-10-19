@@ -1,12 +1,6 @@
 #!/usr/bin/pypy
-import cProfile
-import time
 import json
 import logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(levelname)s %(filename)s:%(funcName)s:%(lineno)s %(message)s')
-from datalogger import DataLogger as DataLogger
-from datalogger import CorrelationMatrixArray as CorrelationMatrixArray
-from commons import *
 
 def get_mse(series1, series2):
     """
@@ -67,7 +61,7 @@ def get_mse_sorted_norm(series1, series2):
     return mse
 
 
-class CorrelationMatrixArray_local(object):
+class CorrelationMatrixArray(object):
 
     def __init__(self, tsa):
         self.__data = {}
@@ -104,7 +98,7 @@ class CorrelationMatrixArray_local(object):
         return cma
 
 
-class CorrelationMatrix_local(object):
+class CorrelationMatrix(object):
 
     def __init__(self, tsa, value_key):
         self.__data = self.__get_correlation_matrix(tsa, value_key)
@@ -123,10 +117,10 @@ class CorrelationMatrix_local(object):
         return False
 
     def __getitem__(self, key):
-        if isinstance(key, basestring):
-            return self.__data[key]
         if isinstance(key, tuple):
             return self.__data[key[0]][key[1]]
+        else:
+            return self.__data[key]
 
     def keys(self):
         return self.__data.keys()
@@ -138,19 +132,22 @@ class CorrelationMatrix_local(object):
         """
         print "Searching for correlation in value_key %s)" % value_key
         matrix = {}
-        keylist = tsa.keys()[:20]
+        keylist = tsa.keys()
         for key in keylist:
             series = tsa[key][value_key]
             matrix[key] = {}
             for otherkey in keylist:
-                if otherkey not in matrix:
-                    matrix[otherkey] = {}
-                other = tsa[otherkey][value_key]
-                if len(series) == len(other):
-                    matrix[key][otherkey] = get_mse_sorted_norm(series, other)
-                    matrix[otherkey][key] = matrix[key][otherkey]
-                else:
-                    print "skipping, dataseries are not of same length"
+                try:
+                    matrix[key][otherkey]
+                except KeyError:
+                    if otherkey not in matrix:
+                        matrix[otherkey] = {}
+                    other = tsa[otherkey][value_key]
+                    if len(series) == len(other):
+                        matrix[key][otherkey] = get_mse_sorted_norm(series, other)
+                        matrix[otherkey][key] = matrix[key][otherkey]
+                    else:
+                        print "skipping, dataseries are not of same length"
         return matrix
 
     def dumps(self):
@@ -161,37 +158,3 @@ class CorrelationMatrix_local(object):
         cm = CorrelationMatrix.__new__(CorrelationMatrix)
         cm.__data = eval(json.loads(data))
         return cm
-
-
-def report(datalogger, datestring):
-    # get data, from datalogger, or dataloggerhelper
-    starttime = time.time()
-    tsa = datalogger.load_tsa(datestring)
-    print "Duration load %f" % (time.time() - starttime)
-    starttime = time.time()
-    tsa3 = datalogger.group_by(datestring, tsa, ("hostname", ), lambda a,b: (a + b) / 2)
-    print "Duration group_by %f" % (time.time() - starttime)
-    starttime = time.time()
-    # tsa_test = tsa.slice(("cpu.used.summation", ))
-    cma = CorrelationMatrixArray(tsa3)
-    print "Duration CorrelationMatrix %f" % (time.time() - starttime)
-    starttime = time.time()
-    cma.dump(open("/tmp/correlation.json", "wb"))
-    cma2 = cma.load(open("/tmp/correlation.json", "rb"))
-    assert cma == cma2
-    cma3 = datalogger.load_correlationmatrix(datestring)
-    # matrix = get_correlating(tsa3, "cpu.used.summation")
-    matrix = cma3["cpu.used.summation"]
-    for key in matrix.keys():
-        print str(key) + "\t" + "\t".join(("%0.2f" % matrix[key, otherkey] for otherkey in matrix.keys()))
-
-def main():
-    project = "vdi"
-    tablename = "virtualMachineCpuStats"
-    datalogger = DataLogger(BASEDIR, project, tablename)
-    datestring = get_last_business_day_datestring()
-    report(datalogger, datestring)
-
-if __name__ == "__main__":
-    main()
-    #cProfile.run("main()")
