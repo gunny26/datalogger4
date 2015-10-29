@@ -46,6 +46,7 @@ class TimeseriesArray(object):
         self.__value_keys = list([unicode(value) for value in value_keys])
         self.__ts_key = unicode(ts_key)
         # define instance data
+        self.__debug = False
         self.__data = {} # holds data
 
     def __len__(self):
@@ -148,6 +149,16 @@ class TimeseriesArray(object):
         """return TimeseriesArrayStats from self"""
         return TimeseriesArrayStats(self)
 
+    @property
+    def debug(self):
+        """set some debugging on or off"""
+        return self.__debug
+
+    @debug.setter
+    def debug(self, value):
+        """set this to True to get more debug messages, like raw data value errors"""
+        assert isinstance(value, bool)
+        self.__debug = value
 
 #    @ts_key.setter
 #    def ts_key(self, value):
@@ -167,7 +178,7 @@ class TimeseriesArray(object):
 #        #logging.info("first ts found in data : %s", last_ts)
 #        return last_ts
 
-    def add(self, data):
+    def add(self, data, group_func=None):
         """
         data must have following keys
         <ts_keyname> <index_keys> <value_keys>
@@ -187,53 +198,68 @@ class TimeseriesArray(object):
             #logging.exception(exc)
             logging.error("there are index_keys missing in this dataset %s, skipping this dataset", data.keys())
             return
-        # if this key is new, create empty Timeseries object
-        if key not in self.__data:
-            self.__data[key] = Timeseries(self.__value_keys)
         # add data to this timeseries object
         try:
             # timestamp and values has to be converted to float
-            self.__data[key].add(float(data[self.__ts_key]), tuple((float(data[key]) for key in self.__value_keys)))
+            # made the next explicit to avoid empty keys if there is no
+            # valueable data -> will result in ValueError
+            ts = float(data[self.__ts_key])
+            values = tuple((float(data[key]) for key in self.__value_keys))
+            if key not in self.__data:
+                # if this key is new, create empty Timeseries object
+                self.__data[key] = Timeseries(self.__value_keys)
+            if group_func is not None:
+                self.__data[key].group_add(ts, values, group_func)
+            else:
+                self.__data[key].add(ts, values)
         except KeyError as exc:
             #logging.exception(exc)
             logging.error("there is some key missing in %s, should be %s and %s, skipping this dataset, skipping this dataset", data.keys(), self.__ts_key, self.__value_keys)
         except ValueError as exc:
             #logging.exception(exc)
-            logging.error("some value_keys or ts_keyname are not numeric and float convertible, skipping this dataset: %s", data)
+            if self.__debug: # some datasources have incorrect data
+                logging.error("some value_keys or ts_keyname are not numeric and float convertible, skipping this dataset: %s", data)
 
     def group_add(self, data, group_func):
-        """
-        data must have following keys
-        <ts_keyname> <index_keys> <value_keys>
-        if there are additional keys, these will be ignored
+        """wrapper to be api consistent, DEPRECATED"""
+        return self.add(data, group_func)
 
-        All index_keys are converted to unicode
-        All value_keys are converted to float
-        ts_keyname is converted to float
-        """
-        #assert self.__ts_key in data # timestamp key has to be in dict
-        #assert (type(data[self.__ts_key]) == int) or (type(data[self.__ts_key]) == float) # timestamp should be int
-        #assert all((value_key in data for value_key in self.__value_keys)) # test if all keys are available
-        # create key from data
-        try:
-            key = tuple([unicode(data[key]) for key in self.__index_keys])
-        except KeyError:
-            #logging.exception(exc)
-            logging.error("there are index_keys missing in this dataset %s, skipping this dataset", data.keys())
-            return
-        # if this key is new, create empty Timeseries object
-        if key not in self.__data:
-            self.__data[key] = Timeseries(self.__value_keys)
-        # add data to this timeseries object
-        try:
-            # timestamp and values has to be converted to float
-            self.__data[key].group_add(float(data[self.__ts_key]), tuple((float(data[key]) for key in self.__value_keys)), group_func)
-        except KeyError as exc:
-            #logging.exception(exc)
-            logging.error("there is some key missing in %s, should be %s and %s, skipping this dataset, skipping this dataset", data.keys(), self.__ts_key, self.__value_keys)
-        except ValueError as exc:
-            #logging.exception(exc)
-            logging.error("some value_keys or ts_keyname are not numeric and float convertible, skipping this dataset: %s", data)
+#    def group_add_old(self, data, group_func):
+#        """
+#        data must have following keys
+#        <ts_keyname> <index_keys> <value_keys>
+#        if there are additional keys, these will be ignored
+#
+#        All index_keys are converted to unicode
+#        All value_keys are converted to float
+#        ts_keyname is converted to float
+#        """
+#        #assert self.__ts_key in data # timestamp key has to be in dict
+#        #assert (type(data[self.__ts_key]) == int) or (type(data[self.__ts_key]) == float) # timestamp should be int
+#        #assert all((value_key in data for value_key in self.__value_keys)) # test if all keys are available
+#        # create key from data
+#        try:
+#            key = tuple([unicode(data[key]) for key in self.__index_keys])
+#        except KeyError:
+#            #logging.exception(exc)
+#            logging.error("there are index_keys missing in this dataset %s, skipping this dataset", data.keys())
+#            return
+#        # add data to this timeseries object
+#        try:
+#            # timestamp and values has to be converted to float
+#            ts = float(data[self.__ts_key])
+#            values = tuple((float(data[key]) for key in self.__value_keys))
+#            if key not in self.__data:
+#                # if this key is new, create empty Timeseries object
+#                self.__data[key] = Timeseries(self.__value_keys)
+#            self.__data[key].group_add(ts, values, group_func)
+#        except KeyError as exc:
+#            #logging.exception(exc)
+#            logging.error("there is some key missing in %s, should be %s and %s, skipping this dataset, skipping this dataset", data.keys(), self.__ts_key, self.__value_keys)
+#        except ValueError as exc:
+#            #logging.exception(exc)
+#            if self.__debug: # some datasource have incorrect data
+#                logging.error("some value_keys or ts_keyname are not numeric and float convertible, skipping this dataset: %s", data)
 
     def append(self, key, timeserie):
         """
@@ -668,6 +694,7 @@ class TimeseriesArray(object):
                 logging.debug("dumping key %s to filename %s", key, ts_filename)
                 ts_filehandle = gzip.open(os.path.join(outpath, ts_filename), "wb")
                 timeseries.dump_to_csv(ts_filehandle)
+                ts_filehandle.close() # close to not get too many open files
             outbuffer["ts_filenames"].append(ts_filename)
         json.dump(outbuffer, open(outfile, "wb"))
     dump_split = dump
@@ -691,11 +718,11 @@ class TimeseriesArray(object):
 
     @staticmethod
     def get_ts_dumpfilename(key):
-        return "ts_%s.csv.gz" % base64.b64encode(unicode(key))
+        return "ts_%s.csv.gz" % base64.urlsafe_b64encode(unicode(key))
 
     @staticmethod
     def get_dumpfilename(index_keys):
-        return "tsa_%s.json" % base64.b64encode(unicode(index_keys))
+        return "tsa_%s.json" % base64.urlsafe_b64encode(unicode(index_keys))
 
     @staticmethod
     def filtermatch(key_dict, filterkeys, matchtype):
@@ -735,7 +762,9 @@ class TimeseriesArray(object):
         tsa_filename = TimeseriesArray.get_dumpfilename(index_keys)
         logging.debug("tsa_filename: %s", tsa_filename)
         infile = os.path.join(path, tsa_filename)
-        data = json.load(open(infile, "rb"))
+        filehandle = open(infile, "rb")
+        data = json.load(filehandle)
+        filehandle.close()
         logging.debug("loaded json data")
         logging.debug("index_keys: %s", data["index_keys"])
         logging.debug("value_keys: %s", data["value_keys"])
@@ -745,7 +774,7 @@ class TimeseriesArray(object):
         for filename in data["ts_filenames"]:
             logging.debug("reading ts from file %s", filename)
             enc_key = filename.split(".")[0][3:] # only this pattern ts_(.*).csv.gz
-            key = eval(base64.b64decode(enc_key))
+            key = eval(base64.urlsafe_b64decode(str(enc_key))) # must be str not unicode
             key_dict = dict(zip(index_keys, key))
             if filterkeys is not None:
                 if TimeseriesArray.filtermatch(key_dict, filterkeys, matchtype):
@@ -765,11 +794,20 @@ class TimeseriesArray(object):
         """
         tsa_filename = TimeseriesArray.get_dumpfilename(index_keys)
         infile = os.path.join(path, tsa_filename)
-        data = json.load(open(infile, "rb"))
+        try:
+            filehandle = open(infile, "rb")
+            data = json.load(filehandle)
+            filehandle.close()
+        except StandardError as exc:
+            logging.exception(exc)
+            logging.error("Something went wrong while loading json data from %s" % tsa_filename)
+            raise exc
         tsa = TimeseriesArray(data["index_keys"], data["value_keys"], data["ts_key"])
         for key, filename in tsa.get_ts_filenames(path, index_keys, filterkeys, matchtype).items():
             logging.debug("loading Timeseries from file %s", filename)
-            tsa.data[key] = Timeseries.load_from_csv(gzip.open(filename, "rb"))
+            filehandle = gzip.open(filename, "rb")
+            tsa.data[key] = Timeseries.load_from_csv(filehandle)
+            filehandle.close() # close to not get too many open files
         return tsa
     load_split = load
 

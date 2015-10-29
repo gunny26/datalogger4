@@ -40,7 +40,7 @@ def datatype_derive(times, series):
         new_series.append(series[index] - series[index - 1])
     return new_series
 
-def __datatype_counter(series, max_value):
+def __datatype_counter(times, series, max_value):
     """
     generic counter datatype with parameterized max_value,
     could be either 2^32, 2^64 or something completely different
@@ -53,11 +53,27 @@ def __datatype_counter(series, max_value):
     <tuple> of <float>
     """
     new_series = [0.0, ]
+    if not(0.0 <= series[0] <= max_value):
+        msg = "counter %f out of range at time %f, max_value: %f " % (series[0], times[0], max_value)
+        logging.error(msg)
+        raise AssertionError(msg)
     for index in range(1, len(series)):
-        derive = series[index] - series[index - 1]
-        if derive < 0: # overflow detected
-            derive = max_value - series[index - 1] + series[index]
-        new_series.append(derive)
+        if not (0.0 <= series[index] <= max_value): # requirement for counter type
+            msg = "counter %f out of range at time %f, max_value: %f " % (series[index], times[index], max_value)
+            logging.error(msg)
+            raise AssertionError(msg)
+        duration = times[index] - times[index - 1]
+        if duration > 0.0: # only if duration above zero
+            derive = series[index] - series[index - 1]
+            if derive < 0.0: # overflow detected
+                derive = max_value - series[index - 1] + series[index]
+            if derive < 0.0:
+                msg = "max_value: %f, old value: %f, new value: %f, old time: %f, new time: %f" % (max_value, series[index - 1], series[index], times[index - 1], times[index])
+                logging.error(msg)
+                raise AssertionError(msg)
+            new_series.append(derive / duration)
+        else:
+            new_series.append(0.0)
     return new_series
 
 def datatype_counter32(times, series):
@@ -72,7 +88,7 @@ def datatype_counter32(times, series):
     returns:
     <tuple> of <float>
     """
-    return __datatype_counter(series, 2^32)
+    return __datatype_counter(times, series, 2.0**32)
 
 def datatype_counter64(times, series):
     """
@@ -86,7 +102,7 @@ def datatype_counter64(times, series):
     returns:
     <tuple> of <float>
     """
-    return __datatype_counter(series, 2^64)
+    return __datatype_counter(times, series, 2.0**64)
 
 def datatype_persecond(times, series):
     """
@@ -104,8 +120,11 @@ def datatype_persecond(times, series):
     new_series = [0.0, ]
     for index in range(1, len(series)):
         duration = times[index] - times[index - 1]
-        derive = (series[index] - series[index - 1])/duration
-        new_series.append(derive)
+        if duration > 0.0: # only if duration above zero
+            derive = (series[index] - series[index - 1])/duration
+            new_series.append(derive)
+        else: # otherwise, there could be no change in value, when no time is gone
+            new_series.append(0.0)
     return new_series
 
 def datatype_counterreset(times, series):
@@ -579,6 +598,9 @@ class Timeseries(object):
         t2 value2  value2-value1
         t3 value3  value3-value2
         """
+        if len(self.data) == 0:
+            logging.error("Empty Timeseries, nothing to convert")
+            return
         datatype_mapper = {
             "derive" : datatype_derive,
             "counter32" : datatype_counter32,
@@ -725,7 +747,10 @@ class Timeseries(object):
         None
         """
         assert colname not in self.__headers
-        assert len(series) == len(self.data)
+        if len(series) != len(self.data):
+            msg = "new series of length %s, is not the same as existing datalength of %s" % (len(series), len(self.data))
+            logging.error(msg)
+            raise AssertionError(msg)
         for index in range(len(self.data)):
             self.data[index].append(series[index])
         self.__headers.append(colname)
@@ -749,11 +774,16 @@ class Timeseries(object):
         """
         recreate Timeseries Object from CSV File
         """
-        data = filehandle.read().split("\n")
-        header_line = data[0].split(";")
-        timeseries = Timeseries(header_line[1:], header_line[0])
-        for row in data[1:]:
-            values = row.split(";")
-            timeseries.add(float(values[0]), tuple((float(value) for value in values[1:])))
-        return timeseries
+        try:
+            data = filehandle.read().split("\n")
+            header_line = data[0].split(";")
+            timeseries = Timeseries(header_line[1:], header_line[0])
+            for row in data[1:]:
+                values = row.split(";")
+                timeseries.add(float(values[0]), tuple((float(value) for value in values[1:])))
+            return timeseries
+        except IOError as exc:
+            logging.exception(exc)
+            logging.error("Error while reading from filehandle")
+            raise exc
     load_from_csv = load

@@ -143,6 +143,7 @@ class CorrelationMatrixTime(object):
         return False
 
     def __getitem__(self, key):
+        print key
         return self.__data[key]
 
     def keys(self):
@@ -171,7 +172,7 @@ class CorrelationMatrixTime(object):
                 continue
             series = tsa1[key][value_key]
             matrix[key] = get_mse_sorted_norm_missing(series, other)
-            print key, matrix[key]
+            #print key, matrix[key]
         return matrix
 
     def dumps(self):
@@ -183,24 +184,50 @@ class CorrelationMatrixTime(object):
         cm.__data = eval(json.loads(data))
         return cm
 
-def report(datalogger, datestring):
+def report_group(project, tablename, datestring1, datestring2, value_key):
     # get data, from datalogger, or dataloggerhelper
+    datalogger = DataLogger(BASEDIR, project, tablename)
     print "loading data"
     starttime = time.time()
-    tsa1 = datalogger.load_tsa("2015-10-13")
-    tsa2 = datalogger.load_tsa("2015-10-06")
+    tsa1 = datalogger.load_tsa(datestring1)
+    tsa1 = datalogger.group_by(datestring1, tsa1, ("hostname",), lambda a,b : (a+b)/2)
+    tsa2 = datalogger.load_tsa(datestring2)
+    tsa2 = datalogger.group_by(datestring2, tsa2, ("hostname",), lambda a,b : (a+b)/2)
     print "Duration load %f" % (time.time() - starttime)
     starttime = time.time()
-    cm = CorrelationMatrixTime(tsa1, tsa2, "cpu.used.summation")
-    for key, coefficient in sorted(cm, key=lambda items: items[1]):
+    cm = CorrelationMatrixTime(tsa1, tsa2, value_key)
+    print "TOP most differing keys between %s and %s" % (datestring1, datestring2)
+    for key, coefficient in sorted(cm.items(), key=lambda items: items[1], reverse=True)[:20]:
+        print key, coefficient
+
+def report(project, tablename, datestring1, datestring2, value_key):
+    # get data, from datalogger, or dataloggerhelper
+    datalogger = DataLogger(BASEDIR, project, tablename)
+    print "loading data"
+    starttime = time.time()
+    tsa1 = datalogger.load_tsa(datestring1)
+    tsa2 = datalogger.load_tsa(datestring2)
+    print "Duration load %f" % (time.time() - starttime)
+    starttime = time.time()
+    cm = CorrelationMatrixTime(tsa1, tsa2, value_key)
+    print "TOP most differing keys between %s and %s" % (datestring1, datestring2)
+    for key, coefficient in sorted(cm.items(), key=lambda items: items[1], reverse=True)[:20]:
         print key, coefficient
 
 def main():
     project = "vicenter"
-    tablename = "virtualMachineCpuStats"
-    datalogger = DataLogger(BASEDIR, project, tablename)
-    datestring = get_last_business_day_datestring()
-    report(datalogger, datestring)
+    tablename = "virtualMachineMemoryStats"
+    datestring = DataLogger.get_last_business_day_datestring()
+    year, month, day = datestring.split("-")
+    date1 = datetime.date(int(year), int(month), int(day))
+    print date1
+    date2 = date1 - datetime.timedelta(days=7)
+    print date2.isoformat()
+    report_group("vicenter", "virtualMachineCpuStats", datestring, date2.isoformat(), "cpu.used.summation")
+    #report(project, tablename, datestring, date2.isoformat(), "mem.active.average")
+    #report("vicenter", "virtualMachineDatastoreStats", datestring, date2.isoformat(), "datastore.totalReadLatency.average")
+    #report("vicenter", "virtualMachineDatastoreStats", datestring, date2.isoformat(), "datastore.write.average")
+    #report("vicenter", "virtualMachineNetworkStats", datestring, date2.isoformat(), "net.usage.average")
 
 if __name__ == "__main__":
     main()

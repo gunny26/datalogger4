@@ -34,4 +34,5 @@ from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 #from Quantilles import Quantilles as Quantilles
 from Quantilles import QuantillesArray as QuantillesArray
 from CorrelationMatrix import CorrelationMatrixArray as CorrelationMatrixArray
+from CustomExceptions import *
 #import DataLoggerHelper

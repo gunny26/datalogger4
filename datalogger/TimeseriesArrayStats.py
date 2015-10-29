@@ -5,7 +5,7 @@ import os
 import logging
 # own modules
 from TimeseriesStats import TimeseriesStats as TimeseriesStats
-
+from CustomExceptions import *
 
 class TimeseriesArrayStats(object):
     """
@@ -25,7 +25,10 @@ class TimeseriesArrayStats(object):
         self.__index_keys = tuple([unicode(value) for value in tsa.index_keys])
         self.__value_keys = tuple([unicode(value) for value in tsa.value_keys])
         for key in tsa.keys():
-            self.__stats[key] = TimeseriesStats(tsa[key])
+            try:
+                self.__stats[key] = TimeseriesStats(tsa[key])
+            except TimeseriesEmptyError as exc:
+                logging.info("Timeseries for key %s is length zero, skipping", key)
 
     def __eq__(self, other):
         try:
@@ -108,7 +111,7 @@ class TimeseriesArrayStats(object):
         returns:
         <str>
         """
-        return "tsstat_%s.json" % base64.b64encode(unicode(key))
+        return "tsstat_%s.json" % base64.urlsafe_b64encode(unicode(key))
 
     @staticmethod
     def get_dumpfilename(index_keys):
@@ -123,7 +126,7 @@ class TimeseriesArrayStats(object):
         returns:
         <str>
         """
-        return "tsastat_%s.json" % base64.b64encode(unicode(index_keys))
+        return "tsastat_%s.json" % base64.urlsafe_b64encode(unicode(index_keys))
 
     def dump(self, outpath, overwrite=False):
         """
@@ -145,7 +148,9 @@ class TimeseriesArrayStats(object):
             filename = self.get_tsstat_dumpfilename(key)
             fullfilename = os.path.join(outpath, filename)
             if (not os.path.isfile(fullfilename)) or (overwrite is True):
-                tsstats.dump(open(fullfilename, "wb"))
+                filehandle = open(fullfilename, "wb")
+                tsstats.dump(filehandle)
+                filehandle.close()
             outdata["tsstat_filenames"].append(filename)
         json.dump(outdata, open(outfilename, "wb"))
 
@@ -189,7 +194,7 @@ class TimeseriesArrayStats(object):
         for filename in data["tsstat_filenames"]:
             logging.debug("reading key for tsstat from file %s", filename)
             enc_key = filename.split(".")[0][7:] # only this pattern tsstat_(.*).json
-            key = eval(base64.b64decode(enc_key))
+            key = eval(base64.urlsafe_b64decode(str(enc_key))) # must be str not unicode
             key_dict = dict(zip(index_keys, key))
             if filterkeys is not None:
                 if TimeseriesArrayStats.filtermatch(key_dict, filterkeys, matchtype):
@@ -215,7 +220,12 @@ class TimeseriesArrayStats(object):
         """
         #logging.info("index_keys: %s", index_keys)
         infilename = os.path.join(path, TimeseriesArrayStats.get_dumpfilename(index_keys))
-        indata = json.load(open(infilename, "rb"))
+        try:
+            indata = json.load(open(infilename, "rb"))
+        except StandardError as exc:
+            logging.exception(exc)
+            logging.error("something went wrong while loading %s", infilename)
+            raise exc
         #logging.info("loaded JSON data: %s", indata)
         tsastats = TimeseriesArrayStats.__new__(TimeseriesArrayStats)
         tsastats.__index_keys = tuple(indata["index_keys"])
@@ -224,5 +234,7 @@ class TimeseriesArrayStats(object):
         #for filename in indata["tsstat_filenames"]:
         for key, filename in tsastats.get_load_filenames(path, index_keys, filterkeys, matchtype).items():
             #logging.info("loading TimeseriesStats object from %s", fullfilename)
-            tsastats.__stats[key] = TimeseriesStats.load(open(filename, "rb"))
+            filehandle = open(filename, "rb")
+            tsastats.__stats[key] = TimeseriesStats.load(filehandle)
+            filehandle.close()
         return tsastats

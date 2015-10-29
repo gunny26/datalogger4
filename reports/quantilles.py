@@ -7,8 +7,9 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(levelname)s %(f
 import datalogger
 from datalogger import DataLogger as DataLogger
 from datalogger import QuantillesArray as QuantillesArray
-from commons import *
+#from commons import *
 
+BASEDIR = "/var/rrd"
 def report(datalogger, datestring):
     qa = datalogger.load_quantilles(datestring)
     quantilles = qa["cpu.used.summation"]
@@ -21,7 +22,9 @@ def report(datalogger, datestring):
 def main():
     project = "vicenter"
     tablename = "virtualMachineCpuStats"
-    datestring = get_last_business_day_datestring()
+    datestring =DataLogger.get_last_business_day_datestring()
+    if len(sys.argv) == 2:
+        datestring = sys.argv[1]
     if len(sys.argv) == 2:
         datestring = sys.argv[1]
     datalogger = DataLogger(BASEDIR, project, tablename)

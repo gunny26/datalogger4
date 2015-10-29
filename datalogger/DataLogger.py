@@ -18,16 +18,9 @@ from TimeseriesArray import TimeseriesArray as TimeseriesArray
 from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 from Quantilles import QuantillesArray as QuantillesArray
 from CorrelationMatrix import CorrelationMatrixArray as CorrelationMatrixArray
+from CustomExceptions import *
 
 DEBUG = False
-
-class DataLoggerRawFileMissing(StandardError):
-    """raised, when there is no available Raw Input File"""
-    pass
-
-class DataLoggerLiveDataError(StandardError):
-    """raised if there is an attempt to read from live data"""
-    pass
 
 def datestring_to_date(datestring):
     """convert datestring 2015-01-31 into date object"""
@@ -99,12 +92,26 @@ class DataLogger(object):
         # there are some stored information about this project tablename
         # combination
         metafile = os.path.join(meta_basedir, "%s.json" % self.__tablename)
-        meta = self.__load_metainfo(metafile)
+        try:
+            meta = self.__load_metainfo(metafile)
+        except StandardError as exc:
+            logging.exception(exc)
+            logging.error("error while loading meta informations from file %s", metafile)
+            raise exc
         # to local __dict__
         self.__delimiter = meta["delimiter"]
         self.__ts_keyname = meta["ts_keyname"]
         self.__headers = tuple(meta["headers"])
-        self.__value_keynames = tuple(meta["value_keynames"])
+        # transitional hook to implement datatypes without correcting
+        # all meta files at once
+        if isinstance(meta["value_keynames"], dict):
+            self.__value_keynames = tuple(meta["value_keynames"].keys())
+            self.__datatypes = meta["value_keynames"]
+        elif isinstance(meta["value_keynames"], list):
+            # if old stype, keep all datatype asis, and print warning
+            self.__value_keynames = tuple(meta["value_keynames"])
+            self.__datatypes = dict(zip(meta["value_keynames"], ("asis",) * len(meta["value_keynames"])))
+            logging.error("You should define value_keynames as dict with datatypes")
         self.__index_keynames = tuple(meta["index_keynames"])
         self.__blacklist = tuple(meta["blacklist"])
         self.__interval = meta["interval"]
@@ -145,6 +152,11 @@ class DataLogger(object):
     def value_keynames(self):
         """keynames of value fields, have to be float convertible"""
         return self.__value_keynames
+
+    @property
+    def datatypes(self):
+        """dictionary of datatypes"""
+        return self.__datatypes
 
     @property
     def index_keynames(self):
@@ -292,6 +304,7 @@ class DataLogger(object):
                     logging.info("Format Error in row: %s, got %s", row, data)
                     continue
                 if not start_ts <= data[self.__ts_keyname] <= stop_ts:
+                    logging.debug("Skipping line, ts %s not between %s and %s", data[self.__ts_keyname], start_ts, stop_ts)
                     continue
                 yield data
             except KeyError as exc:
@@ -442,10 +455,7 @@ class DataLogger(object):
             """
             tsa = self.load_tsa_raw(datestring, timedelta)
             tsa.dump_split(cachedir) # save full data
-            tsa = TimeseriesArray.load_split(cachedir, self.__index_keynames, filterkeys)
-            # also generate statistics, so its done
-            tsastats = TimeseriesArrayStats(tsa) # generate full Stats
-            tsastats.dump(cachedir) # save
+            tsa = self.iconvert(TimeseriesArray.load_split(cachedir, self.__index_keynames, filterkeys))
             return tsa
         if not os.path.isfile(cachefilename):
             logging.info("cachefile %s does not exist, fallback read from raw", cachefilename)
@@ -456,7 +466,7 @@ class DataLogger(object):
             return fallback()
         logging.debug("loading stored TimeseriesArray object file %s", cachefilename)
         try:
-            tsa = TimeseriesArray.load_split(cachedir, self.__index_keynames, filterkeys)
+            tsa = self.iconvert(TimeseriesArray.load_split(cachedir, self.__index_keynames, filterkeys))
             return tsa
         except IOError:
             logging.error("IOError while reading from %s, using fallback", cachefilename)
@@ -466,6 +476,19 @@ class DataLogger(object):
             logging.error("EOFError while reading from %s, using fallback", cachefilename)
             os.unlink(cachefilename)
             return fallback()
+
+    def iconvert(self, tsa):
+        """
+        convert given tsa to defined datatypes
+        modifies tsa object and return the modified version
+
+        parameters:
+        tsa <TimeseriesArray>
+        """
+        for colname, datatype in self.__datatypes.items():
+            if datatype != "asis":
+                tsa.convert(colname, datatype)
+        return tsa
 
     def load_tsastats(self, datestring, filterkeys=None, timedelta=0, cleancache=False):
         """
@@ -573,11 +596,31 @@ class DataLogger(object):
         returns:
         <tuple> decoded key (eval(base64.b64decode(key)))
         """
-        _, key_and_ending = filename.split("_")
-        key_encoded = key_and_ending.split(".")[0]
-        key = eval(base64.b64decode(key_encoded))
-        assert type(key) == tuple
-        return key
+        try:
+            parts = filename.split(".")[0].split("_")
+            key_encoded = "_".join(parts[1:]) # there could be more than 2 parts
+            # the first part ist something like tsa_, tsastats_, ts_,
+            # tsstats_ and so on.
+            #_, key_and_ending = filename.split("_")
+            #key_encoded = key_and_ending.split(".")[0]
+            key = None
+            try:
+                # TODO: there are some problems to decode b64string with
+                # urlsafe_b64decode if unicode,
+                # try to use b64decode instead
+                try:
+                    key = eval(base64.urlsafe_b64decode(str(key_encoded)))
+                except TypeError as exc:
+                    logging.exception(exc)
+                    key = eval(base64.b64decode(key_encoded))
+                assert type(key) == tuple
+                return key
+            except StandardError as exc:
+                logging.exception(exc)
+                raise DataLoggerFilenameDecodeError("filename %s could not be decoded to tuple, result: %s" % (filename, key))
+        except StandardError as exc:
+            logging.exception(exc)
+            raise DataLoggerFilenameDecodeError("Something went wrong while decoding filensme %s" % filename)
 
     def load_tsa_raw(self, datestring, timedelta=0):
         """
@@ -781,6 +824,6 @@ class DataLogger(object):
         returns last businessday datestring, ignoring Feiertage
         """
         last_business_day = datetime.date.today()
-        shift = datetime.timedelta(max(1,(last_business_day.weekday() + 6) % 7 - 3))
+        shift = datetime.timedelta(max(1, (last_business_day.weekday() + 6) % 7 - 3))
         last_business_day = last_business_day - shift
         return last_business_day.isoformat()

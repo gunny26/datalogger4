@@ -3,6 +3,7 @@
 import json
 #from scipy import stats
 import logging
+from CustomExceptions import *
 
 
 def mean(data):
@@ -76,13 +77,16 @@ class TimeseriesStats(object):
         # calculate statisticsi, if timeseries given
         for key in timeseries.headers:
             series = timeseries.get_serie(key)
-            if len(series) > 0:
+            if len(series) == 0:
+                logging.error("%s %s", key, len(timeseries))
+                raise TimeseriesEmptyError("Timeseries without data cannot have stats")
+            if len(series) > 1:
                 self.__stats[key] = {}
                 for func_name, func in self.stat_funcs.items():
                     self.__stats[key][func_name] = func(series)
             else:
                 logging.error("%s %s", key, len(timeseries))
-                raise StandardError("Timeseries without data cannot have stats")
+                raise TimeseriesEmptyError("some TimeseriesStats need at minimum 2 values")
 
     def __eq__(self, other):
         """ test for equality ion depth"""
