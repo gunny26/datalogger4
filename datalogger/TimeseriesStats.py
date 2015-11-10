@@ -129,6 +129,9 @@ class TimeseriesStats(object):
         return True
 
     def __getitem__(self, index):
+        if isinstance(index, tuple):
+            value_key, func_name = index
+            return self.__stats[key, func_name]
         return self.__stats[index]
 
     def __str__(self):
@@ -233,4 +236,13 @@ class TimeseriesStats(object):
         """
         tsstats = TimeseriesStats.__new__(TimeseriesStats)
         tsstats.__stats = json.load(filehandle)
+        return tsstats
+
+    def to_json(self):
+        return json.dumps(self.__stats)
+
+    @staticmethod
+    def from_json(jsondata):
+        tsstats = TimeseriesStats.__new__(TimeseriesStats)
+        tsstats.__stats = json.loads(jsondata)
         return tsstats

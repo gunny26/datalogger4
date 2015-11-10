@@ -238,3 +238,28 @@ class TimeseriesArrayStats(object):
             tsastats.__stats[key] = TimeseriesStats.load(filehandle)
             filehandle.close()
         return tsastats
+
+    def to_json(self):
+        outdata = []
+        outdata.append(self.__index_keys)
+        outdata.append(self.__value_keys)
+        outdata.append([(key, tsstat.to_json()) for key, tsstat in self.__stats.items()])
+        try:
+            return json.dumps(outdata)
+        except TypeError as exc:
+            logging.exception(exc)
+            logging.error(outdata)
+            raise exc
+
+    @staticmethod
+    def from_json(jsondata):
+        indata = json.loads(jsondata)
+        tsastats = TimeseriesArrayStats.__new__(TimeseriesArrayStats)
+        tsastats.__index_keys = indata[0]
+        tsastats.__value_keys = indata[1]
+        tsastats.__stats = {}
+        for key, tsstats in indata[2]:
+            # from json there are only list, but these are not hashable,
+            # so convert key to tuple
+            tsastats.__stats[tuple(key)] = TimeseriesStats.from_json(tsstats)
+        return tsastats

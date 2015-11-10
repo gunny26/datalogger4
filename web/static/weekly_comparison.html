@@ -1,7 +1,6 @@
 <html>
 <head>
     <link rel="stylesheet" href="jquery-ui.css" />
-    <link rel="stylesheet" href="datalogger.css" />
     <!--jquery itself-->
     <script type="text/javascript" src="jquery-2.1.3.js"></script>
     <!-- used for autofill feature -->
@@ -27,12 +26,12 @@ var actual_container;
 
 $(document).ready(function(){
     // set some meaningful default values
-    //var datestring = get_url_key("datestring");
-    //$("#datestring").val(get_last_business_day_datestring());
+    var datestring = get_url_key("datestring");
+    $("#datestring").val(datestring);
     // add first graphics container
     add_container();
     // fill project and tablenames
-    get_last_business_day_datestring();
+    get_projects();
     // datatype select box
     var datatype = $("#datatype");
     datatype.append("<option value=absolute>absolute</option>");
@@ -68,21 +67,7 @@ function get_url_key(keyname) {
     });
     return(retval);
 }
-
-/*
-// get value keys for this particular project, tablename combination
-*/
-function get_last_business_day_datestring() {
-    //var value_keynames = $("#value_keynames");
-    var url = base_url + "/get_last_business_day_datestring";
-    console.log("getting last businessday datestring from " + url);
-    $.getJSON(url, function(result) {
-        console.log("Last Businessday datestring: " + result);
-        $("#datestring").val(result);
-    });
-    get_projects();
-}
-
+ 
 /*
 get a list of available projects
 */
@@ -129,14 +114,14 @@ function get_tablenames(project) {
         });
         $('body').css('cursor','default');
     });
-    // definig change for tablename
+    // definig chanhe for tablename
     $( '#tablename').change(function() {
         get_index_keynames($('#project').val(), $('#tablename').val());
         get_value_keynames($('#project').val(), $('#tablename').val());
         //recreate autocomplete for new data
         ticker('recreating autocomplete list for ' + $('#project').val() + "/" + $('#tablename').val());
         $('#keys').removeData('autocomplete');
-        $('#keys').autocomplete({source: get_ts_caches($('#project').val(), $('#tablename').val(), $('#datestring').val()),});
+        $('#keys').autocomplete({source: get_tsstat_caches($('#project').val(), $('#tablename').val(), $('#datestring').val()),});
     });
 }
 
@@ -162,7 +147,7 @@ function get_index_keynames(project, tablename) {
 function get_value_keynames(project, tablename) {
     //var value_keynames = $("#value_keynames");
     $('#select_value_keynames').empty();
-    $('#select_value_keynames').append('<select id="value_keynames" multiple size=10></select)')
+    $('#select_value_keynames').append('<select id="value_keynames" size=10></select)')
     var url = base_url + "/get_value_keynames/" + project + "/" + tablename;
     console.log("getting value_keys from " + url);
     $.getJSON(url, function(result) {
@@ -177,8 +162,8 @@ function get_value_keynames(project, tablename) {
 /*
 get keys of caches timeseries for this project/tablename/datestring combination
 */
-function get_ts_caches(project, tablename, datestring) {
-    var url = base_url + "/get_ts_caches/" + project + "/" + tablename + "/" + datestring;
+function get_tsstat_caches(project, tablename, datestring) {
+    var url = base_url + "/get_tsstat_caches/" + project + "/" + tablename + "/" + datestring;
     console.log("Getting Data from url " + url);
     var keys = [];
     $.getJSON(url).then(function(data) {
@@ -212,76 +197,69 @@ function getData() {
     var datestring = $("#datestring").val();
     var keys = $("#keys").val();
     var selected = $("#value_keynames" ).val();
-    var datatype = $("#datatype").val();
-    var index_keynames = $("#index_keynames").val()
-    if (index_keynames == "") {
-        index_keynames = null;
-    }
     var yAxisMax = $('#yAxisMax').val()
     if (yAxisMax == "") {
         yAxisMax = null;
     }
-    var url = base_url + "/get_chart_data_ungrouped/" + project + "/" + tablename + "/" + datestring + "/" + Base64.encode(keys) + "/" + JSON.stringify(selected) + "/" + JSON.stringify(datatype) + "/" + JSON.stringify(index_keynames);
+    var url = base_url + "/get_longtime_data/" + project + "/" + tablename + "/" + datestring + "/" + Base64.encode(keys) + "/" + selected;
     console.log("Getting Data from url " + url);
     ticker("Fetching data, this could last for some time, if this is the first request");
     $.getJSON(url).then(function(data) {
-        $('#stats').html(data.stats);
-        console.log(data.stats);
         console.log("Drawing to actual_container = #" + actual_container);
-        title = "Datum :"+datestring+"<br>, Project:"+project+", Tablename: "+tablename+"<br>, key:" + keys + ", values:" + JSON.stringify(selected);
-        draw_develop(actual_container, title, data.data, yAxisMax);
+        title = project + "/" + tablename + "<br>" + datestring + "<br>Filters " + keys + "<br>Values " + JSON.stringify(selected);
+        draw_longtime(actual_container, title, data, yAxisMax);
         ticker("Got data, finished, maybe you select another one?");
     });
 }
 
 </script>
-<h1>Datalogger Graphics Engine</h1>
+<h1>Datalogger Compare two Datasets</h1>
+<h2>Mandatory Parameters</h2>
 <table>
     <tr>
         <td>
-            <h2>Mandatory Parameters</h2>
-            <table>
-                <tr>
-                    <td>
-                        <label title="Datestring in form YYYY-MM-DD">Date</label>
-                        <div><input id="datestring" type="text" size=10></div>
-                    </td><td>
-                        <label>Project</label>
-                        <div id="select_project"></div>
-                    </td><td>
-                        <label>Tablename</label>
-                        <div id="select_tablename">select one project first</div>
-                    </td>
-                </tr>
-            </table>
-            <h2>Search Parameters</h2>
-            <table>
-                <tr>
-                    <td>
-                        <label>Key(s)</label>
-                        <div><input id="keys" type=text value="" size=60></div>
-                    </td>
-                </tr>
-            </table>
-            <h2>Filter Parameters</h2>
-            <table>
-                <tr>
-                    <td>
-                        <label title="at least one must be selected">Values</label>
-                        <div id="select_value_keynames">select project and tablename first</div>
-                    </td><td>
-                        <label title="select one field to group by this field">Grouping Indexes</label>
-                        <div id="select_index_keynames">selecz project and tablename first</div>
-                    </td><td>
-                        <label title="depends on kind of value_key, absolut : draw as is, counter : use per_s or derive">Datatype</label>
-                        <div><select id="datatype"></select></div>
-                    </td><td>
-                        <label title="max value of yAxis, if nothing is given autoscale">y-Max</label>
-                        <div><input id="yAxisMax" type=text size=5></div>
-                    </td></tr>
-            </table>
-        </td><td>
-            <div id="stats">There will be some statistics when data is fetched</div>
+            <label title="Monthstring in form YYYY-MM-DD">Date1</label>
+            <div><input id="datestring1" type="text" size=10></div>
+            <label title="Monthstring in form YYYY-MM-DD">Date2</label>
+            <div><input id="datestring2" type="text" size=10></div>
+        </td>
+        <td>
+            <label>Project</label>
+            <div id="select_project"></div>
+        </td>
+        <td>
+            <label>Tablename</label>
+            <div id="select_tablename">select one project first</div>
+        </td>
+    </tr>
+</table>
+<h2>Search Parameters</h2>
+<table>
+    <tr>
+        <td>
+            <label>Key(s)</label>
+            <div><input id="keys" type=text value="" size=60></div>
+        </td>
+    </tr>
+</table>
+<h2>Filter Parameters</h2>
+<table>
+    <tr>
+        <td>
+            <label title="at least one must be selected">Values</label>
+            <div id="select_value_keynames">select project and tablename first</div>
+        </td>
+        <td>
+            <label title="select one field to group by this field">Grouping Indexes</label>
+            <div id="select_index_keynames">selecz project and tablename first</div>
+        </td>
+        <td>
+            <label title="depends on kind of value_key, absolut : draw as is, counter : use per_s or derive">Datatype</label>
+            <div><select id="datatype"></select></div>
+        </td>
+         <td>
+            <label title="max value of yAxis, if nothing is given autoscale">y-Max</label>
+            <div><input id="yAxisMax" type=text size=5></div>
         </td>
     </tr>
 </table>

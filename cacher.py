@@ -39,15 +39,6 @@ def table_by_index(tsa_stat, key):
     print "\n".join(outbuffer)
 
 
-def report(datalogger, datestring):
-    tsastats = datalogger.load_tsastats(datestring)
-    key = tsastats.keys()[0]
-    value_key = tsastats[key].keys()[0]
-    funcname = tsastats[key].funcnames[0]
-    print datestring, key, value_key, funcname, tsastats[key][value_key][funcname]
-    return
-
-
 def worker():
     while not queue.empty():
         (project, tablename, datestring) = queue.get()
@@ -58,7 +49,7 @@ def worker():
             logging.info("Skipping, no input file available")
         try:
             datalogger[datestring]
-            #report(datalogger, datestring)
+            datalogger.load_tsastats(datestring)
         except StandardError as exc:
             logging.error("Error on %s, %s, %s", datestring, project, tablename)
         #queue.task_done()
@@ -68,11 +59,10 @@ if __name__ == "__main__":
     for project in DataLogger.get_projects(BASEDIR):
         for tablename in DataLogger.get_tablenames(BASEDIR, project):
             datalogger = DataLogger(BASEDIR, project, tablename)
-            for datestring in datewalker("2015-09-01", "2015-10-01"):
+            for datestring in datewalker("2015-08-01", "2015-10-01"):
                 queue.put((project, tablename, datestring))
     for threadid in range(16):
         t = multiprocessing.Process(target=worker)
-        #t.daemon = True
         t.start()
     queue.join()
     logging.info("Ending")

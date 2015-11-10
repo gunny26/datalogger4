@@ -184,7 +184,7 @@ class DataLogger(object):
         """
         #print key
         #print type(key)
-        if type(key) == str: # only datestring given
+        if isinstance(key, basestring): # only datestring given
             return self.load_tsa(key)
         if type(key) == tuple: # tsa key selection given
             if len(key) == 2:
@@ -377,7 +377,7 @@ class DataLogger(object):
             for abs_filename in glob.glob(file_pattern):
                 filename = os.path.basename(abs_filename)
                 key = self.__decode_filename(filename)
-                caches[cachetype]["keys"][key] = filename
+                caches[cachetype]["keys"][unicode(key)] = filename
         return caches
 
     def list_ts_caches(self, datestring):

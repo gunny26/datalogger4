@@ -1,12 +1,16 @@
 #!/usr/bin/pypy
 import cProfile
 import time
+import datetime
 import json
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(levelname)s %(filename)s:%(funcName)s:%(lineno)s %(message)s')
 from datalogger import DataLogger as DataLogger
 from datalogger import DataLoggerWeb as DataLoggerWeb
-from commons import *
+#from commons import *
+
+BASEDIR = "/var/rrd"
+DATALOGGER_URL = "http://srvmgdata1.tilak.cc/DataLogger"
 
 def get_mse(series1, series2):
     """
@@ -191,10 +195,8 @@ def report_group(project, tablename, datestring1, datestring2, value_key):
     dataloggerweb = DataLoggerWeb(DATALOGGER_URL)
     print "loading data"
     starttime = time.time()
-    #tsa1 = datalogger.load_tsa(datestring1)
     tsa1 = dataloggerweb.get_tsa(project, tablename, datestring1)
     tsa1 = datalogger.group_by(datestring1, tsa1, ("hostname",), lambda a,b : (a+b)/2)
-    #tsa2 = datalogger.load_tsa(datestring2)
     tsa2 = dataloggerweb.get_tsa(project, tablename, datestring2)
     tsa2 = datalogger.group_by(datestring2, tsa2, ("hostname",), lambda a,b : (a+b)/2)
     print "Duration load %f" % (time.time() - starttime)
@@ -210,13 +212,9 @@ def report(project, tablename, datestring1, datestring2, value_key):
     dataloggerweb = DataLoggerWeb(DATALOGGER_URL)
     print "loading data"
     starttime = time.time()
-    #tsa1 = datalogger.load_tsa(datestring1)
     tsa1 = dataloggerweb.get_tsa(project, tablename, datestring1)
-    #tsastat1 = datalogger.load_tsastats(datestring1)
     tsastat1 = dataloggerweb.get_tsastats(project, tablename, datestring1)
-    #tsa2 = datalogger.load_tsa(datestring2)
     tsa2 = dataloggerweb.get_tsa(project, tablename, datestring2)
-    #tsastat2 = datalogger.load_tsastats(datestring2)
     tsastat2 = dataloggerweb.get_tsastats(project, tablename, datestring2)
     print "Duration load %f" % (time.time() - starttime)
     starttime = time.time()

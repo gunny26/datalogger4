@@ -10,7 +10,11 @@ class QuantillesArray(object):
         self.__keys = tuple(tsa.keys())
         self.__value_keys = tuple(tsa.value_keys)
         for value_key in self.__value_keys:
-            self.__data[value_key] = Quantilles(tsa, value_key)
+            try:
+                self.__data[value_key] = Quantilles(tsa, value_key)
+            except QuantillesError as exc:
+                logging.exception(exc)
+                logging.error("skipping value_key %s", value_key)
 
     @property
     def keys(self):
@@ -58,6 +62,13 @@ class QuantillesArray(object):
         quantille_data = dict(((key, quantille.dumps()) for key, quantille in self.__data.items()))
         json.dump((quantille_data, self.__keys, self.__value_keys), filehandle)
 
+    def to_json(self):
+        """
+        dump internal data to json
+        """
+        quantille_data = dict(((key, quantille.dumps()) for key, quantille in self.__data.items()))
+        return json.dumps((quantille_data, self.__keys, self.__value_keys))
+
     @staticmethod
     def load(filehandle):
         qa = QuantillesArray.__new__(QuantillesArray)
@@ -67,6 +78,19 @@ class QuantillesArray(object):
         qa.__value_keys = tuple(qa.__value_keys)
         qa.__data = dict(((key, Quantilles.loads(data)) for key, data in quantille_data.items()))
         return qa
+
+    @staticmethod
+    def from_json(json_data):
+        qa = QuantillesArray.__new__(QuantillesArray)
+        quantille_data, qa.__keys, qa.__value_keys = json.loads(json_data)
+        # convert to tuple, to be equal to normal initialization
+        qa.__keys = tuple((tuple(key) for key in qa.__keys))
+        qa.__value_keys = tuple(qa.__value_keys)
+        qa.__data = dict(((key, Quantilles.loads(data)) for key, data in quantille_data.items()))
+        return qa
+
+class QuantillesError(Exception):
+    """raised if there is some problem calculating Quantilles"""
 
 
 class Quantilles(object):
@@ -97,6 +121,9 @@ class Quantilles(object):
             self.__maxx = maxx
         # do the calculations
         width = int(100 / (len(self.__quants.keys()) - 1))
+        # if __maxx or width is equal zero, empty Data
+        if (self.__maxx == 0.0) or  (width == 0):
+            raise QuantillesError("either length of data or maximum is zero")
         self.__quantilles = dict(((key, self.__calculate(ts[value_key], width)) for key, ts in tsa.items()))
         #for key, ts in tsa.items():
         #    self.__quantilles[key] =  self.__calculate(ts[value_key], width)

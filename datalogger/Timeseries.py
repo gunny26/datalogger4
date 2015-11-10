@@ -53,12 +53,12 @@ def __datatype_counter(times, series, max_value):
     <tuple> of <float>
     """
     new_series = [0.0, ]
-    if not(0.0 <= series[0] <= max_value):
+    if not 0.0 <= series[0] <= max_value:
         msg = "counter %f out of range at time %f, max_value: %f " % (series[0], times[0], max_value)
         logging.error(msg)
         raise AssertionError(msg)
     for index in range(1, len(series)):
-        if not (0.0 <= series[index] <= max_value): # requirement for counter type
+        if not 0.0 <= series[index] <= max_value: # requirement for counter type
             msg = "counter %f out of range at time %f, max_value: %f " % (series[index], times[index], max_value)
             logging.error(msg)
             raise AssertionError(msg)
@@ -146,6 +146,45 @@ def datatype_counterreset(times, series):
         if derive < 0.0:
             derive = series[index]
         new_series.append(derive)
+    return new_series
+
+def datatype_gauge32(times, series):
+    """
+    for counter which are steadily increasing, but will reset after restart
+    of some part of this system
+    eg. haproxy statistics counter which increases until restart, then begin by 0
+    There is naturally some data missing, from last value to next value after reset
+    this counter is not supposed to overflow, so lower next level in time,
+    means there was a reset
+
+    parameters:
+    series <tuple> of <tuple>(ts:<float>, value:<float>)
+
+    returns:
+    <tuple> of <float>
+    """
+    new_series = [0.0, ]
+    if not 0.0 <= series[0]:
+        msg = "counter %f out of range at time %f" % (series[0], times[0])
+        logging.error(msg)
+        raise AssertionError(msg)
+    for index in range(1, len(series)):
+        if not 0.0 <= series[index]: # requirement for counter type
+            msg = "counter %f out of range at time %f" % (series[index], times[index])
+            logging.error(msg)
+            raise AssertionError(msg)
+        duration = times[index] - times[index - 1]
+        if duration > 0.0: # only if duration above zero
+            derive = series[index] - series[index - 1]
+            if derive < 0.0: # reset detected, only difference to counter
+                derive = series[index]
+            if derive < 0.0:
+                msg = "old value: %f, new value: %f, old time: %f, new time: %f" % (series[index - 1], series[index], times[index - 1], times[index])
+                logging.error(msg)
+                raise AssertionError(msg)
+            new_series.append(derive / duration)
+        else:
+            new_series.append(0.0)
     return new_series
 
 
@@ -604,6 +643,7 @@ class Timeseries(object):
         datatype_mapper = {
             "derive" : datatype_derive,
             "counter32" : datatype_counter32,
+            "gauge32" : datatype_gauge32,
             "counter64" : datatype_counter64,
             "counterreset" : datatype_counterreset,
             "percent" : datatype_percent,

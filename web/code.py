@@ -65,7 +65,7 @@ class DataLoggerWeb(object):
 #        web.header('Content-type', 'text/html')
 #        return "GEt from DataLoggerWeb"
         method = args.split("/")[0]
-        logging.info("method %s should be called", method)
+        logging.info("calling method %s", method)
         web.header('Access-Control-Allow-Origin', '*')
         web.header('Access-Control-Allow-Credentials', 'true')
         method_args = args.split("/")[1:] # all without method name
@@ -83,6 +83,20 @@ class DataLoggerWeb(object):
             return self.get_tablenames(method_args)
         elif method == "get_headers":
             return self.get_headers(method_args)
+        elif method == "get_last_business_day_datestring":
+            return self.get_last_business_day_datestring(method_args)
+        elif method == "get_datewalk":
+            return self.get_datewalk(method_args)
+        elif method == "get_caches":
+            return self.get_caches(method_args)
+        elif method == "get_tsa":
+            return self.get_tsa(method_args)
+        elif method == "get_ts":
+            return self.get_ts(method_args)
+        elif method == "get_tsastats":
+            return self.get_tsastats(method_args)
+        elif method == "get_quantilles":
+            return self.get_quantilles(method_args)
         elif method == "get_chart_data_ungrouped":
             return self.get_chart_data_ungrouped(method_args)
         elif method == "get_ts_caches":
@@ -275,6 +289,96 @@ class DataLoggerWeb(object):
             key = dict(zip(datalogger.index_keynames, cache[1][1]))
             keys.append(key)
         return json.dumps(keys)
+
+    @calllogger
+    def get_last_business_day_datestring(self, args):
+        """
+        get datestring of last businessday Mo.-Fr.
+        """
+        return json.dumps(DataLogger.get_last_business_day_datestring())
+
+    @calllogger
+    def get_datewalk(self, args):
+        """
+        get datestring of last businessday Mo.-Fr.
+        """
+        datestring1, datestring2 = args
+        logging.info("getting datewalker from %s to %s", datestring1, datestring2)
+        data = tuple(DataLogger.datewalker(datestring1, datestring2))
+        logging.error("Got datewalker output: %s", data)
+        return json.dumps(data)
+
+    @calllogger
+    def get_caches(self, args):
+        """
+        return dictionary of caches available for this project/tablename/datestring combination
+        """
+        project, tablename, datestring = args
+        datalogger = DataLogger(basedir, project, tablename)
+        caches = {}
+        try:
+            caches = datalogger.get_caches(datestring)
+        except StandardError as exc:
+            logging.exception(exc)
+            logging.error(caches)
+        return json.dumps(caches)
+
+    @calllogger
+    def get_tsa(self, args):
+        """
+        return exported TimeseriesArray json formatted
+        """
+        project, tablename, datestring = args
+        datalogger = DataLogger(basedir, project, tablename)
+        tsa = datalogger[datestring]
+        #web.header('Content-type','text/html')
+        #web.header('Transfer-Encoding','chunked')
+        outbuffer = json.dumps(list(tsa.export()))
+        return outbuffer
+
+    @calllogger
+    def get_ts(self, args):
+        """
+        get TimeseriesArray object with one particular Timeseries selected by key
+
+        parameters:
+        /<str>project/<str>tablename/<str>datestring/base64endoded(tuple(key))
+
+        returns:
+        tsa exported in JSON format
+        """
+        assert len(args) == 4
+        project, tablename, datestring, key_str = args
+        key = tuple([unicode(key_value) for key_value in eval(base64.b64decode(key_str))])
+        logging.info("project : %s", project)
+        logging.info("tablename : %s", tablename)
+        logging.info("datestring : %s", datestring)
+        logging.info("key : %s", key)
+        datalogger = DataLogger(basedir, project, tablename)
+        key_dict = dict(zip(datalogger.index_keynames, key))
+        tsa = datalogger.load_tsa(datestring, filterkeys=key_dict)
+        outbuffer = json.dumps(list(tsa.export()))
+        return outbuffer
+
+    @calllogger
+    def get_tsastats(self, args):
+        """
+        return exported TimeseriesArrayStats json formatted
+        """
+        project, tablename, datestring = args
+        datalogger = DataLogger(basedir, project, tablename)
+        tsastats = datalogger.load_tsastats(datestring)
+        return tsastats.to_json()
+
+    @calllogger
+    def get_quantilles(self, args):
+        """
+        return exported QuantillesArray json formatted
+        """
+        project, tablename, datestring = args
+        datalogger = DataLogger(basedir, project, tablename)
+        quantilles = datalogger.load_quantilles(datestring)
+        return quantilles.to_json()
 
     @calllogger
     def get_chart_data_ungrouped(self, args):

@@ -13,6 +13,7 @@ except ImportError:
     pass
 
 BASEDIR = "/var/rrd"
+DATALOGGER_URL = "http://srvmgdata1.tilak.cc/DataLogger"
 
 def get_header(datalogger):
     wikitext = ""
