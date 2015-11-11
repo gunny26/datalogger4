@@ -7,15 +7,16 @@ import gc
 import logging
 logging.basicConfig(level=logging.INFO)
 from datalogger import DataLogger as DataLogger
-from datalogger import TimeseriesArray as TimeseriesArray
-from datalogger import TimeseriesArrayStats as TimeseriesArrayStats
-from datalogger import Timeseries as Timeseries
+from datalogger import DataLoggerWeb as DataLoggerWeb
+#from datalogger import TimeseriesArray as TimeseriesArray
+#from datalogger import TimeseriesArrayStats as TimeseriesArrayStats
+#from datalogger import Timeseries as Timeseries
 from commons import *
 
-def main(datestring, datalogger):
-    caches = datalogger.get_caches(datestring)
+def main(project, tablename, datestring):
+    caches = dataloggerweb.get_caches(project, tablename, datestring)
     #print(caches)
-    tsa = datalogger[datestring]
+    tsa = dataloggerweb.get_tsa(project, tablename, datestring)
     # filtering
     blacklist = ("10.3.51.11", "10.3.23.99", )
     for key in tsa.keys():
@@ -36,16 +37,13 @@ def main(datestring, datalogger):
             pass
     return
     print(tsa[tsa.keys()[0]])
-    tsastats = datalogger.load_tsastats(datestring)
+    tsastats = dataloggerweb.load_tsastats(project, tablename, datestring)
     print(tsastats[tsastats.keys()[0]])
 
 if __name__ == "__main__":
-    datalogger = DataLogger(BASEDIR, "haproxy", "haproxylog")
-    main("2015-11-03", datalogger)
-    sys.exit(0)
-    for datestring in DataLogger.datewalker("2015-10-01", DataLogger.get_last_business_day_datestring()):
-        for project in DataLogger.get_projects(BASEDIR):
-            for tablename in DataLogger.get_tablenames(BASEDIR, project):
-                datalogger = DataLogger(BASEDIR, project, tablename)
-                main(datestring, datalogger)
+    project = "haproxy"
+    tablename = "haproxylog"
+    datalogger = DataLogger(BASEDIR, project, tablename)
+    dataloggerweb = DataLoggerWeb(DATALOGGER_URL)
+    main(project, tablename, "2015-11-03")
     #cProfile.run("main()")

@@ -43,6 +43,30 @@ def calllogger(func):
             return "call to %s caused StandardError" % call_str
     return inner
 
+MEMCACHE = {}
+MAXAGE = 300
+def memcache(func):
+    def inner(*args, **kwds):
+        starttime = time.time()
+        key = unicode((func.__name__, args[1:], kwds))
+        if key not in MEMCACHE:
+            #logging.info("createing new cache entry for %s", key)
+            MEMCACHE[key] = { "ts" : time.time(), "data" : None }
+        else:
+            if MEMCACHE[key]["ts"] < time.time() + MAXAGE:
+                logging.info("returning from cache")
+                return MEMCACHE[key]["data"]
+        logging.debug("key : ", key)
+        try:
+            ret_val = func(*args, **kwds)
+            #logging.info("Storing returned data in cache for %s s", MAXAGE)
+            MEMCACHE[key]["data"] = ret_val
+            return ret_val
+        except StandardError as exc:
+            logging.exception(exc)
+    return inner
+
+
 
 class DataLoggerWeb(object):
     """retrieve Data from RRD Archive"""
@@ -135,6 +159,7 @@ class DataLoggerWeb(object):
             return "There is no method called %s" % method
 
     @calllogger
+    @memcache
     def get_projects(self, args):
         """
         get all available projects, use directory listing for that,
@@ -149,6 +174,7 @@ class DataLoggerWeb(object):
         return json.dumps(DataLogger.get_projects(basedir))
 
     @calllogger
+    @memcache
     def get_tablenames(self, args):
         """
         get available tablenames, for one particular project
@@ -165,6 +191,7 @@ class DataLoggerWeb(object):
         return json.dumps(DataLogger.get_tablenames(basedir, project))
 
     @calllogger
+    @memcache
     def get_headers(self, args):
         """
         get name of headers (all columns so ts_keyname + index_keynames + value_keynames)
@@ -181,6 +208,7 @@ class DataLoggerWeb(object):
         return json.dumps(datalogger.headers)
 
     @calllogger
+    @memcache
     def get_index_keynames(self, args):
         """
         get name of index columns for project/tablename
@@ -197,6 +225,7 @@ class DataLoggerWeb(object):
         return json.dumps(datalogger.index_keynames)
 
     @calllogger
+    @memcache
     def get_value_keynames(self, args):
         """
         get name of value columns for project/tablename
@@ -214,6 +243,7 @@ class DataLoggerWeb(object):
         return json.dumps(datalogger.value_keynames)
 
     @calllogger
+    @memcache
     def get_ts_keyname(self, args):
         """
         get name of timestamp column
@@ -309,6 +339,7 @@ class DataLoggerWeb(object):
         return json.dumps(data)
 
     @calllogger
+    @memcache
     def get_caches(self, args):
         """
         return dictionary of caches available for this project/tablename/datestring combination
