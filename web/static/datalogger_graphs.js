@@ -267,14 +267,14 @@ function draw_develop(canvas, title, data, max) {
     });
 }
 
-function draw_scatterplot(canvas, keys, value_keys, data) {
-    $(canvas).highcharts({
+function draw_scatterplot(canvas, title, data, value_key1, value_key2) {
+    $("#" + canvas).highcharts({
         chart: {
             type: 'scatter',
             zoomType: 'xy'
         },
         title: {
-            text: 'Counter for key ' + value_keys
+            text: title
         },
         subtitle: {
             text: 'DataLogger'
@@ -282,7 +282,7 @@ function draw_scatterplot(canvas, keys, value_keys, data) {
         xAxis: {
             title: {
                 enabled: true,
-                text: value_keys[0]
+                text: value_key1
             },
             startOnTick: true,
             endOnTick: true,
@@ -290,10 +290,11 @@ function draw_scatterplot(canvas, keys, value_keys, data) {
         },
         yAxis: {
             title: {
-                text: value_keys[1]
+                text: value_key2
             }
         },
         legend: {
+            enabled : false
         },
         plotOptions: {
             scatter: {

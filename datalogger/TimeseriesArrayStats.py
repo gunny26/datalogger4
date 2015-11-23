@@ -48,6 +48,9 @@ class TimeseriesArrayStats(object):
     def __getitem__(self, key):
         return self.__stats[key]
 
+    def __delitem__(self, key):
+        del self.__stats[key]
+
     def keys(self):
         return self.__stats.keys()
 
@@ -263,3 +266,29 @@ class TimeseriesArrayStats(object):
             # so convert key to tuple
             tsastats.__stats[tuple(key)] = TimeseriesStats.from_json(tsstats)
         return tsastats
+
+    def remove_by_value(self, value_key, stat_func_name, value):
+        """
+        remove key from internal data, if condition is met
+        """
+        for key, tsstats in self.__stats.items():
+            if tsstats[value_key][stat_func_name]  == value:
+                del self.__stats[key]
+
+    def to_csv(self, stat_func_name, sortkey=None, reverse=True):
+        """
+        return csv table of data for one specific statistical function
+        """
+        outbuffer = []
+        outbuffer.append(self.__index_keys + self.__value_keys)
+        data = None
+        if sortkey is not None:
+            data = sorted(self.__stats.items(), key=lambda item: item[1][sortkey][stat_func_name], reverse=True)
+        else:
+            data = self.__stats.items()
+        for key, value in data:
+            values = list(key) + [value[value_key][stat_func_name] for value_key in self.__value_keys]
+            outbuffer.append(values)
+        return outbuffer
+
+

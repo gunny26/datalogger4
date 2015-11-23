@@ -11,6 +11,7 @@ import base64
 import gzip
 # own modules
 from datalogger import DataLogger as DataLogger
+from datalogger import TimeseriesStats as TimeseriesStats
 
 urls = (
     "/(.*)", "DataLoggerWeb",
@@ -41,6 +42,9 @@ def calllogger(func):
             logging.exception(exc)
             logging.error("call to %s caused StandardError", call_str)
             return "call to %s caused StandardError" % call_str
+    # set inner function __name__ and __doc__ to original ones
+    inner.__name__ = func.__name__
+    inner.__doc__ = func.__doc__
     return inner
 
 MEMCACHE = {}
@@ -64,6 +68,9 @@ def memcache(func):
             return ret_val
         except StandardError as exc:
             logging.exception(exc)
+    # set inner function __name__ and __doc__ to original ones
+    inner.__name__ = func.__name__
+    inner.__doc__ = func.__doc__
     return inner
 
 
@@ -93,7 +100,9 @@ class DataLoggerWeb(object):
         web.header('Access-Control-Allow-Origin', '*')
         web.header('Access-Control-Allow-Credentials', 'true')
         method_args = args.split("/")[1:] # all without method name
-        if method == "get_headers":
+        if method == "doc":
+            return self.doc(method_args)
+        elif method == "get_headers":
             return self.get_headers(method_args)
         elif method == "get_index_keynames":
             return self.get_index_keynames(method_args)
@@ -119,6 +128,8 @@ class DataLoggerWeb(object):
             return self.get_ts(method_args)
         elif method == "get_tsastats":
             return self.get_tsastats(method_args)
+        elif method == "get_stat_func_names":
+            return self.get_stat_func_names(method_args)
         elif method == "get_quantilles":
             return self.get_quantilles(method_args)
         elif method == "get_chart_data_ungrouped":
@@ -133,6 +144,8 @@ class DataLoggerWeb(object):
             return self.get_scatter_data(method_args)
         elif method == "get_longtime_data":
             return self.get_longtime_data(method_args)
+        elif method == "get_tsastats_table":
+            return self.get_tsastats_table(method_args)
         else:
             return "There is no method called %s" % method
 
@@ -157,6 +170,22 @@ class DataLoggerWeb(object):
             return self.upload_raw_file(method_args)
         else:
             return "There is no method called %s" % method
+
+    @calllogger
+    def doc(self, args):
+        """
+        get docstrings from methods available
+        """
+        name = __name__
+        doc = __doc__
+        if len(args) == 1:
+            func =  eval("self.%s" % args[0])
+            doc = func.__doc__
+            name = func.__name__
+        outbuffer = ["def %s(*args, **kwds)" % name]
+        if doc is not None:
+            outbuffer += doc.split("\n")
+        return "<br>".join(outbuffer)
 
     @calllogger
     @memcache
@@ -402,6 +431,14 @@ class DataLoggerWeb(object):
         return tsastats.to_json()
 
     @calllogger
+    def get_stat_func_names(self, args):
+        """
+        return defined stat_func_names in TimeseriesStats objects
+        """
+        stat_func_names = TimeseriesStats.stat_funcs.keys()
+        return json.dumps(stat_func_names)
+
+    @calllogger
     def get_quantilles(self, args):
         """
         return exported QuantillesArray json formatted
@@ -511,56 +548,6 @@ class DataLoggerWeb(object):
             )
         return json.dumps(result)
 
-    def get_scatter_data(self, args):
-        """
-        gets scatter plot data
-
-        vicenter/hostSystemDiskStats/2015-07-13/["disk.totalReadLatency.average","disk.totalWriteLatency.average"]/"absolute"/"hostname"
-        """
-        assert len(args) == 6
-        project, tablename, datestring, value_keys_str, datatype_str, group_str = args
-        value_keys = ()
-        if json.loads(value_keys_str) is not None:
-            value_keys = tuple(json.loads(value_keys_str))
-        datatype = json.loads(datatype_str)
-        group_by = ()
-        if json.loads(group_str) is not None:
-            group_by = (json.loads(group_str),)
-        logging.info("project : %s", project)
-        logging.info("tablename : %s", tablename)
-        logging.info("datestring : %s", datestring)
-        logging.info("value_keys : %s", value_keys)
-        logging.info("datatype : %s", datatype)
-        logging.info("group_by : %s", group_by)
-        tsa = None
-        datalogger = DataLogger(basedir, project, tablename)
-        tsa = datalogger.load_tsa(datestring)
-        # is there something to calculate, lets do it
-        if datatype != u"absolute":
-            new_value_keys = []
-            for value_key in value_keys:
-                new_value_key = None
-                if datatype == "derive":
-                    new_value_key = "%s_d" % value_key
-                    logging.info("deriving %s to %s", value_key, new_value_key)
-                    tsa.add_derive_col(value_key, new_value_key)
-                elif datatype == "per_s":
-                    new_value_key = "%s_s" % value_key
-                    logging.info("deriving %s to %s", value_key, new_value_key)
-                    tsa.add_per_s_col(value_key, new_value_key)
-                tsa.remove_col(value_key)
-                new_value_keys.append(new_value_key)
-            value_keys = new_value_keys
-        #logging.info(tsa.get_value_keys())
-        # grouping stuff if necessary
-        data = None # holds finally calculated data
-        if len(group_by) > 0:
-            logging.info("grouping tsa by %s", group_by)
-            new_tsa = tsa.get_group_by_tsa(group_by, group_func=lambda a: sum(a))
-            tsa = new_tsa
-        data = datalogger.get_scatter_data(tsa, value_keys, "mean")
-        return json.dumps(data)
-
     @calllogger
     def get_longtime_data(self, args):
         """
@@ -640,6 +627,49 @@ class DataLoggerWeb(object):
         logging.info("File stored")
         return "File stored"
 
+    @calllogger
+    def get_tsastats_table(self, args):
+        """
+        return exported QuantillesArray json formatted
+        """
+        def csv_to_table(csvdata):
+            outbuffer = []
+            outbuffer.append("<thead><tr>")
+            [outbuffer.append("<th>%s</th>" % header) for header in csvdata[0]]
+            outbuffer.append("</tr></thead><tbody>")
+            for values in csvdata[1:]:
+                outbuffer.append("<tr>")
+                [outbuffer.append("<td type=numeric>%s</td>" % value) for value in values]
+                outbuffer.append("</tr>")
+            outbuffer.append("</tbody>")
+            return outbuffer
+        project, tablename, datestring, stat_func_name = args
+        datalogger = DataLogger(basedir, project, tablename)
+        tsastats = datalogger.load_tsastats(datestring)
+        return json.dumps("\n".join(csv_to_table(tsastats.to_csv(stat_func_name))))
+
+    def get_scatter_data(self, args):
+        """
+        gets scatter plot data
+
+        vicenter/hostSystemDiskStats/2015-07-13/disk.totalReadLatency.average/disk.totalWriteLatency.average/avg
+        """
+        assert len(args) == 6
+        project, tablename, datestring, value_key1, value_key2, stat_func_name = args
+        logging.info("project : %s", project)
+        logging.info("tablename : %s", tablename)
+        logging.info("datestring : %s", datestring)
+        logging.info("value_key1 : %s", value_key1)
+        logging.info("value_key2 : %s", value_key2)
+        datalogger = DataLogger(basedir, project, tablename)
+        tsastats = datalogger.load_tsastats(datestring)
+        hc_scatter_data = []
+        for key, tsstat in tsastats.items():
+            hc_scatter_data.append({
+                "name" : str(key),
+                "data" : ((tsstat[value_key1]["avg"], tsstat[value_key2]["avg"]), )
+            })
+        return json.dumps(hc_scatter_data)
 
 if __name__ == "__main__":
     app = web.application(urls, globals())

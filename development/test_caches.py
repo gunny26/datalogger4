@@ -42,7 +42,7 @@ def main(project, tablename, datestring, datalogger):
 if __name__ == "__main__":
     datalogger = DataLoggerWeb(DATALOGGER_URL)
     #for datestring in DataLogger.datewalker("2015-09-01", datalogger.get_last_business_day_datestring()):
-    for datestring in datalogger.get_datewalk("2015-09-01", datalogger.get_last_business_day_datestring()):
+    for datestring in datalogger.get_datewalk("2015-03-01", datalogger.get_last_business_day_datestring()):
         for project in datalogger.get_projects():
             for tablename in datalogger.get_tablenames(project):
                 #datalogger = DataLogger(BASEDIR, project, tablename)
