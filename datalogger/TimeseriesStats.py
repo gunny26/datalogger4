@@ -158,7 +158,6 @@ class TimeseriesStats(object):
         outbuffer.append("</table>")
         return "\n".join(outbuffer)
 
-
     def keys(self):
         return self.__stats.keys()
 

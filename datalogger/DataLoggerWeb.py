@@ -89,6 +89,36 @@ class DataLoggerWeb(object):
             logging.error("Error occured calling %s", url)
             raise exc
 
+    def __get_json_chunked(self, method, uri_params, query_params):
+        """
+        call url return data received
+
+        parameters:
+        method <str> Web Application Function to call
+        uri_parameters <dict>
+        query_parameters <dict>
+
+        returns:
+        <str> returnd from urllib
+        """
+        url = self.__get_url(method, uri_params, query_params)
+        try:
+            res = urllib2.urlopen(url)
+            logging.debug("got Status code : %s", res.code)
+            data = ""
+            raw = res.read()
+            while raw:
+                try:
+                    data += raw
+                    raw = res.read()
+                except ValueError as exc:
+                    logging.exception(exc)
+            return json.loads(data)
+        except StandardError as exc:
+            logging.exception(exc)
+            logging.error("Error occured calling %s", url)
+            raise exc
+
 #    def __urlencode_json(self, data):
 #        return urllib.quote_plus(json.dumps(data).replace(" ", ""))
 
@@ -119,6 +149,25 @@ class DataLoggerWeb(object):
         }
         query_params = {}
         data = self.__get_json("get_tablenames", uri_params, query_params)
+        return data
+
+    def get_wikiname(self, project, tablename):
+        """
+        get wikiname for given project tablename
+
+        parameters:
+        project <str>
+        tablename <str>
+
+        returns:
+        <str>
+        """
+        uri_params = {
+            "project" : project,
+            "tablename" : tablename
+        }
+        query_params = {}
+        data = self.__get_json("get_wikiname", uri_params, query_params)
         return data
 
     def get_headers(self, project, tablename):
@@ -267,7 +316,7 @@ class DataLoggerWeb(object):
             "datestring" : datestring,
         }
         query_params = {}
-        data = self.__get_json("get_tsa", uri_params, query_params)
+        data = self.__get_json_chunked("get_tsa", uri_params, query_params)
         for row in data:
             tsa.add(row)
         return tsa
@@ -296,7 +345,7 @@ class DataLoggerWeb(object):
             "key" : base64.b64encode(unicode(key)),
         }
         query_params = {}
-        data = self.__get_json("get_ts", uri_params, query_params)
+        data = self.__get_json_chunked("get_ts", uri_params, query_params)
         for row in data:
             tsa.add(row)
         return tsa
@@ -357,6 +406,10 @@ class Test(unittest.TestCase):
     def test_get_tablenames(self):
         data = self.datalogger.get_tablenames("vicenter")
         self.assertTrue(isinstance(data, list))
+
+    def test_get_wikiname(self):
+        data = self.datalogger.get_wikiname("ucs", "ifTable")
+        self.assertTrue(isinstance(data, basestring))
 
     def test_get_headers(self):
         data = self.datalogger.get_headers("ucs", "ifTable")

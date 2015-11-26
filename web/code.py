@@ -114,6 +114,8 @@ class DataLoggerWeb(object):
             return self.get_projects(method_args)
         elif method == "get_tablenames":
             return self.get_tablenames(method_args)
+        elif method == "get_wikiname":
+            return self.get_wikiname(method_args)
         elif method == "get_headers":
             return self.get_headers(method_args)
         elif method == "get_last_business_day_datestring":
@@ -218,6 +220,23 @@ class DataLoggerWeb(object):
         assert len(args) == 1
         project = args[0]
         return json.dumps(DataLogger.get_tablenames(basedir, project))
+
+    @calllogger
+    @memcache
+    def get_wikiname(self, args):
+        """
+        return WikiName for given project/tablename
+
+        parameters:
+        <str>projectname
+        <str>tablename
+
+        returns:
+        <json><str> to use as WikiName
+        """
+        assert len(args) == 2
+        project, tablename = args
+        return json.dumps("DataLoggerReport%s%s" % (project.capitalize(), tablename.capitalize()))
 
     @calllogger
     @memcache
@@ -383,7 +402,6 @@ class DataLoggerWeb(object):
             logging.error(caches)
         return json.dumps(caches)
 
-    @calllogger
     def get_tsa(self, args):
         """
         return exported TimeseriesArray json formatted
@@ -391,10 +409,17 @@ class DataLoggerWeb(object):
         project, tablename, datestring = args
         datalogger = DataLogger(basedir, project, tablename)
         tsa = datalogger[datestring]
-        #web.header('Content-type','text/html')
-        #web.header('Transfer-Encoding','chunked')
-        outbuffer = json.dumps(list(tsa.export()))
-        return outbuffer
+        web.header('Content-type','text/html')
+        # you must not set this option, according to
+        # http://stackoverflow.com/questions/11866333/ioerror-when-trying-to-serve-file
+        # web.header('Transfer-Encoding','chunked')
+        yield "[" + json.dumps(tsa.export().next())
+        for chunk in tsa.export():
+                #logging.info("yielding %s", chunk)
+                yield "," + json.dumps(chunk)
+        yield "]"
+        #outbuffer = json.dumps(tuple(tsa.export()))
+        #return outbuffer
 
     @calllogger
     def get_ts(self, args):
@@ -417,8 +442,12 @@ class DataLoggerWeb(object):
         datalogger = DataLogger(basedir, project, tablename)
         key_dict = dict(zip(datalogger.index_keynames, key))
         tsa = datalogger.load_tsa(datestring, filterkeys=key_dict)
-        outbuffer = json.dumps(list(tsa.export()))
-        return outbuffer
+        yield "[" + json.dumps(tsa.export().next())
+        for chunk in tsa.export():
+            yield "," + json.dumps(chunk)
+        yield "]"
+        #outbuffer = json.dumps(tuple(tsa.export()))
+        #return outbuffer
 
     @calllogger
     def get_tsastats(self, args):
@@ -632,21 +661,22 @@ class DataLoggerWeb(object):
         """
         return exported QuantillesArray json formatted
         """
-        def csv_to_table(csvdata):
+        def csv_to_table(csvdata, keys):
             outbuffer = []
             outbuffer.append("<thead><tr>")
             [outbuffer.append("<th>%s</th>" % header) for header in csvdata[0]]
             outbuffer.append("</tr></thead><tbody>")
             for values in csvdata[1:]:
                 outbuffer.append("<tr>")
-                [outbuffer.append("<td type=numeric>%s</td>" % value) for value in values]
+                [outbuffer.append("<td >%s</td>" % value) for value in values[0:keys]]
+                [outbuffer.append("<td type=numeric>%0.2f</td>" % value) for value in values[keys:]]
                 outbuffer.append("</tr>")
             outbuffer.append("</tbody>")
             return outbuffer
         project, tablename, datestring, stat_func_name = args
         datalogger = DataLogger(basedir, project, tablename)
         tsastats = datalogger.load_tsastats(datestring)
-        return json.dumps("\n".join(csv_to_table(tsastats.to_csv(stat_func_name))))
+        return json.dumps("\n".join(csv_to_table(tsastats.to_csv(stat_func_name), len(tsastats.index_keys))))
 
     def get_scatter_data(self, args):
         """
