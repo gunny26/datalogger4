@@ -1,6 +1,6 @@
 #!/usr/bin/python
 import logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.ERROR)
 import os
 import time
 import datetime
