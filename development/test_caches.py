@@ -22,7 +22,7 @@ def main(project, tablename, datestring, datalogger):
         #print("RAW filename : %s" % caches["tsa"]["raw"])
         if len(caches["tsa"]["keys"]) == 0:
             print(suffix, "TSA Archive missing, calling get_tsa and get_tsastats")
-            datalogger.get_tsa(project, tablename, datestring)
+            #datalogger.get_tsa(project, tablename, datestring)
             datalogger.get_tsastats(project, tablename, datestring)
         else:
             #print("TSA filename : %s" % caches["tsa"]["keys"])
