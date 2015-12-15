@@ -3,6 +3,7 @@
 """
 module for TiemseriesArray Class
 """
+import re
 import logging
 import base64
 import json
@@ -469,10 +470,18 @@ class TimeseriesArray(object):
         return filenames
 
     @staticmethod
-    def load(path, index_keys, filterkeys=None, matchtype="and"):
+    def load(path, index_keys, filterkeys=None, index_pattern=None, matchtype="and"):
         """
         filterkeys could be a part of existing index_keys
         all matching keys will be used
+
+        index_keys <tuple>
+        filterkeys <tuple> default None
+        matchtype <str> default "and"
+        index_pattern <str> for use in re.compile(index_pattern)
+
+        return:
+        <TimeseriesArray>
         """
         tsa_filename = TimeseriesArray.get_dumpfilename(index_keys)
         infile = os.path.join(path, tsa_filename)
@@ -482,14 +491,27 @@ class TimeseriesArray(object):
             filehandle.close()
         except StandardError as exc:
             logging.exception(exc)
-            logging.error("Something went wrong while loading json data from %s" % tsa_filename)
+            logging.error("Something went wrong while loading json data from %s", tsa_filename)
             raise exc
         tsa = TimeseriesArray(data["index_keys"], data["value_keys"], data["ts_key"])
-        for key, filename in tsa.get_ts_filenames(path, index_keys, filterkeys, matchtype).items():
-            logging.debug("loading Timeseries from file %s", filename)
-            filehandle = gzip.open(filename, "rb")
-            tsa.data[key] = Timeseries.load_from_csv(filehandle)
-            filehandle.close() # close to not get too many open files
+        if index_pattern is None:
+            for key, filename in tsa.get_ts_filenames(path, index_keys, filterkeys, matchtype).items():
+                logging.debug("loading Timeseries from file %s", filename)
+                filehandle = gzip.open(filename, "rb")
+                tsa.data[key] = Timeseries.load_from_csv(filehandle)
+                filehandle.close() # close to not get too many open files
+        else:
+            logging.info("using index_pattern %s to filter loaded keys", index_pattern)
+            rex = re.compile(index_pattern)
+            for key, filename in tsa.get_ts_filenames(path, index_keys, filterkeys, matchtype).items():
+                m = rex.match(unicode(key))
+                if m is not None:
+                    logging.debug("loading Timeseries from file %s", filename)
+                    filehandle = gzip.open(filename, "rb")
+                    tsa.data[key] = Timeseries.load_from_csv(filehandle)
+                    filehandle.close() # close to not get too many open files
+                else:
+                    logging.info("index_key %s filtered", key)
         return tsa
     load_split = load
 
