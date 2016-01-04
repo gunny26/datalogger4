@@ -22,7 +22,7 @@ def main(project, tablename, datestring, datalogger):
         #print("RAW filename : %s" % caches["tsa"]["raw"])
         if len(caches["tsa"]["keys"]) == 0:
             print(suffix, "TSA Archive missing, calling get_tsa and get_tsastats")
-            datalogger.get_tsa(project, tablename, datestring)
+            #datalogger.get_tsa(project, tablename, datestring)
             datalogger.get_tsastats(project, tablename, datestring)
         else:
             #print("TSA filename : %s" % caches["tsa"]["keys"])
@@ -42,7 +42,7 @@ def main(project, tablename, datestring, datalogger):
 if __name__ == "__main__":
     datalogger = DataLoggerWeb()
     #for datestring in DataLogger.datewalker("2015-09-01", datalogger.get_last_business_day_datestring()):
-    for datestring in datalogger.get_datewalk("2015-03-01", datalogger.get_last_business_day_datestring()):
+    for datestring in datalogger.get_datewalk("2015-11-01", datalogger.get_last_business_day_datestring()):
         for project in datalogger.get_projects():
             for tablename in datalogger.get_tablenames(project):
                 #datalogger = DataLogger(BASEDIR, project, tablename)

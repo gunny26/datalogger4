@@ -41,7 +41,7 @@ def find_values(result):
         #logging.debug("Found more than one MetricSeries, searching for default series")
         # if there are more than one MetricSeries,
         # search for set with instance = '' and use this one
-        # if there is no dfault set, buld average of available
+        # if there is no dfault set, build average of available
         # datasets
         for metric_series in result.value:
             if metric_series.id.instance == '':
@@ -98,11 +98,7 @@ def get_data(managed_object, interval, counters):
         #Find VM supplied as arg and use Managed Object Reference (moref) for the PrintVmInfo
         for mor in properties:
             if mor['runtime.powerState'] == "poweredOn":
-                if not ".tilak" in mor["moref"].name:
-                    logging.debug("skipping non valid DNS virtual machine name %s", mor["moref"].name)
-                    continue
-                else:
-                    logging.info("getting performance counter for %s", mor["moref"].name)
+                logging.info("getting performance counter for %s", mor["moref"].name)
                 try:
                     get_perf_values(mor['moref'], vchtime, interval, perf_dict, data, counters)
                 except EmptyResultSet as exc:

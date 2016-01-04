@@ -92,11 +92,7 @@ def get_data(managed_object, interval, counters):
             #if mor["moref"].name != "srvcacapp1.tilak.cc":
             #    continue
             if mor['runtime.powerState'] == "poweredOn":
-                if not ".tilak" in mor["moref"].name:
-                    logging.debug("skipping non valid DNS virtual machine name %s", mor["moref"].name)
-                    continue
-                else:
-                    logging.info("getting performance counter for %s", mor["moref"].name)
+                logging.info("getting performance counter for %s", mor["moref"].name)
                 try:
                     get_perf_values(mor['moref'], vchtime, interval, perf_dict, data, counters)
                 except EmptyResultSet as exc:

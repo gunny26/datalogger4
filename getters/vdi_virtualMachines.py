@@ -32,18 +32,16 @@ def datetime_to_timestamp(in_datetime):
 
 def find_values(result):
     """
-    find correct value set in resultset
+    extract values from resultset
 
-    in vicenter nic interfaces start with instance name 4000 und upward
-    all other instance names are ignored, they belong to esx (vmnic1, 2,)
-    or are summary of every interface instance=""
+    returns
+    <dict>[instance] = <tuple>values
     """
     values = {}
     for metric_series in result.value:
         instance = metric_series.id.instance
-        if instance.startswith("40"):
-            values[instance] = metric_series.value
-    return(values)
+        values[instance] = metric_series.value
+    return values
 
 def parse_result(result, data, name, counter):
     """
@@ -53,18 +51,26 @@ def parse_result(result, data, name, counter):
     # first find correct values in result
     values = find_values(result)
     # get data in shape
-    index = 0
-    for sample_info in result.sampleInfo:
+    for index, sample_info in enumerate(result.sampleInfo):
+        # iterating over every timestamp in sampleInfo
         timestamp = datetime_to_timestamp(sample_info.timestamp) # to unix timestamp
         for instance in values.keys():
+            # if there is only one instance - use it,
+            # if there are multiple, ignore the instance named ""
+            if (len(values.keys()) >  1) and (instance == ""):
+                continue
+            # build keyname, and correct "" to "all"
+            # memory will be only this instance name
             keyid = (timestamp, name, instance)
+            if instance == "":
+                keyid = (timestamp, name, "all")
             if keyid not in data:
                 data[keyid] = {
                     counter : values[instance][index] # index corresponds to index in results
                 }
             else:
                 data[keyid][counter] = values[instance][index]
-        index += 1
+    return data
 
 def get_perf_values(mor, vchtime, interval, perf_dict, data, counters):
     """
@@ -91,10 +97,9 @@ def get_data(managed_object, interval, counters):
         properties = tvsp.get_properties([managed_object], ['name', 'runtime.powerState'], managed_object)
         #Find VM supplied as arg and use Managed Object Reference (moref) for the PrintVmInfo
         for mor in properties:
-            #if mor["moref"].name != "srvcacapp1.tilak.cc":
+            #if mor["moref"].name != "WS00008220":
             #    continue
             if mor['runtime.powerState'] == "poweredOn":
-                logging.info("getting performance counter for %s", mor["moref"].name)
                 try:
                     get_perf_values(mor['moref'], vchtime, interval, perf_dict, data, counters)
                 except EmptyResultSet as exc:
@@ -143,30 +148,70 @@ def main():
     """main what else"""
     #import cProfile
     #cProfile.run("main()")
-    counters = (
-        "net.usage.average",
-        "net.received.average",
-        "net.transmitted.average",
-        "net.droppedRx.summation",
-        "net.droppedTx.summation",
-        )
+    counter_dict = {
+        "virtualMachineCpuStats" : ( # datalogger tablename
+            "cpu.idle.summation", # vicenter counter names in this table
+            "cpu.ready.summation",
+            "cpu.system.summation",
+            "cpu.used.summation",
+            "cpu.wait.summation",
+            ),
+        "virtualMachineMemoryStats": (
+            "mem.consumed.average",
+            "mem.overhead.average",
+            "mem.active.average",
+            "mem.shared.average",
+            "mem.granted.average",
+            "mem.swapped.average",
+            ),
+        "virtualMachineDatastoreStats" : (
+            "datastore.totalReadLatency.average",
+            "datastore.totalWriteLatency.average",
+            "datastore.read.average",
+            "datastore.write.average",
+            "datastore.numberReadAveraged.average",
+            "datastore.numberWriteAveraged.average",
+            ),
+        "virtualMachineDiskStats" : (
+            "disk.numberReadAveraged.average",
+            "disk.numberWriteAveraged.average",
+            "disk.read.average",
+            "disk.write.average",
+            "disk.commandsAborted.summation",
+            "disk.commands.summation",
+            "disk.busResets.summation",
+            ),
+# known issue as of vicenter 5.5, these counters are not available
+#        "virtualMachineNetworkStats" : (
+#            "net.usage.average",
+#            "net.received.average",
+#            "net.transmitted.average",
+#            "net.droppedRx.summation",
+#            "net.droppedTx.summation",
+#            ),
+    }
     basedir = "/var/rrd"
     project = "vdi"
-    tablename = "virtualMachineNetworkStats"
     interval = 35 # get 35 minutes of performance counters
-    # create basic directory structure
-    if not os.path.exists(os.path.join(basedir, project)):
-        os.mkdir(os.path.join(basedir, project))
-    basedir_raw = os.path.join(basedir, project, "raw")
-    basedir_rrd = os.path.join(basedir, project, "rrd")
-    basedir_gfx = os.path.join(basedir, project, "gfx")
-    for directory in (basedir_raw, basedir_rrd, basedir_gfx):
-        if not os.path.exists(directory):
-            os.mkdir(directory)
-    # get data
-    data = get_data(vim.VirtualMachine, interval, counters)
-    # save data
-    save_data(basedir_raw, tablename, data)
+    for tablename, counters in counter_dict.items():
+        logging.info("fetching table %s", tablename)
+        # create basic directory structure
+        if not os.path.exists(os.path.join(basedir, project)):
+            os.mkdir(os.path.join(basedir, project))
+        basedir_raw = os.path.join(basedir, project, "raw")
+        basedir_rrd = os.path.join(basedir, project, "rrd")
+        basedir_gfx = os.path.join(basedir, project, "gfx")
+        for directory in (basedir_raw, basedir_rrd, basedir_gfx):
+            if not os.path.exists(directory):
+                os.mkdir(directory)
+        # get data
+        data = get_data(vim.VirtualMachine, interval, counters)
+        if len(data) > 0:
+            logging.info("saving data")
+            # save data
+            save_data(basedir_raw, tablename, data)
+        else:
+            logging.info("no data receiveed")
 
 if __name__ == "__main__":
     tvsp = tilak_vimomi.TilakVdi()
