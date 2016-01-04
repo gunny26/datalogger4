@@ -428,7 +428,7 @@ class DataLogger(object):
             calls.append((self.load_tsastats, (datestring, key)))
         return calls
 
-    def load_tsa(self, datestring, filterkeys=None, timedelta=0, cleancache=False):
+    def load_tsa(self, datestring, filterkeys=None, index_pattern=None, timedelta=0, cleancache=False):
         """
         caching version to load_tsa_raw
         if never called, get ts from load_tsa_raw, and afterwards dump_tsa
@@ -437,8 +437,10 @@ class DataLogger(object):
 
         parameters:
         datestring <str>
-        timedelta <int>
-        cleancache <bool>
+        filterkeys <tuple> or None default None
+        index_pattern <str> or None default None
+        timedelta <int> default 0
+        cleancache <bool> default False
 
         returns
         <TimeseriesArray> object read from cachefile or from raw data
@@ -455,7 +457,7 @@ class DataLogger(object):
             """
             tsa = self.load_tsa_raw(datestring, timedelta)
             tsa.dump_split(cachedir) # save full data
-            tsa = self.iconvert(TimeseriesArray.load_split(cachedir, self.__index_keynames, filterkeys))
+            tsa = self.iconvert(TimeseriesArray.load_split(cachedir, self.__index_keynames, filterkeys=filterkeys, index_pattern=index_pattern))
             return tsa
         if not os.path.isfile(cachefilename):
             logging.info("cachefile %s does not exist, fallback read from raw", cachefilename)
@@ -466,7 +468,7 @@ class DataLogger(object):
             return fallback()
         logging.debug("loading stored TimeseriesArray object file %s", cachefilename)
         try:
-            tsa = self.iconvert(TimeseriesArray.load_split(cachedir, self.__index_keynames, filterkeys))
+            tsa = self.iconvert(TimeseriesArray.load_split(cachedir, self.__index_keynames, filterkeys=filterkeys, index_pattern=index_pattern))
             return tsa
         except IOError:
             logging.error("IOError while reading from %s, using fallback", cachefilename)

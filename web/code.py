@@ -126,6 +126,8 @@ class DataLoggerWeb(object):
             return self.get_caches(method_args)
         elif method == "get_tsa":
             return self.get_tsa(method_args)
+        elif method == "get_tsa_adv":
+            return self.get_tsa_adv(method_args)
         elif method == "get_ts":
             return self.get_ts(method_args)
         elif method == "get_tsastats":
@@ -381,9 +383,7 @@ class DataLoggerWeb(object):
         get datestring of last businessday Mo.-Fr.
         """
         datestring1, datestring2 = args
-        logging.info("getting datewalker from %s to %s", datestring1, datestring2)
         data = tuple(DataLogger.datewalker(datestring1, datestring2))
-        logging.error("Got datewalker output: %s", data)
         return json.dumps(data)
 
     @calllogger
@@ -402,6 +402,7 @@ class DataLoggerWeb(object):
             logging.error(caches)
         return json.dumps(caches)
 
+    @calllogger
     def get_tsa(self, args):
         """
         return exported TimeseriesArray json formatted
@@ -418,8 +419,48 @@ class DataLoggerWeb(object):
                 #logging.info("yielding %s", chunk)
                 yield "," + json.dumps(chunk)
         yield "]"
-        #outbuffer = json.dumps(tuple(tsa.export()))
-        #return outbuffer
+
+    @calllogger
+    def get_tsa_adv(self, args):
+        """
+        return exported TimeseriesArray json formatted
+        """
+        group_funcs = {
+            "avg" : lambda a, b: (a+b)/2,
+            "min" : min,
+            "max" : max,
+            "sum" : lambda a, b: a+b,
+        }
+        logging.info(args)
+        project, tablename, datestring, groupkeys_enc, group_func_name, index_pattern_enc = args
+        groupkeys_dec = eval(base64.b64decode(groupkeys_enc)) # should be tuple
+        logging.info("groupkeys_dec: %s", groupkeys_dec)
+        index_pattern = base64.b64decode(index_pattern_enc)
+        if index_pattern == "None":
+            index_pattern = None
+        logging.info("index_pattern: %s", index_pattern)
+        assert group_func_name in group_funcs.keys()
+        datalogger = DataLogger(basedir, project, tablename)
+        tsa = None
+        # gete data
+        if groupkeys_dec is not None:
+            logging.info("groupkeys is %s", groupkeys_dec)
+            groupkeys = tuple([unicode(key_value) for key_value in groupkeys_dec])
+            tsa1 = datalogger.load_tsa(datestring, index_pattern=index_pattern)
+            tsa = datalogger.group_by(datestring, tsa1, groupkeys, group_funcs[group_func_name])
+        else:
+            logging.info("groupkeys is None, fallback to get ungrouped tsa")
+            tsa = datalogger.load_tsa(datestring, index_pattern=index_pattern)
+        logging.info(tsa.keys()[0])
+        web.header('Content-type','text/html')
+        # you must not set this option, according to
+        # http://stackoverflow.com/questions/11866333/ioerror-when-trying-to-serve-file
+        # web.header('Transfer-Encoding','chunked')
+        yield "[" + json.dumps(tsa.export().next())
+        for chunk in tsa.export():
+                #logging.info("yielding %s", chunk)
+                yield "," + json.dumps(chunk)
+        yield "]"
 
     @calllogger
     def get_ts(self, args):
@@ -610,7 +651,7 @@ class DataLoggerWeb(object):
         logging.info("value_keys : %s", value_key)
         datalogger = DataLogger(basedir, project, tablename)
         data = datalogger.get_tsastats_longtime_hc(monthstring, keys, value_key)
-        logging.info("got data: %s", data)
+        #logging.info("got data: %s", data)
         hc_data = [{"name" : funcname, "data" : data[funcname]} for funcname in data.keys()]
         return json.dumps(hc_data)
 

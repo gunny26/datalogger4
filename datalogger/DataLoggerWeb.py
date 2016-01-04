@@ -9,8 +9,10 @@ import unittest
 import logging
 import os
 # own modules
+from datalogger import Timeseries as Timeseries
 from datalogger import TimeseriesArray as TimeseriesArray
 from datalogger import TimeseriesArrayStats as TimeseriesArrayStats
+from datalogger import TimeseriesStats as TimeseriesStats
 from datalogger import QuantillesArray as QuantillesArray
 
 DATALOGGER_URL = "http://srvmgdata1.tilak.cc/DataLogger"
@@ -132,9 +134,6 @@ class DataLoggerWeb(object):
             logging.exception(exc)
             logging.error("Error occured calling %s", url)
             raise exc
-
-#    def __urlencode_json(self, data):
-#        return urllib.quote_plus(json.dumps(data).replace(" ", ""))
 
     def get_projects(self):
         """
@@ -335,6 +334,42 @@ class DataLoggerWeb(object):
             tsa.add(row)
         return tsa
 
+    def get_tsa_adv(self, project, tablename, datestring, groupkeys, group_func_name, index_pattern):
+        """
+        get TimeseriesArray object for this particular project/tablename/datestring combination
+
+        parameters:
+        project <str>
+        tablename <str>
+        datestring <str>
+        groupkeys <tuple>
+        group_func_name <str>
+        index_pattern <str>
+
+        returns:
+        <TimeseriesArray>
+        """
+        value_keynames = self.get_value_keynames(project, tablename)
+        ts_keyname = self.get_ts_keyname(project, tablename)
+        tsa = None
+        if groupkeys is None:
+            index_keynames = self.get_index_keynames(project, tablename)
+            tsa = TimeseriesArray(index_keynames, value_keynames, ts_keyname)
+        else:
+            tsa = TimeseriesArray(groupkeys, value_keynames, ts_keyname)
+        uri_params = OrderedDict()
+        uri_params["project"] = project
+        uri_params["tablename"] = tablename
+        uri_params["datestring"] = datestring
+        uri_params["groupkey_enc"] = base64.b64encode(unicode(groupkeys))
+        uri_params["group_func_name"] = group_func_name
+        uri_params["index_pattern"] = base64.b64encode(unicode(index_pattern))
+        query_params = {}
+        data = self.__get_json_chunked("get_tsa_adv", uri_params, query_params)
+        for row in data:
+            tsa.add(row)
+        return tsa
+
     def get_ts(self, project, tablename, datestring, key):
         """
         get Timeseries object for this particular project/tablename/datestring/key combination
@@ -386,6 +421,18 @@ class DataLoggerWeb(object):
         tsastats = TimeseriesArrayStats.from_json(data)
         return tsastats
 
+    def get_stat_func_names(self):
+        """
+        get statistical functions defined in TimeseriesArrayStats
+
+        returns:
+        <list>
+        """
+        uri_params = {}
+        query_params = {}
+        data = self.__get_json("get_stat_func_names", uri_params, query_params)
+        return data
+
     def get_quantilles(self, project, tablename, datestring):
         """
         get QuantillesArray object for this particular project/tablename/datestring combination
@@ -411,80 +458,114 @@ class DataLoggerWeb(object):
 
 class Test(unittest.TestCase):
 
-    datalogger = DataLoggerWeb(DATALOGGER_URL)
+    datalogger = DataLoggerWeb()
 
     def test_get_projects(self):
         data = self.datalogger.get_projects()
         self.assertTrue(isinstance(data, list))
+        assert u"ucs" in data
 
     def test_get_tablenames(self):
-        data = self.datalogger.get_tablenames("vicenter")
+        data = self.datalogger.get_tablenames("ucs")
         self.assertTrue(isinstance(data, list))
+        assert "ifTable" in data
 
     def test_get_wikiname(self):
         data = self.datalogger.get_wikiname("ucs", "ifTable")
         self.assertTrue(isinstance(data, basestring))
+        assert data == u"DataLoggerReportUcsIftable"
 
     def test_get_headers(self):
         data = self.datalogger.get_headers("ucs", "ifTable")
-        print data
+        assert isinstance(data, list)
+        assert data == [u'hostname', u'ifAdminStatus', u'ifDescr', u'ifInDiscards', u'ifInErrors',
+            u'ifInNUcastPkts', u'ifInOctets', u'ifInUcastPkts', u'ifInUnknownProtos', u'ifIndex',
+            u'ifLastChange', u'ifMtu', u'ifOperStatus', u'ifOutDiscards', u'ifOutErrors', u'ifOutNUcastPkts',
+            u'ifOutOctets', u'ifOutQLen', u'ifOutUcastPkts', u'ifPhysAddress', u'ifSpecific',
+            u'ifSpeed', u'ifType', u'index', u'ts']
 
     def test_get_index_keynames(self):
         data = self.datalogger.get_index_keynames("ucs", "ifTable")
-        print data
+        assert isinstance(data, list)
+        assert data == [u'hostname', u'ifDescr', u'ifType']
 
     def test_get_value_keynames(self):
         data = self.datalogger.get_value_keynames("ucs", "ifTable")
-        print data
+        assert isinstance(data, list)
+        assert data == [u'ifInDiscards', u'ifInErrors', u'ifInOctets', u'ifSpeed', u'ifOutQLen',
+            u'ifInUcastPkts', u'ifOutNUcastPkts', u'ifOutDiscards', u'ifOutOctets', u'ifOutErrors',
+            u'ifInUnknownProtos', u'ifOutUcastPkts', u'ifInNUcastPkts', u'ifMtu']
 
     def test_get_ts_keyname(self):
         data = self.datalogger.get_ts_keyname("ucs", "ifTable")
-        print data
+        assert isinstance(data, basestring)
+        assert data == u"ts"
 
     def test_get_last_business_day_datestring(self):
         data = self.datalogger.get_last_business_day_datestring()
-        print data
+        assert isinstance(data, basestring)
 
     def test_get_datewalk(self):
-        data = self.datalogger.get_datewalk("2015-11-01", self.datalogger.get_last_business_day_datestring())
-        print data
+        data = self.datalogger.get_datewalk("2015-11-01", "2015-11-30")
+        assert u"2015-11-26" in data
+        assert u"2015-10-31" not in data
+        assert u"2015-12-01" not in data
         self.assertGreater(len(data), 1)
 
     def test_get_caches(self):
         caches = self.datalogger.get_caches("ucs", "ifTable", "2015-11-06")
-        #print caches
-        print type(caches)
-        print caches.keys()
+        assert isinstance(caches, dict)
+        assert caches.keys() == [u'tsa', u'tsstat', u'tsastat', u'ts']
         for key, filename in caches["ts"]["keys"].items()[:10]:
-            print "getting ts for key %s" % key
-            self.datalogger.get_ts("ucs", "ifTable", "2015-11-06", key)
+            tsa = self.datalogger.get_ts("ucs", "ifTable", "2015-11-06", key)
+            assert isinstance(tsa, TimeseriesArray)
+            ts = tsa[tsa.keys()[0]]
+            assert isinstance(ts, Timeseries)
+            assert len(ts) > 0
 
     def test_get_tsa(self):
         tsa = self.datalogger.get_tsa("ucs", "ifTable", "2015-11-06")
-        print tsa
-        print type(tsa)
-        print tsa.keys()
+        assert isinstance(tsa, TimeseriesArray)
+        assert len(tsa.keys()) == 570
+
+    def test_get_tsa_adv(self):
+        tsa = self.datalogger.get_tsa_adv("ucs", "ifTable", "2015-11-06", None, "avg", "(.*)Ethernet(.*)")
+        assert isinstance(tsa, TimeseriesArray)
+        assert all((len(key) == 3 for key in tsa.keys()))
+        assert all((u"Ethernet" in unicode(key) for key in tsa.keys()))
+        tsa = self.datalogger.get_tsa_adv("ucs", "ifTable", "2015-11-06", ("hostname", ), "max", "(.*)gigabit(.*)")
+        assert isinstance(tsa, TimeseriesArray)
+        assert all((len(key) == 1 for key in tsa.keys()))
+        tsa = self.datalogger.get_tsa_adv("ucs", "ifTable", "2015-11-06", (), "sum", "(.*)port-channel(.*)")
+        assert isinstance(tsa, TimeseriesArray)
+        assert len(tsa.keys()) == 1
+        assert tsa.keys()[0] == ()
 
     def test_get_ts(self):
         tsa = self.datalogger.get_ts("ucs", "ifTable", "2015-11-06", (u'ucsfia-sr2-1-mgmt0', u'Vethernet9175', u'gigabitEthernet'))
-        print tsa
-        print type(tsa)
-        print tsa.keys()
-        print len(tsa.keys())
+        assert isinstance(tsa, TimeseriesArray)
+        assert len(tsa.keys()) == 1
+        assert tsa.keys()[0] == (u'ucsfia-sr2-1-mgmt0', u'Vethernet9175', u'gigabitEthernet')
 
     def test_get_tsastats(self):
         tsastats = self.datalogger.get_tsastats("ucs", "ifTable", "2015-11-06")
-        print tsastats
+        assert isinstance(tsastats, TimeseriesArrayStats)
+        assert len(tsastats.keys()) > 1
         tsstat = tsastats[tsastats.keys()[0]]
-        print tsstat
-        print type(tsstat)
-        print tsstat["ifSpeed"]["avg"]
-        print type(tsstat["ifSpeed"]["avg"])
+        assert isinstance(tsstat, TimeseriesStats)
+        tsstat["ifSpeed"]["avg"]
+        assert type(tsstat["ifSpeed"]["avg"]) == float
+
+    def test_get_stat_func_names(self):
+        data = self.datalogger.get_stat_func_names()
+        assert isinstance(data, list)
+        assert len(data) > 1
+        assert data == [u'std', u'count', u'last', u'min', u'mean', u'max', u'sum', u'avg', u'median', u'first']
 
     def test_get_quantilles(self):
         qa = self.datalogger.get_quantilles("ucs", "ifTable", "2015-11-06")
-        print qa
-        print type(qa)
+        assert isinstance(qa, QuantillesArray)
+        # TODO: do more checking
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

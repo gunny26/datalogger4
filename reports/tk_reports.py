@@ -134,7 +134,7 @@ def report_vicenter_virtualMachineNetworkStats(project, tablename, wikiname):
     standard_wiki_report(project, tablename, datestring, tsa, tsa_grouped, wikiname=wikiname)
 
 if __name__ == "__main__":
-    datalogger = DataLoggerWeb(DATALOGGER_URL)
+    datalogger = DataLoggerWeb()
     datestring = datalogger.get_last_business_day_datestring()
     for project in datalogger.get_projects():
         for tablename in datalogger.get_tablenames(project):
