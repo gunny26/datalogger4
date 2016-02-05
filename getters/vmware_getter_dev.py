@@ -149,39 +149,39 @@ def main():
     #import cProfile
     #cProfile.run("main()")
     counter_dict = {
-        "virtualMachineCpuStats" : ( # datalogger tablename
-            "cpu.idle.summation", # vicenter counter names in this table
-            "cpu.ready.summation",
-            "cpu.system.summation",
-            "cpu.used.summation",
-            "cpu.wait.summation",
-            ),
-        "virtualMachineMemoryStats": (
-            "mem.consumed.average",
-            "mem.overhead.average",
-            "mem.active.average",
-            "mem.shared.average",
-            "mem.granted.average",
-            "mem.swapped.average",
-            ),
-        "virtualMachineDatastoreStats" : (
-            "datastore.totalReadLatency.average",
-            "datastore.totalWriteLatency.average",
-            "datastore.read.average",
-            "datastore.write.average",
-            "datastore.numberReadAveraged.average",
-            "datastore.numberWriteAveraged.average",
-            ),
-        "virtualMachineDiskStats" : (
-            "disk.numberReadAveraged.average",
-            "disk.numberWriteAveraged.average",
-            "disk.read.average",
-            "disk.write.average",
-            "disk.commandsAborted.summation",
-            "disk.commands.summation",
-            "disk.busResets.summation",
-            ),
-        "virtualMachinePowerStats" : (
+#        "virtualMachineCpuStats" : ( # datalogger tablename
+#            "cpu.idle.summation", # vicenter counter names in this table
+#            "cpu.ready.summation",
+#            "cpu.system.summation",
+#            "cpu.used.summation",
+#            "cpu.wait.summation",
+#            ),
+#        "virtualMachineMemoryStats": (
+#            "mem.consumed.average",
+#            "mem.overhead.average",
+#            "mem.active.average",
+#            "mem.shared.average",
+#            "mem.granted.average",
+#            "mem.swapped.average",
+#            ),
+#        "virtualMachineDatastoreStats" : (
+#            "datastore.totalReadLatency.average",
+#            "datastore.totalWriteLatency.average",
+#            "datastore.read.average",
+#            "datastore.write.average",
+#            "datastore.numberReadAveraged.average",
+#            "datastore.numberWriteAveraged.average",
+#            ),
+#        "virtualMachineDiskStats" : (
+#            "disk.numberReadAveraged.average",
+#            "disk.numberWriteAveraged.average",
+#            "disk.read.average",
+#            "disk.write.average",
+#            "disk.commandsAborted.summation",
+#            "disk.commands.summation",
+#            "disk.busResets.summation",
+#            ),
+        "virtualPowerStats" : (
             "power.power.average",
             ),
 # known issue as of vicenter 5.5, these counters are not available
@@ -212,7 +212,8 @@ def main():
         if len(data) > 0:
             logging.info("saving data")
             # save data
-            save_data(basedir_raw, tablename, data)
+            print(data)
+            #save_data(basedir_raw, tablename, data)
         else:
             logging.info("no data receiveed")
 

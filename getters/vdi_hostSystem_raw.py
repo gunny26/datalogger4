@@ -234,6 +234,16 @@ def main():
                 "net.droppedTx.summation",
             ),
         },
+        "hostSystemPowerStats" : {
+            "ts_keyname" : "ts",
+            "index_keys" : (
+                "hostname",
+                "instance"
+            ),
+            "counters" : (
+                "power.power.average",
+                ),
+        },
     }
     for tablename, meta_data in counters_dict.items():
         logging.info("Getting counters for tablename %s", tablename)

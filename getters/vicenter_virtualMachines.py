@@ -185,16 +185,16 @@ def main():
             "power.power.average",
             ),
 # known issue as of vicenter 5.5, these counters are not available
-#        "virtualMachineNetworkStats" : (
-#            "net.usage.average",
-#            "net.received.average",
-#            "net.transmitted.average",
-#            "net.droppedRx.summation",
-#            "net.droppedTx.summation",
-#            ),
+        "virtualMachineNetworkStats" : (
+            "net.usage.average",
+            "net.received.average",
+            "net.transmitted.average",
+            "net.droppedRx.summation",
+            "net.droppedTx.summation",
+            ),
     }
     basedir = "/var/rrd"
-    project = "vdi"
+    project = "vicenter"
     interval = 35 # get 35 minutes of performance counters
     for tablename, counters in counter_dict.items():
         logging.info("fetching table %s", tablename)
@@ -217,5 +217,5 @@ def main():
             logging.info("no data receiveed")
 
 if __name__ == "__main__":
-    tvsp = tilak_vimomi.TilakVdi()
+    tvsp = tilak_vimomi.TilakVsphere()
     main()
