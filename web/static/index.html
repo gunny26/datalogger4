@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=0.9">
+    <meta charset='utf-8'>
+    <title>Datalogger Dashboard</title>
+    <!-- link rel="stylesheet" href="jquery-ui.css" /-->
+    <link rel="stylesheet" href="datalogger.css" />
+    <!--jquery itself-->
+    <script type="text/javascript" src="jquery-2.1.3.js"></script>
+    <!-- used for autofill feature -->
+    <!-- <script text="text/javascript" src="jquery-ui.js"></script>
+    <script src="jquery-ui.js"></script>
+    <link rel="stylesheet" href="jquery-ui.css" />
+    <script type="text/javascript" src="jquery.tablesorter.js"></script> 
+    -->
+    <script>
+    // Wait until the DOM has loaded before querying the document
+    $(document).ready(function(){
+        $('ul.tabs-menu').each(function(){
+            // For each set of tabs, we want to keep track of
+            // which tab is active and its associated content
+            var $active, $content, $links = $(this).find('a');
+
+            // If the location.hash matches one of the links, use that as the active tab.
+            // If no match is found, use the first link as the initial active tab.
+            $active = $($links.filter('[href="'+location.hash+'"]')[0] || $links[0]);
+            $active.addClass('active');
+
+            $content = $($active[0].hash);
+
+            // Hide the remaining content
+            $links.not($active).each(function () {
+                $(this.hash).hide();
+            });
+
+            // Bind the click event handler
+            $(this).on('click', 'a', function(e){
+                // Make the old tab inactive.
+                $active.removeClass('active');
+                $content.hide();
+
+                // Update the variables with the new link and content
+                $active = $(this);
+                $content = $(this.hash);
+
+                // Make the tab active.
+                $active.addClass('active');
+                $content.show();
+
+                // Prevent the anchor's default click action
+                e.preventDefault();
+            });
+        });
+    });
+    </script>
+</head>
+<body class="tk-site">
+    <div class="tk-site-name">
+        <h1>
+            tirol kliniken
+            <span>Datalogger Dashboard</span>
+        </h1>
+    </div>
+    <ul class="tabs-menu">
+        <li><a href="#tab1">Daily Graphics</a></li>
+        <li><a href="#tab2">Daily Report</a></li>
+        <li><a href="#tab3">Longtime Graphics</a></li>
+        <li><a href="#tab4">Scatterplot</a></li>
+    </ul>
+    <div id="tab1">
+        <iframe class="tab-iframe" src="daily_graph.html" id="frameDailyGraph"></iframe>
+    </div>
+    <div id="tab2">
+        <iframe class="tab-iframe" src="daily_report.html" id="frameDailyReport"></iframe>
+    </div>
+    <div id="tab3">
+        <iframe class="tab-iframe" src="longtime.html" id="frameLongtime"></iframe>
+    </div>
+    <div id="tab4">
+        <iframe class="tab-iframe" src="daily_scatter.html" id="frameScatter"></iframe>
+    </div>
+</body>
+</html>

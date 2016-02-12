@@ -5,7 +5,7 @@ import copy
 import sys
 import gc
 import logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 from datalogger import DataLogger as DataLogger
 from datalogger import TimeseriesArray as TimeseriesArray
 from datalogger import TimeseriesArrayStats as TimeseriesArrayStats
@@ -57,8 +57,8 @@ def main():
     read_tsa_full_aligned(datestring, slotlength=600)
 
 if __name__ == "__main__":
-    project = "sanportperf"
-    tablename = "fcIfC3AccountingTable"
+    project = "ucs"
+    tablename = "ifXTable"
     datalogger = DataLogger(BASEDIR, project, tablename)
     datestring = get_last_business_day_datestring()
     #main()

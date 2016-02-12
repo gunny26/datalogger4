@@ -8,7 +8,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 # own modules
 from datalogger import DataLoggerWeb as DataLoggerWeb
-from commons import *
+#from commons import *
 
 def main(project, tablename, datestring, datalogger):
     #caches = datalogger.get_caches(datestring)

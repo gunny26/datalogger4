@@ -99,6 +99,7 @@ class DataLoggerWeb(object):
         logging.info("calling method %s", method)
         web.header('Access-Control-Allow-Origin', '*')
         web.header('Access-Control-Allow-Credentials', 'true')
+        web.header("Content-Type", "application/json")
         method_args = args.split("/")[1:] # all without method name
         if method == "doc":
             return self.doc(method_args)
@@ -150,6 +151,8 @@ class DataLoggerWeb(object):
             return self.get_longtime_data(method_args)
         elif method == "get_tsastats_table":
             return self.get_tsastats_table(method_args)
+        elif method == "get_tsastats_func":
+            return self.get_tsastats_func(method_args)
         else:
             return "There is no method called %s" % method
 
@@ -718,6 +721,27 @@ class DataLoggerWeb(object):
         datalogger = DataLogger(basedir, project, tablename)
         tsastats = datalogger.load_tsastats(datestring)
         return json.dumps("\n".join(csv_to_table(tsastats.to_csv(stat_func_name), len(tsastats.index_keys))))
+
+    def get_tsastats_func(self, args):
+        """
+        return jason data to render html table from it
+        """
+        def csv_to_table(csvdata, keys):
+            outbuffer = []
+            outbuffer.append("<thead><tr>")
+            [outbuffer.append("<th>%s</th>" % header) for header in csvdata[0]]
+            outbuffer.append("</tr></thead><tbody>")
+            for values in csvdata[1:]:
+                outbuffer.append("<tr>")
+                [outbuffer.append("<td >%s</td>" % value) for value in values[0:keys]]
+                [outbuffer.append("<td type=numeric>%0.2f</td>" % value) for value in values[keys:]]
+                outbuffer.append("</tr>")
+            outbuffer.append("</tbody>")
+            return outbuffer
+        project, tablename, datestring, stat_func_name = args
+        datalogger = DataLogger(basedir, project, tablename)
+        tsastats = datalogger.load_tsastats(datestring)
+        return json.dumps(tsastats.to_csv(stat_func_name))
 
     def get_scatter_data(self, args):
         """

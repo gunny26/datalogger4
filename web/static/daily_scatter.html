@@ -205,37 +205,50 @@ function getData() {
 }
 
 </script>
-<h1>Datalogger Scatter Graph Engine</h1>
-<h2>Mandatory Parameters</h2>
-<table>
-<tr>
-    <td>
-        <label title="Datestring in form YYYY-MM-DD">Date</label>
-        <div><input id="datestring" type="text" size=10></div>
-    </td><td>
-        <label>Project</label>
-        <div id="select_project"></div>
-    </td><td>
-        <label>Tablename</label>
-        <div id="select_tablename">select one project first</div>
-    </td>
-</tr>
-</table>
-<h2>Filter Parameters</h2>
-<table>
-<tr>
-    <td>
-        <label title="at least one must be selected">X-Values</label>
-        <div id="select_value1_keynames">select project and tablename first</div>
-    </td><td>
-        <label title="at least one must be selected">Y-Values</label>
-        <div id="select_value2_keynames">select project and tablename first</div>
-    </td><td>
-</table>
-<div id="status"></div>
-<button id="getData" type="button">Fetch Data</button>
-<button id="addContainer" type="button">Add new Container</button>
-<div id="graphs">
+<div class="datalogger-mandatories">
+    <ul>
+        <li>Mandatory Parameters</li>
+        <li class="datalogger-project" id="select_project">select project</li>
+        <li class="datalogger-tablename" id="select_tablename">select tablename</li>
+        <li class="datalogger-datestring"><input id="datestring" type="date"></li>
+    </ul>
 </div>
+<!--
+<div class="datalogger-mandatories">
+    <table>
+    <tr>
+        <td>
+            <label title="Datestring in form YYYY-MM-DD">Date</label>
+            <div><input id="datestring" type="text" size=10></div>
+        </td><td>
+            <label>Project</label>
+            <div id="select_project"></div>
+        </td><td>
+            <label>Tablename</label>
+            <div id="select_tablename">select Project first</div>
+        </td>
+    </tr>
+    </table>
+</div>
+-->
+<div class="datalogger-filters">
+    <table>
+    <tr>
+        <td>
+            <label title="at least one must be selected">X-Values</label>
+            <div id="select_value1_keynames">select project and tablename first</div>
+        </td><td>
+            <label title="at least one must be selected">Y-Values</label>
+            <div id="select_value2_keynames">select project and tablename first</div>
+        </td>
+    </tr>
+    </table>
+</div>
+<div class="datalogger-btn">
+    <button id="getData" type="button">Fetch Data</button>
+    <button id="addContainer" type="button">Add new Container</button>
+</div>
+<div class="datalogger-status" id="status"></div>
+<div class="datalogger-graphs" id="graphs"></div>
 </body>
 </html>

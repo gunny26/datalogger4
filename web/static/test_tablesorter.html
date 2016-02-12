@@ -6,8 +6,6 @@
     <script type="text/javascript" src="jquery-2.1.3.js"></script>
     <!-- used for autofill feature -->
     <script text="text/javascript" src="jquery-ui.js"></script>
-    <!-- used for autofill feature -->
-    <script text="text/javascript" src="datalogger.js"></script>
     <!-- 
     <script src="jquery-ui.js"></script>
     <link rel="stylesheet" href="jquery-ui.css" />
@@ -140,6 +138,53 @@ function get_stat_func_names() {
     });
 }
 
+/*
+render tablesorter usable html from json data
+first row is used as headers
+add following classes for styling
+
+table      : tablesorter
+even rows  : datalogger-tsastats-table-even-row
+uneven rows: datalogger-tsastats-table-uneven-row
+text fields: datalogger-tsastats-table-value-field
+numeric f. : datalogger-tsastats-table-index-field
+*/
+function renderTable(data, id) {
+    firstRow = true;
+    evenRow = false;
+    html="<table id=" + id + " class=tablesorter>";
+    data.forEach(function(row) {
+        /* header fields if this is the first row */
+        if (firstRow == true) {
+            html += "<thead>";
+            html += "<th>" + row.join("</th><th>") + "</th>";
+            html += "</thead><tbody>";
+            firstRow = false;
+        } else {
+            /* even or uneven row, set according class */
+            trClass = "";
+            if (evenRow == true) {
+                trClass = "datalogger-tsastats-table-even-row";
+                evenRow = false;
+            } else {
+                trClass = "datalogger-tsastats-table-uneven-row";
+                evenRow = true;
+            }
+            html += "<tr class=" + trClass + ">"
+            /* join fields according to datatype */
+            row.forEach(function(field) {
+                if (jQuery.isNumeric(field) == true) {
+                    html += "<td class=datalogger-tsastats-table-value-field>" + field + "</td>";
+                } else {
+                    html += "<td class=datalogger-tsastats-table-index-field>" + field + "</td>";
+                }
+            });
+            html += "</tr>"
+        }
+    });
+    html += "</tbody></table>";
+    return html;
+}
 
 /*
 get data from json and create a graph on actual container
@@ -153,12 +198,12 @@ function getData() {
     console.log("Getting Data from url " + url);
     ticker("Fetching data, this could last for some time, if this is the first request");
     $.getJSON(url).then(function(data) {
-        $('#reports').html(renderTable(data, "reportTable")); 
         //console.log(data);
-        //$('#report_table').html(data);
+        renderTable(data);
+        $('#reports').html(renderTable(data, "reportTable"));
         $("#reportTable").tablesorter();
         /* little helper so right align numerical td values
-        $('#reportTable tr').each( function () { 
+        //$('#report_table tr').each( function () { 
             $(this).children('td:gt(0)').filter(function() {
                 return this.innerHTML.match(/^[0-9\s\.,]+$/);
             }).css('text-align','right')
