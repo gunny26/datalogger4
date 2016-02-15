@@ -196,13 +196,14 @@ function getData() {
     var project = $("#project").val();
     var tablename = $("#tablename").val();
     var datestring = $("#datestring").val();
+    var monthstring = datestring.slice(0,7)
     var keys = $("#keys").val();
     var selected = $("#value_keynames" ).val();
     var yAxisMax = $('#yAxisMax').val()
     if (yAxisMax == "") {
         yAxisMax = null;
     }
-    var url = base_url + "/get_longtime_data/" + project + "/" + tablename + "/" + datestring + "/" + Base64.encode(keys) + "/" + selected;
+    var url = base_url + "/get_longtime_data/" + project + "/" + tablename + "/" + monthstring + "/" + Base64.encode(keys) + "/" + selected;
     console.log("Getting Data from url " + url);
     ticker("Fetching data, this could last for some time, if this is the first request");
     $.getJSON(url).then(function(data) {
