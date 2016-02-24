@@ -1,9 +1,11 @@
 #!/usr/bin/python
-#import numpy
+"""
+Modules deals with timeseries statistics
+"""
 import json
-#from scipy import stats
 import logging
-from CustomExceptions import *
+# own modules
+from datalogger.CustomExceptions import TimeseriesEmptyError as TimeseriesEmptyError
 
 
 def mean(data):
@@ -44,6 +46,27 @@ def geometric_mean(nums):
     '''
     return (reduce(lambda x, y: x*y, nums))**(1.0/len(nums))
 
+def increments(data):
+    """
+    sums up all incrementing steps in list
+    so:
+    if x2 > x1 : increments += (x2-x1)
+    else : do nothin
+    """
+    return float(sum([data[index + 1] - data[index] for index in range(len(data)-1) if data[index + 1] > data[index]]))
+
+def decrements(data):
+    """
+    sums up all decrementing steps in list
+    so:
+    if x1 < x2 : decrements += (x1-x2)
+    else : do nothin
+
+    value will be always positive
+    """
+    return float(sum([data[index] - data[index + 1] for index in range(len(data)-1) if data[index + 1] < data[index]]))
+
+
 class TimeseriesStats(object):
     """
     Statistics for one sepcific Timeseries Object
@@ -51,16 +74,19 @@ class TimeseriesStats(object):
     separated to cache statistics in own files
     """
     stat_funcs = {
-        u"min" : lambda series: min(series),
-        u"max" : lambda series: max(series),
-        u"avg" : lambda series: mean(series),
-        u"sum" : lambda series: sum(series),
-        u"std" : lambda series: pstdev(series),
+        u"min" : min,
+        u"max" : max,
+        u"avg" : mean,
+        u"sum" : sum,
+        u"std" : pstdev,
         u"median" : lambda series: median(list(series)),
-        u"count" : lambda series: len(series),
+        u"count" : len,
         u"first" : lambda series: series[0],
         u"last" : lambda series: series[-1],
-        u"mean" : lambda series: mean(series),
+        u"mean" : mean,
+        u"inc" : increments,
+        u"dec" : decrements,
+        u"diff" : lambda series: series[-1] - series[0],
     }
 
     def __init__(self, timeseries):
@@ -89,7 +115,7 @@ class TimeseriesStats(object):
                 raise TimeseriesEmptyError("some TimeseriesStats need at minimum 2 values")
 
     def __eq__(self, other):
-        """ test for equality ion depth"""
+        """ test for equality in depth"""
         try:
             assert self.stat_funcs == other.stat_funcs
         except AssertionError as exc:
@@ -129,12 +155,14 @@ class TimeseriesStats(object):
         return True
 
     def __getitem__(self, index):
+        """either numerical index or tuple (value_keyname, statistical functio name)"""
         if isinstance(index, tuple):
             value_key, func_name = index
-            return self.__stats[key, func_name]
+            return self.__stats[value_key, func_name]
         return self.__stats[index]
 
     def __str__(self):
+        """printable string representation"""
         outbuffer = []
         headers = [u"key", ] + self.stat_funcs.keys()
         outbuffer.append("\t".join(headers))
@@ -144,6 +172,7 @@ class TimeseriesStats(object):
         return "\n".join(outbuffer)
 
     def htmltable(self):
+        """DEPRECATED: should be done in Javascript not here"""
         outbuffer = []
         outbuffer.append("<table>")
         outbuffer.append("<tr><th>")
@@ -159,24 +188,30 @@ class TimeseriesStats(object):
         return "\n".join(outbuffer)
 
     def keys(self):
+        """dict behaviour"""
         return self.__stats.keys()
 
     def values(self):
+        """dict behaviour"""
         return self.__stats.values()
 
     def items(self):
+        """dict behaviour"""
         return self.__stats.items()
 
     @property
     def stats(self):
+        """get statistics dictionary"""
         return self.__stats
 
     @stats.setter
     def stats(self, value):
+        """set statistics dictionary"""
         self.__stats = value
 
     @property
     def funcnames(self):
+        """get statistical function names"""
         return self.stat_funcs.keys()
 
     def get_stats(self):
@@ -238,10 +273,17 @@ class TimeseriesStats(object):
         return tsstats
 
     def to_json(self):
+        """
+        return json encoded statistics dictionary
+        used to store data in file
+        """
         return json.dumps(self.__stats)
 
     @staticmethod
     def from_json(jsondata):
+        """
+        create class from json encoded statistics dictionary
+        """
         tsstats = TimeseriesStats.__new__(TimeseriesStats)
         tsstats.__stats = json.loads(jsondata)
         return tsstats

@@ -175,7 +175,8 @@ class TimeseriesArray(object):
                 self.__data[key].add(ts, values)
         except KeyError as exc:
             #logging.exception(exc)
-            logging.error("there is some key missing in %s, should be %s and %s, skipping this dataset, skipping this dataset", data.keys(), self.__ts_key, self.__value_keys)
+            if self.__debug: # some datasources have incorrect data
+                logging.error("there is some key missing in %s, should be %s and %s, skipping this dataset, skipping this dataset", data.keys(), self.__ts_key, self.__value_keys)
         except ValueError as exc:
             #logging.exception(exc)
             if self.__debug: # some datasources have incorrect data
