@@ -171,172 +171,186 @@ class DataLoggerWeb(object):
     def doc(self, args):
         """
         get docstrings from methods available
+
+        ex: DataLogger/doc/get_projects/something/or/nothing
+
+        only the first argument after doc is evaluated,
+        the remaining is ignored
         """
-        name = __name__
-        doc = __doc__
-        if len(args) == 1:
+        # use only the fist argument to find function
+        web.header("Content-Type", "text/html")
+        outbuffer = ["<html><body>"]
+        try:
             func = eval("self.%s" % args[0])
             doc = func.__doc__
             name = func.__name__
-        outbuffer = ["def %s(*args, **kwds)" % name]
-        if doc is not None:
-            outbuffer += doc.split("\n")
-        return "<br>".join(outbuffer)
+            outbuffer.append("<h1 class=datalogger-function-name>def %s(*args, **kwds)</h1>" % name)
+            outbuffer.append("<div class=datalogger-function-doc>")
+            if doc is not None:
+                outbuffer.append(doc.replace("\n", "<br>"))
+            outbuffer.append("</div>")
+        except AttributeError as exc:
+            logging.info(exc)
+            outbuffer.append(str(exc))
+        outbuffer.append("</body></html>")
+        return "\n".join(outbuffer)
 
+    @staticmethod
     @memcache
-    def get_projects(self, args):
+    def get_projects(args):
         """
-        get all available projects, use directory listing for that,
-        but blacklist some non project directories
+        get available projects for this Datalogger Server
 
-        parameters:
-        None
+        ex: Datalogger/get_projects/...
+        there is no further argument needed
 
         returns:
-        <json><list> of existing project names
+        json(existing project names)
         """
         return json.dumps(DataLogger.get_projects(basedir))
 
+    @staticmethod
     @memcache
-    def get_tablenames(self, args):
+    def get_tablenames(args):
         """
         get available tablenames, for one particular project
         uses directory listing in raw subdirectory for this purpose
 
-        parameters:
-        <str>projectname
+        ex: Datalogger/get_tablenames/{projectname}
+        <projectname> has to be something from Datalogger/get_projects
 
         returns:
-        <json><list> of possible tablenames
+        json(list of possible tablenames for given project)
         """
-        assert len(args) == 1
         project = args[0]
         return json.dumps(DataLogger.get_tablenames(basedir, project))
 
+    @staticmethod
     @memcache
-    def get_wikiname(self, args):
+    def get_wikiname(args):
         """
         return WikiName for given project/tablename
+        special method for generating wiki reports
 
-        parameters:
-        <str>projectname
-        <str>tablename
+        ex: Datalogger/get_wikiname/{projectname}/{tablename}
 
         returns:
-        <json><str> to use as WikiName
+        json(str to use as WikiName)
         """
-        assert len(args) == 2
-        project, tablename = args
+        project, tablename = args[:2]
         return json.dumps("DataLoggerReport%s%s" % (project.capitalize(), tablename.capitalize()))
 
+    @staticmethod
     @memcache
-    def get_headers(self, args):
+    def get_headers(args):
         """
-        get name of headers (all columns so ts_keyname + index_keynames + value_keynames)
+        get name of all headers (all columns so ts_keyname + index_keynames + value_keynames)
 
-        parameters:
-        /<str>project/<str>tablename
+        ex: Datalogger/get_headers/{projectname}/{tablename}
 
         returns:
-        <json><list> of header names
+        json(list of header names)
         """
-        assert len(args) == 2
-        project, tablename = args
+        project, tablename = args[:2]
         datalogger = DataLogger(basedir, project, tablename)
         return json.dumps(datalogger.headers)
 
+    @staticmethod
     @memcache
-    def get_index_keynames(self, args):
+    def get_index_keynames(args):
         """
         get name of index columns for project/tablename
 
-        parameters:
-        /<str>project/<str>tablename
+        ex: Datalogger/get_index_keynames/{projectname}/{tablename}
 
         returns:
-        <json><list> columns names of index columns defined
+        json(list of columns names of index columns defined)
         """
-        assert len(args) == 2
-        project, tablename = args
+        project, tablename = args[:2]
         datalogger = DataLogger(basedir, project, tablename)
         return json.dumps(datalogger.index_keynames)
 
+    @staticmethod
     @memcache
-    def get_value_keynames(self, args):
+    def get_value_keynames(args):
         """
         get name of value columns for project/tablename
-        all value_keynames have to be strictly numeric
+        all value_keynames have to be strictly numeric, in special are floats
 
-        parameters:
-        /<str>project/<str>tablename
+        ex: Datalogger/get_value_keynames/{projectname}/{tablename}
 
         returns:
-        <json><list> column names of value columns defined
+        json(list of column names of value columns defined)
         """
-        assert len(args) == 2
-        project, tablename = args
+        project, tablename = args[:2]
         datalogger = DataLogger(basedir, project, tablename)
         return json.dumps(datalogger.value_keynames)
 
+    @staticmethod
     @memcache
-    def get_ts_keyname(self, args):
+    def get_ts_keyname(args):
         """
         get name of timestamp column
 
-        parameters:
-        /<str>project/<str>tablename
+        ex: Datalogger/get_ts_keyname/{projectname}/{tablename}
 
         returns:
-        <json><list> column names of value columns defined
+        json(column name of timestamp)
         """
-        assert len(args) == 2
-        project, tablename = args
+        project, tablename = args[:2]
         datalogger = DataLogger(basedir, project, tablename)
         return json.dumps(datalogger.ts_keyname)
 
+    @staticmethod
     @memcache
-    def get_ts_caches(self, args):
+    def get_ts_caches(args):
         """
-        get name of all index keys found in one specific TimeseriesArray
+        DEPRECATED use get_caches instead
 
-        parameters:
-        /<str>project/<str>tablename/<str>datestring
+        get name of all index keys found in one specific TimeseriesArray
+        useful to build autofill input fields
+        attention: there are only ts caches if the raw data is already converted
+
+        ex: Datalogger/get_ts_caches/{projectname}/{tablename}/{datestring}
+        datstring has to be in format YYYY-MM-DD
 
         returns:
-        <json><list> of all index combinations
+        json(list of all index keys)
         """
-        # the same for all vicenter data
-        assert len(args) == 3
-        project, tablename, datestring = args
+        project, tablename, datestring = args[:3]
         datalogger = DataLogger(basedir, project, tablename)
         keys = []
         for cache in datalogger.list_ts_caches(datestring):
             keys.append(cache[1])
         return json.dumps(keys)
 
+    @staticmethod
     @memcache
-    def get_tsstat_caches(self, args):
+    def get_tsstat_caches(args):
         """
-        get name of all index keys found in one specific TimeseriesArray
+        DEPRECATED use get_caches instead
 
-        parameters:
-        /<str>project/<str>tablename/<str>datestring
+        get a list of all available TimeseriesStats available
+        attention: there are only tsstat caches if raw data is already analyzed
+
+        ex: Datalogger/get_tsstat_caches/{projectname}/{tablename}/{datestring}
 
         returns:
-        <json><list> of all index combinations
+        json(list of all available TimeseriesStats data)
         """
-        # the same for all vicenter data
-        assert len(args) == 3
-        project, tablename, datestring = args
+        project, tablename, datestring = args[:3]
         datalogger = DataLogger(basedir, project, tablename)
         keys = []
         for cache in datalogger.list_tsstat_caches(datestring):
             keys.append(cache[1])
         return json.dumps(keys)
 
+    @staticmethod
     @memcache
-    def get_caches_dict(self, args):
+    def get_caches_dict(args):
         """
+        DEPRECATED use get_caches instead
+
         get name of all index keys found in one specific TimeseriesArray
 
         parameters:
@@ -346,8 +360,7 @@ class DataLoggerWeb(object):
         <json><list> of all index combinations
         """
         # the same for all vicenter data
-        assert len(args) == 3
-        project, tablename, datestring = args
+        project, tablename, datestring = args[:3]
         datalogger = DataLogger(basedir, project, tablename)
         keys = []
         for cache in datalogger.list_ts_caches(datestring):
@@ -355,28 +368,68 @@ class DataLoggerWeb(object):
             keys.append(key)
         return json.dumps(keys)
 
+    @staticmethod
     @memcache
-    def get_last_business_day_datestring(self, args):
+    def get_last_business_day_datestring(args):
         """
         get datestring of last businessday Mo.-Fr.
+
+        ex: Dataloger/get_last_business_day_datestring/...
+
+        returns:
+        json(datestring of last businessday)
         """
         return json.dumps(DataLogger.get_last_business_day_datestring())
 
+    @staticmethod
     @memcache
-    def get_datewalk(self, args):
+    def get_datewalk(args):
         """
-        get datestring of last businessday Mo.-Fr.
+        get list of datestrings between two datestrings
+
+        ex: Datalogger/get_datewalk/{datestring1}/{datestring2}
+
+        returns:
+        json(list of datestrings)
         """
-        datestring1, datestring2 = args
+        datestring1, datestring2 = args[:2]
         data = tuple(DataLogger.datewalker(datestring1, datestring2))
         return json.dumps(data)
 
-    @memcache
-    def get_caches(self, args):
+    @staticmethod
+    def get_caches(args):
         """
         return dictionary of caches available for this project/tablename/datestring combination
+
+        ex: Datalogger/get_caches/{project}/{tablename}/{datestring}
+
+        {
+            "tsastat" : {
+                "keys" : dictionary of available keys,
+                "pattern" : filename pattern,
+            },
+            "tsstat" : {
+                "keys" : dictionary of available keys,
+                "pattern" : filename pattern,
+            },
+            "tsa":
+                "keys" : dictionary of available keys,
+                "pattern" : filename pattern,
+            },
+            "ts" : {
+                "keys" : dictionary of available keys,
+                "pattern" : filename pattern,
+            },
+            "raw" : None or filename of raw data,
+        }
+
+        if return_date["raw"] == null it means, there is no raw data available
+        else if something (tsa,ts,tsastat,tsstat) is missing you can call get_tsastat to generate all caches
+
+        returns:
+        json(dictionary of caches and available data)
         """
-        project, tablename, datestring = args
+        project, tablename, datestring = args[:3]
         datalogger = DataLogger(basedir, project, tablename)
         caches = {}
         try:
@@ -474,8 +527,19 @@ class DataLoggerWeb(object):
     def get_tsastats(self, args):
         """
         return exported TimeseriesArrayStats json formatted
+
+        [
+            list of index_keys,
+            list of value_keys,
+            list of [
+                index_key : tsstat_dictionary
+                ]
+        ]
+
+        returns:
+        json(tsastats_dict)
         """
-        project, tablename, datestring = args
+        project, tablename, datestring = args[:3]
         datalogger = DataLogger(basedir, project, tablename)
         tsastats = datalogger.load_tsastats(datestring)
         return tsastats.to_json()
@@ -484,6 +548,11 @@ class DataLoggerWeb(object):
     def get_stat_func_names(self, args):
         """
         return defined stat_func_names in TimeseriesStats objects
+
+        ex: Datalogger/get_stat_func_names/
+
+        returns:
+        json(list of statistical function_names for tsstat)
         """
         stat_func_names = TimeseriesStats.stat_funcs.keys()
         return json.dumps(stat_func_names)
@@ -491,8 +560,19 @@ class DataLoggerWeb(object):
     def get_quantilles(self, args):
         """
         return exported QuantillesArray json formatted
+
+        ex: Datalogger/get_quantilles/{projectname}/{tablename}/{datestring}
+
+        [
+            dict of index_keys : dict of quantilles,
+            list of index_keys,
+            list of value_names,
+        ]
+
+        returns:
+        json(quantilles_dict)
         """
-        project, tablename, datestring = args
+        project, tablename, datestring = args[:3]
         datalogger = DataLogger(basedir, project, tablename)
         quantilles = datalogger.load_quantilles(datestring)
         return quantilles.to_json()
@@ -716,11 +796,18 @@ class DataLoggerWeb(object):
         return json.dumps(tsastats.to_csv(stat_func_name))
 
     @staticmethod
+    @calllogger
     def get_scatter_data(args):
         """
-        gets scatter plot data
+        gets scatter plot data of two value_keys of the same tablename
 
-        vicenter/hostSystemDiskStats/2015-07-13/disk.totalReadLatency.average/disk.totalWriteLatency.average/avg
+        ex: Datalogger/{projectname}/{tablename}/{datestring}/{value_keyname1}/{value_keyname2}/{stat function name}
+
+        value_keyname{1/2} has to be one of get_value_keynames
+        stat function name has to be one of get_stat_func_names
+
+        returns:
+        json(highgraph data)
         """
         assert len(args) == 6
         project, tablename, datestring, value_key1, value_key2, stat_func_name = args

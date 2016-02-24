@@ -73,6 +73,31 @@ function get_index_keynames(project, tablename) {
     });
 }
  
+function fillIndexKeynames(uiObj) {
+    uiObj.empty();
+    uiObj.append('<option value=""></option>');
+    var url = base_url + "/get_index_keynames/" + $('#project').val() + "/" + $('#tablename').val();
+    console.log("getting index_keynames from " + url);
+    $.getJSON(url, {}, function(result) {
+        result.forEach(function(item) {
+            uiObj.append('<option value=' + item + '>' + item + '</option>');
+            console.log("got index_keyname: " + item);
+        });
+    });
+}
+function fillValueKeynames(uiObj) {
+    uiObj.empty();
+    uiObj.append('<option value=""></option>');
+    var url = base_url + "/get_value_keynames/" + $('#project').val() + "/" + $('#tablename').val();
+    console.log("getting index_keys from " + url);
+    $.getJSON(url, {}, function(result) {
+        result.forEach(function(item) {
+            uiObj.append('<option value=' + item + '>' + item + '</option>');
+            console.log("got value_keyname: " + item);
+        });
+    });
+}
+ 
 /*
 // get value keys for this particular project, tablename combination
 */
@@ -80,7 +105,7 @@ function get_value_keynames(project, tablename) {
     var value_keynames = $("#value_keynames");
     value_keynames.empty();
     var url = base_url + "/get_value_keynames/" + project + "/" + tablename;
-    console.log("getting value_keys from " + url);
+    console.log("getting value_keynames from " + url);
     $.getJSON(url, function(result) {
         $('body').css('cursor','wait');
         result.sort(); // sort value_keys
@@ -111,6 +136,36 @@ function get_ts_caches(project, tablename, datestring) {
     });
     return keys;
 }
+
+
+/*
+recreate autocomplete list of given object with data from backend
+*/
+function fillTsAutocomplete(autocompleteObj) {
+    var url = base_url + "/get_caches/" +   $('#project').val() + "/" + $('#tablename').val() + "/" + $('#datestring').val()
+    console.log("Getting Data from url " + url);
+    var index_keys = [];
+    $.getJSON(url, {}, function(data) {
+        console.log("success reached");
+        for (key in data.ts.keys) {
+            index_keys.push(key);
+        }
+        console.log(index_keys);
+        ticker('recreating autocomplete list for ' + $('#project').val() + "/" + $('#tablename').val());
+        autocompleteObj.removeData('autocomplete');
+        autocompleteObj.autocomplete({source: index_keys});
+    })
+        .done(function() {
+            console.log("done reached");
+        })
+        .fail(function() {
+            console.log("fail reached");
+        })
+        .always(function() {
+            console.log("always reached");
+        })
+}
+
 
 /*
 Add new drawing container ad end of graphs container
