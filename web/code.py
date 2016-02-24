@@ -2,6 +2,8 @@
 
 import web
 import os
+#import gc
+#gc.set_debug(gc.DEBUG_STATS)
 import logging
 logging.basicConfig(level=logging.INFO)
 #import logging.handlers
@@ -28,7 +30,7 @@ application = web.application(urls, globals()).wsgifunc()
 
 def calllogger(func):
     """
-    decorator
+    decorator to log and measure call durations
     """
     def inner(*args, **kwds):
         starttime = time.time()
@@ -50,21 +52,32 @@ def calllogger(func):
 MEMCACHE = {}
 MAXAGE = 300
 def memcache(func):
+    """
+    decorator to cache return values according to used function parameters
+    """
     def inner(*args, **kwds):
         starttime = time.time()
-        key = unicode((func.__name__, args[1:], kwds))
-        if key not in MEMCACHE:
-            #logging.info("createing new cache entry for %s", key)
-            MEMCACHE[key] = { "ts" : time.time(), "data" : None }
-        else:
-            if MEMCACHE[key]["ts"] < time.time() + MAXAGE:
-                logging.info("returning from cache")
-                return MEMCACHE[key]["data"]
-        logging.debug("key : ", key)
+        thiskey = unicode((func.__name__, args[1:], kwds))
+        logging.info("number of keys in cache %d", len(MEMCACHE.keys()))
+        logging.info("key to look for %s", thiskey)
+        # get rid of old cache entries
+        for key in MEMCACHE.keys():
+            if (MEMCACHE[key]["ts"] + MAXAGE) < starttime:
+                logging.info("deleting aged cache entry for key %s", key)
+                del MEMCACHE[key]
+        # is there an entry for this key
+        if thiskey in MEMCACHE:
+            if (MEMCACHE[thiskey]["ts"] + MAXAGE) > starttime:
+                logging.info("returning from cache for key %s", thiskey)
+                return MEMCACHE[thiskey]["data"]
+        #logging.info("createing new cache entry for %s", key)
         try:
             ret_val = func(*args, **kwds)
             #logging.info("Storing returned data in cache for %s s", MAXAGE)
-            MEMCACHE[key]["data"] = ret_val
+            MEMCACHE[thiskey] = {
+                "ts" : starttime,
+                "data" : ret_val,
+            }
             return ret_val
         except StandardError as exc:
             logging.exception(exc)
@@ -93,67 +106,44 @@ class DataLoggerWeb(object):
         return function_name(what is left of arguments)
 
         """
-#        web.header('Content-type', 'text/html')
-#        return "GEt from DataLoggerWeb"
-        method = args.split("/")[0]
+        method = args.split("/")[0].lower()
         logging.info("calling method %s", method)
         web.header('Access-Control-Allow-Origin', '*')
         web.header('Access-Control-Allow-Credentials', 'true')
         web.header("Content-Type", "application/json")
+#        web.header('Content-type', 'text/html')
         method_args = args.split("/")[1:] # all without method name
-        if method == "doc":
-            return self.doc(method_args)
-        elif method == "get_headers":
-            return self.get_headers(method_args)
-        elif method == "get_index_keynames":
-            return self.get_index_keynames(method_args)
-        elif method == "get_value_keynames":
-            return self.get_value_keynames(method_args)
-        elif method == "get_ts_keyname":
-            return self.get_ts_keyname(method_args)
-        elif method == "get_projects":
-            return self.get_projects(method_args)
-        elif method == "get_tablenames":
-            return self.get_tablenames(method_args)
-        elif method == "get_wikiname":
-            return self.get_wikiname(method_args)
-        elif method == "get_headers":
-            return self.get_headers(method_args)
-        elif method == "get_last_business_day_datestring":
-            return self.get_last_business_day_datestring(method_args)
-        elif method == "get_datewalk":
-            return self.get_datewalk(method_args)
-        elif method == "get_caches":
-            return self.get_caches(method_args)
-        elif method == "get_tsa":
-            return self.get_tsa(method_args)
-        elif method == "get_tsa_adv":
-            return self.get_tsa_adv(method_args)
-        elif method == "get_ts":
-            return self.get_ts(method_args)
-        elif method == "get_tsastats":
-            return self.get_tsastats(method_args)
-        elif method == "get_stat_func_names":
-            return self.get_stat_func_names(method_args)
-        elif method == "get_quantilles":
-            return self.get_quantilles(method_args)
-        elif method == "get_chart_data_ungrouped":
-            return self.get_chart_data_ungrouped(method_args)
-        elif method == "get_ts_caches":
-            return self.get_ts_caches(method_args)
-        elif method == "get_tsstat_caches":
-            return self.get_tsstat_caches(method_args)
-        elif method == "get_caches_dict":
-            return self.get_caches_dict(method_args)
-        elif method == "get_scatter_data":
-            return self.get_scatter_data(method_args)
-        elif method == "get_longtime_data":
-            return self.get_longtime_data(method_args)
-        elif method == "get_tsastats_table":
-            return self.get_tsastats_table(method_args)
-        elif method == "get_tsastats_func":
-            return self.get_tsastats_func(method_args)
-        else:
+        method_func_dict = {
+            "doc" : self.doc,
+            "get_index_keynames" : self.get_index_keynames,
+            "get_value_keynames" : self.get_value_keynames,
+            "get_ts_keyname" : self.get_ts_keyname,
+            "get_projects" : self.get_projects,
+            "get_tablenames" : self.get_tablenames,
+            "get_wikiname" : self.get_wikiname,
+            "get_headers" : self.get_headers,
+            "get_last_business_day_datestring" : self.get_last_business_day_datestring,
+            "get_datewalk" : self.get_datewalk,
+            "get_caches" : self.get_caches,
+            "get_tsa" : self.get_tsa,
+            "get_tsa_adv" : self.get_tsa_adv,
+            "get_ts" : self.get_ts,
+            "get_tsastats" : self.get_tsastats,
+            "get_stat_func_names" : self.get_stat_func_names,
+            "get_quantilles" : self.get_quantilles,
+            "get_chart_data_ungrouped" : self.get_chart_data_ungrouped,
+            "get_ts_caches" : self.get_ts_caches,
+            "get_tsstat_caches" : self.get_tsstat_caches,
+            "get_caches_dict" : self.get_caches_dict,
+            "get_scatter_data" : self.get_scatter_data,
+            "get_longtime_data" : self.get_longtime_data,
+            "get_tsastats_table" : self.get_tsastats_table,
+            "get_tsastats_func" : self.get_tsastats_func,
+        }
+        try:
+            return method_func_dict[method](method_args)
+        except KeyError as exc:
+            logging.debug("unknown method called %s", method)
             return "There is no method called %s" % method
 
     def POST(self, args):
@@ -178,7 +168,6 @@ class DataLoggerWeb(object):
         else:
             return "There is no method called %s" % method
 
-    @calllogger
     def doc(self, args):
         """
         get docstrings from methods available
@@ -186,7 +175,7 @@ class DataLoggerWeb(object):
         name = __name__
         doc = __doc__
         if len(args) == 1:
-            func =  eval("self.%s" % args[0])
+            func = eval("self.%s" % args[0])
             doc = func.__doc__
             name = func.__name__
         outbuffer = ["def %s(*args, **kwds)" % name]
@@ -194,7 +183,6 @@ class DataLoggerWeb(object):
             outbuffer += doc.split("\n")
         return "<br>".join(outbuffer)
 
-    @calllogger
     @memcache
     def get_projects(self, args):
         """
@@ -209,7 +197,6 @@ class DataLoggerWeb(object):
         """
         return json.dumps(DataLogger.get_projects(basedir))
 
-    @calllogger
     @memcache
     def get_tablenames(self, args):
         """
@@ -226,7 +213,6 @@ class DataLoggerWeb(object):
         project = args[0]
         return json.dumps(DataLogger.get_tablenames(basedir, project))
 
-    @calllogger
     @memcache
     def get_wikiname(self, args):
         """
@@ -243,7 +229,6 @@ class DataLoggerWeb(object):
         project, tablename = args
         return json.dumps("DataLoggerReport%s%s" % (project.capitalize(), tablename.capitalize()))
 
-    @calllogger
     @memcache
     def get_headers(self, args):
         """
@@ -260,7 +245,6 @@ class DataLoggerWeb(object):
         datalogger = DataLogger(basedir, project, tablename)
         return json.dumps(datalogger.headers)
 
-    @calllogger
     @memcache
     def get_index_keynames(self, args):
         """
@@ -277,7 +261,6 @@ class DataLoggerWeb(object):
         datalogger = DataLogger(basedir, project, tablename)
         return json.dumps(datalogger.index_keynames)
 
-    @calllogger
     @memcache
     def get_value_keynames(self, args):
         """
@@ -295,7 +278,6 @@ class DataLoggerWeb(object):
         datalogger = DataLogger(basedir, project, tablename)
         return json.dumps(datalogger.value_keynames)
 
-    @calllogger
     @memcache
     def get_ts_keyname(self, args):
         """
@@ -312,7 +294,7 @@ class DataLoggerWeb(object):
         datalogger = DataLogger(basedir, project, tablename)
         return json.dumps(datalogger.ts_keyname)
 
-    @calllogger
+    @memcache
     def get_ts_caches(self, args):
         """
         get name of all index keys found in one specific TimeseriesArray
@@ -332,7 +314,7 @@ class DataLoggerWeb(object):
             keys.append(cache[1])
         return json.dumps(keys)
 
-    @calllogger
+    @memcache
     def get_tsstat_caches(self, args):
         """
         get name of all index keys found in one specific TimeseriesArray
@@ -352,7 +334,7 @@ class DataLoggerWeb(object):
             keys.append(cache[1])
         return json.dumps(keys)
 
-    @calllogger
+    @memcache
     def get_caches_dict(self, args):
         """
         get name of all index keys found in one specific TimeseriesArray
@@ -373,14 +355,14 @@ class DataLoggerWeb(object):
             keys.append(key)
         return json.dumps(keys)
 
-    @calllogger
+    @memcache
     def get_last_business_day_datestring(self, args):
         """
         get datestring of last businessday Mo.-Fr.
         """
         return json.dumps(DataLogger.get_last_business_day_datestring())
 
-    @calllogger
+    @memcache
     def get_datewalk(self, args):
         """
         get datestring of last businessday Mo.-Fr.
@@ -389,7 +371,6 @@ class DataLoggerWeb(object):
         data = tuple(DataLogger.datewalker(datestring1, datestring2))
         return json.dumps(data)
 
-    @calllogger
     @memcache
     def get_caches(self, args):
         """
@@ -405,7 +386,6 @@ class DataLoggerWeb(object):
             logging.error(caches)
         return json.dumps(caches)
 
-    @calllogger
     def get_tsa(self, args):
         """
         return exported TimeseriesArray json formatted
@@ -413,17 +393,16 @@ class DataLoggerWeb(object):
         project, tablename, datestring = args
         datalogger = DataLogger(basedir, project, tablename)
         tsa = datalogger[datestring]
-        web.header('Content-type','text/html')
+        web.header('Content-type', 'text/html')
         # you must not set this option, according to
         # http://stackoverflow.com/questions/11866333/ioerror-when-trying-to-serve-file
         # web.header('Transfer-Encoding','chunked')
         yield "[" + json.dumps(tsa.export().next())
         for chunk in tsa.export():
-                #logging.info("yielding %s", chunk)
-                yield "," + json.dumps(chunk)
+            #logging.info("yielding %s", chunk)
+            yield "," + json.dumps(chunk)
         yield "]"
 
-    @calllogger
     def get_tsa_adv(self, args):
         """
         return exported TimeseriesArray json formatted
@@ -455,17 +434,16 @@ class DataLoggerWeb(object):
             logging.info("groupkeys is None, fallback to get ungrouped tsa")
             tsa = datalogger.load_tsa(datestring, index_pattern=index_pattern)
         logging.info(tsa.keys()[0])
-        web.header('Content-type','text/html')
+        web.header('Content-type', 'text/html')
         # you must not set this option, according to
         # http://stackoverflow.com/questions/11866333/ioerror-when-trying-to-serve-file
         # web.header('Transfer-Encoding','chunked')
         yield "[" + json.dumps(tsa.export().next())
         for chunk in tsa.export():
-                #logging.info("yielding %s", chunk)
-                yield "," + json.dumps(chunk)
+            #logging.info("yielding %s", chunk)
+            yield "," + json.dumps(chunk)
         yield "]"
 
-    @calllogger
     def get_ts(self, args):
         """
         get TimeseriesArray object with one particular Timeseries selected by key
@@ -493,7 +471,6 @@ class DataLoggerWeb(object):
         #outbuffer = json.dumps(tuple(tsa.export()))
         #return outbuffer
 
-    @calllogger
     def get_tsastats(self, args):
         """
         return exported TimeseriesArrayStats json formatted
@@ -503,7 +480,7 @@ class DataLoggerWeb(object):
         tsastats = datalogger.load_tsastats(datestring)
         return tsastats.to_json()
 
-    @calllogger
+    @memcache
     def get_stat_func_names(self, args):
         """
         return defined stat_func_names in TimeseriesStats objects
@@ -511,7 +488,6 @@ class DataLoggerWeb(object):
         stat_func_names = TimeseriesStats.stat_funcs.keys()
         return json.dumps(stat_func_names)
 
-    @calllogger
     def get_quantilles(self, args):
         """
         return exported QuantillesArray json formatted
@@ -521,7 +497,6 @@ class DataLoggerWeb(object):
         quantilles = datalogger.load_quantilles(datestring)
         return quantilles.to_json()
 
-    @calllogger
     def get_chart_data_ungrouped(self, args):
         """
         get values from RAW Archive
@@ -621,7 +596,6 @@ class DataLoggerWeb(object):
             )
         return json.dumps(result)
 
-    @calllogger
     def get_longtime_data(self, args):
         """
         get values from RAW Archive
@@ -658,7 +632,6 @@ class DataLoggerWeb(object):
         hc_data = [{"name" : funcname, "data" : data[funcname]} for funcname in data.keys()]
         return json.dumps(hc_data)
 
-    @calllogger
     def upload_raw_file(self, args):
         """
         save receiving file into datalogger structure
@@ -700,7 +673,6 @@ class DataLoggerWeb(object):
         logging.info("File stored")
         return "File stored"
 
-    @calllogger
     def get_tsastats_table(self, args):
         """
         return exported QuantillesArray json formatted
@@ -743,7 +715,8 @@ class DataLoggerWeb(object):
         tsastats = datalogger.load_tsastats(datestring)
         return json.dumps(tsastats.to_csv(stat_func_name))
 
-    def get_scatter_data(self, args):
+    @staticmethod
+    def get_scatter_data(args):
         """
         gets scatter plot data
 

@@ -14,11 +14,11 @@ import time
 import gzip
 import base64
 # own modules
-from TimeseriesArray import TimeseriesArray as TimeseriesArray
-from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
-from Quantilles import QuantillesArray as QuantillesArray
-from CorrelationMatrix import CorrelationMatrixArray as CorrelationMatrixArray
-from CustomExceptions import *
+from datalogger.TimeseriesArray import TimeseriesArray as TimeseriesArray
+from datalogger.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
+from datalogger.Quantilles import QuantillesArray as QuantillesArray
+from datalogger.CorrelationMatrix import CorrelationMatrixArray as CorrelationMatrixArray
+from datalogger.CustomExceptions import *
 
 DEBUG = False
 
@@ -294,8 +294,10 @@ class DataLogger(object):
         """
         filename = self.__get_raw_filename(datestring)
         start_ts, stop_ts = self.get_ts_for_datestring(datestring) # get first and last timestamp of this date
-        data = self.__get_file_handle(filename, "rb").read().split("\n")
-        for lineno, row in enumerate(data[1:]):
+        #data = self.__get_file_handle(filename, "rb").read().split("\n")
+        filehandle = self.__get_file_handle(filename, "rb")
+        next(filehandle) # skip header line
+        for lineno, row in enumerate(filehandle):
             if len(row) == 0 or row[0] == "#":
                 continue
             try:
