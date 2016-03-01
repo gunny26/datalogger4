@@ -63,9 +63,9 @@ function fillIndexKeynames(uiObj) {
     var url = base_url + "/get_index_keynames/" + $('#project').val() + "/" + $('#tablename').val();
     console.log("getting index_keynames from " + url);
     $.getJSON(url, {}, function(result) {
+        result.sort();
         result.forEach(function(item) {
             uiObj.append('<option value=' + item + '>' + item + '</option>');
-            console.log("got index_keyname: " + item);
         });
     });
 }
@@ -79,12 +79,17 @@ function fillValueKeynames(uiObj) {
     var url = base_url + "/get_value_keynames/" + $('#project').val() + "/" + $('#tablename').val();
     console.log("getting index_keys from " + url);
     $.getJSON(url, {}, function(result) {
+        result.sort();
         result.forEach(function(item) {
             uiObj.append('<option value=' + item + '>' + item + '</option>');
-            console.log("got value_keyname: " + item);
         });
-    });
-}
+    })
+        .fail(function() {
+            console.log("fail reached");
+            ticker("there was a failure calling backend");
+        })
+    ;
+}   
 /*
  * fill autocomplete data for given uiObj
  */
@@ -97,7 +102,6 @@ function fillTsAutocomplete(uiObj) {
         for (key in data.ts.keys) {
             index_keys.push(key);
         }
-        console.log(index_keys);
         ticker('recreating autocomplete list for ' + $('#project').val() + "/" + $('#tablename').val());
         uiObj.removeData('autocomplete');
         uiObj.autocomplete({source: index_keys});
@@ -120,7 +124,6 @@ function fillDatestring(uiObj) {
     var url = base_url + "/get_last_business_day_datestring";
     console.log("getting last businessday datestring from " + url);
     $.getJSON(url, function(result) {
-        console.log("Last Businessday datestring: " + result);
         uiObj.val(result);
     });
 }
@@ -137,13 +140,21 @@ function fillProject(uiObj) {
         $('body').css('cursor','wait');
         data.sort();
         data.forEach(function(rowdata) {
-            console.log('appending '+rowdata+' to project select');
             uiObj.append('<option value=' + rowdata + '>' + rowdata + '</option>');
         });
         $('body').css('cursor','default');
     });
 }
-
+/*
+ * Generator returns function to output Messages on status line
+ * ticker = tickerGenerator($("#something"));
+ * ticker("that message went to the status line");
+ */
+function tickerGenerator(uiObj) {
+    return function(message) {
+        uiObj.html(message);
+    }
+}
 /*
  * get a list of available tablenames for this project
  * project is required
@@ -164,9 +175,184 @@ function fillTablename(uiObj) {
     });
 }
 /*
+ * get a list of available statistical function names
+ */
+function fillStatFuncnames(uiObj) {
+    uiObj.empty();
+    uiObj.append('<option value=""></option>');
+    var url = base_url + '/get_stat_func_names'
+    ticker('getting statistical function names');
+    console.log('Getting Data from url ' + url);
+    $.getJSON(url).then(function(data) {
+        $('body').css('cursor','wait');
+        data.sort();
+        data.forEach( function(rowdata) {
+            $('#stat_func_names').append('<option value=' + rowdata + '>' + rowdata + '</option>');
+        });
+        $('body').css('cursor','default');
+    });
+}
+/*
  * Base64 encoding
  */
 var Base64={_keyStr:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",encode:function(e){var t="";var n,r,i,s,o,u,a;var f=0;e=Base64._utf8_encode(e);while(f<e.length){n=e.charCodeAt(f++);r=e.charCodeAt(f++);i=e.charCodeAt(f++);s=n>>2;o=(n&3)<<4|r>>4;u=(r&15)<<2|i>>6;a=i&63;if(isNaN(r)){u=a=64}else if(isNaN(i)){a=64}t=t+this._keyStr.charAt(s)+this._keyStr.charAt(o)+this._keyStr.charAt(u)+this._keyStr.charAt(a)}return t},decode:function(e){var t="";var n,r,i;var s,o,u,a;var f=0;e=e.replace(/[^A-Za-z0-9\+\/\=]/g,"");while(f<e.length){s=this._keyStr.indexOf(e.charAt(f++));o=this._keyStr.indexOf(e.charAt(f++));u=this._keyStr.indexOf(e.charAt(f++));a=this._keyStr.indexOf(e.charAt(f++));n=s<<2|o>>4;r=(o&15)<<4|u>>2;i=(u&3)<<6|a;t=t+String.fromCharCode(n);if(u!=64){t=t+String.fromCharCode(r)}if(a!=64){t=t+String.fromCharCode(i)}}t=Base64._utf8_decode(t);return t},_utf8_encode:function(e){e=e.replace(/\r\n/g,"\n");var t="";for(var n=0;n<e.length;n++){var r=e.charCodeAt(n);if(r<128){t+=String.fromCharCode(r)}else if(r>127&&r<2048){t+=String.fromCharCode(r>>6|192);t+=String.fromCharCode(r&63|128)}else{t+=String.fromCharCode(r>>12|224);t+=String.fromCharCode(r>>6&63|128);t+=String.fromCharCode(r&63|128)}}return t},_utf8_decode:function(e){var t="";var n=0;var r=c1=c2=0;while(n<e.length){r=e.charCodeAt(n);if(r<128){t+=String.fromCharCode(r);n++}else if(r>191&&r<224){c2=e.charCodeAt(n+1);t+=String.fromCharCode((r&31)<<6|c2&63);n+=2}else{c2=e.charCodeAt(n+1);c3=e.charCodeAt(n+2);t+=String.fromCharCode((r&15)<<12|(c2&63)<<6|c3&63);n+=3}}return t}}
 // use Base64.encode(<str>) or Base64.decode(<str>)
+
+/*
+ * Graphics Section
+ * special hicharts functions
+ */
+
+/*
+ *correct timestamps from python
+ */
+Highcharts.setOptions({
+    global: {
+        useUTC: true,
+        timezoneOffset : -120
+    }
+});
+/*
+ * Draw Daily Timeseries Graphics
+ */
+function drawDailyGraph(canvas, title, data, max) {
+    //var chart = new Highcharts.Chart({
+    $("#" + canvas).highcharts({
+        chart: {
+            type: 'spline',
+            zoomType : 'xy'
+        },
+        title: {
+            text: title 
+        },
+        xAxis: {
+            type: 'datetime',
+            dateTimeLabelFormats: { // don't display the dummy year
+                month: '%e. %b',
+                year: '%b'
+            },
+            title: {
+                text: 'Datetime'
+            }
+        },
+        yAxis: {
+            title: {
+                text: 'unit according to measured counter'
+            },
+            min: null,
+            max: max
+        },
+        tooltip: {
+            headerFormat: '<b>{series.name}</b><br>',
+            pointFormat: '{point.x:%H:%M:%S}: {point.y:.2f} '
+        },
+        plotOptions: {
+            spline: {
+                marker: {
+                    enabled: false
+                }
+            }
+        },
+        series: data
+    });
+}
+/*
+ * Daily Scatterplot Graphics 
+ */
+function drawDailyScatterplot(canvas, title, data, value_key1, value_key2) {
+    $("#" + canvas).highcharts({
+        chart: {
+            type: 'scatter',
+            zoomType: 'xy'
+        },
+        title: {
+            text: title
+        },
+        subtitle: {
+            text: 'DataLogger'
+        },
+        xAxis: {
+            title: {
+                enabled: true,
+                text: value_key1
+            },
+            startOnTick: true,
+            endOnTick: true,
+            showLastLabel: true
+        },
+        yAxis: {
+            title: {
+                text: value_key2
+            }
+        },
+        legend: {
+            enabled : false
+        },
+        plotOptions: {
+            scatter: {
+                marker: {
+                    radius: 5,
+                    states: {
+                        hover: {
+                            enabled: true,
+                            lineColor: 'rgb(100,100,100)'
+                        }
+                    }
+                },
+                states: {
+                    hover: {
+                        marker: {
+                            enabled: false
+                        }
+                    }
+                },
+                tooltip: {
+                    headerFormat: '<b>{series.name}</b><br>',
+                    pointFormat: '{point.x}, {point.y}'
+                }
+            }
+        },
+        series: data
+    });
+}
+/*
+ * Monthly Graphics
+ */
+function drawMonthlyGraph(canvas, title, data, max) {
+    $("#" + canvas).highcharts({
+        chart: {
+            type: 'spline',
+            zoomType : 'xy'
+        },
+        title: {
+            text: title 
+        },
+        xAxis: {
+            type: 'category',
+            title: {
+                text: 'Date'
+            }
+        },
+        yAxis: {
+            title: {
+                text: 'unit according to measured counter'
+            },
+            min: null,
+            max: max
+        },
+        tooltip: {
+            headerFormat: '<b>{series.name}</b><br>',
+            pointFormat: '{point.x:%H:%M:%S}: {point.y:.2f} '
+        },
+        plotOptions: {
+            spline: {
+                marker: {
+                    enabled: false
+                }
+            }
+        },
+        series: data
+    });
+}
 
 

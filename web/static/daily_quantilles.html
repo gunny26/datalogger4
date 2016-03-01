@@ -30,7 +30,9 @@ $(document).ready(function(){
     $("#project").change(function() { // on change fetch list of tablenames
         fillTablename($('#tablename'));
     });
-    fillStatFuncnames($("#stat_func_names"));
+    $("#tablename").change(function() {
+        fillValueKeynames($("#value_keynames"));
+    });
     // datatype select box
     $("#getData").click(function() {
         getData();
@@ -43,8 +45,8 @@ function getData() {
     var project = $("#project").val();
     var tablename = $("#tablename").val();
     var datestring = $("#datestring").val();
-    var stat_func_name = $("#stat_func_names" ).val();
-    var url = base_url + "/get_tsastats_func/" + project + "/" + tablename + "/" + datestring + "/" + stat_func_name;
+    var value_keyname = $("#value_keynames" ).val();
+    var url = base_url + "/get_quantilles_web/" + project + "/" + tablename + "/" + datestring + "/" + value_keyname;
     console.log("Getting Data from url " + url);
     ticker("Fetching data, this could last for some time, if this is the first request");
     $.getJSON(url).then(function(data) {
@@ -74,7 +76,7 @@ function getData() {
 <div class="datalogger-filters">
     <ul>
         <li>Statistical function to show</li>
-        <li><div id="select_stat_funcs"><select id="stat_func_names"></select></div><li>
+        <li><div id="select_value_keynames"><select id="value_keynames"></select></div><li>
     </ul>
 </div>
 <div class="datalogger-btn">

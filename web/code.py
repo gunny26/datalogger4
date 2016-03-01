@@ -57,7 +57,7 @@ def memcache(func):
     """
     def inner(*args, **kwds):
         starttime = time.time()
-        thiskey = unicode((func.__name__, args[1:], kwds))
+        thiskey = unicode((func.__name__, args, kwds))
         logging.info("number of keys in cache %d", len(MEMCACHE.keys()))
         logging.info("key to look for %s", thiskey)
         # get rid of old cache entries
@@ -131,6 +131,7 @@ class DataLoggerWeb(object):
             "get_tsastats" : self.get_tsastats,
             "get_stat_func_names" : self.get_stat_func_names,
             "get_quantilles" : self.get_quantilles,
+            "get_quantilles_web" : self.get_quantilles_web,
             "get_chart_data_ungrouped" : self.get_chart_data_ungrouped,
             "get_ts_caches" : self.get_ts_caches,
             "get_tsstat_caches" : self.get_tsstat_caches,
@@ -576,6 +577,35 @@ class DataLoggerWeb(object):
         datalogger = DataLogger(basedir, project, tablename)
         quantilles = datalogger.load_quantilles(datestring)
         return quantilles.to_json()
+
+    def get_quantilles_web(self, args):
+        """
+        return exported QuantillesArray json formatted, special
+        version for use in webpages to render with tablesorter
+
+        in difference to get_quantilles the value_keyname has to be given
+
+        ex: Datalogger/get_quantilles/{projectname}/{tablename}/{datestring}
+
+        [
+            dict of index_keys : dict of quantilles,
+            list of index_keys,
+            list of value_names,
+        ]
+
+        returns:
+        json(quantilles_dict)
+        """
+        project, tablename, datestring, value_keyname = args[:4]
+        datalogger = DataLogger(basedir, project, tablename)
+        qa = datalogger.load_quantilles(datestring)
+        ret_data = []
+        # build header
+        ret_data.append(list(datalogger.index_keynames) + ["Q0", "Q1", "Q2", "Q3", "Q4"])
+        # data part
+        for k, v  in qa[value_keyname].quantilles.items():
+            ret_data.append(list(k) + v.values())
+        return json.dumps(ret_data)
 
     def get_chart_data_ungrouped(self, args):
         """

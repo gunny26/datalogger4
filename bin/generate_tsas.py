@@ -23,17 +23,17 @@ def main(project, tablename, datestring):
         if len(caches["tsa"]["keys"]) == 0:
             print(suffix, "TSA Archive missing, calling get_tsa and get_tsastats")
             #datalogger.get_tsa(project, tablename, datestring)
-            datalogger.get_tsastats(datestring)
+            datalogger.load_tsastats(datestring)
         else:
             #print("TSA filename : %s" % caches["tsa"]["keys"])
             if len(caches["tsastat"]["keys"]) == 0:
                 print(suffix, "TSASTAT Archive missing, calling get_tsastats")
-                datalogger.get_tsastats(datestring)
+                datalogger.load_tsastats(datestring)
             else:
                 #print("TSASTAT filename : %s" % caches["tsastat"]["keys"])
                 if len(caches["ts"]["keys"]) == 0:
                     print(suffix, "there are no ts archives, something went wrong, or tsa is completely empty, calling get_tsastats")
-                    datalogger.get_tsastats(datestring)
+                    datalogger.load_tsastats(datestring)
                 else:
                     #print("TS filename : %s" % len(caches["ts"]["keys"]))
                     #print("TSSTAT filename : %s" % len(caches["tsstat"]["keys"]))
