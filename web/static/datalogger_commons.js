@@ -56,61 +56,6 @@ function get_tablenames(project) {
     });
 }
 
-// get index keys for this particular project, tablename combination
-function get_index_keynames(project, tablename) {
-    var index_keynames = $("#index_keynames");
-    index_keynames.empty();
-    index_keynames.append('<option value=""></option>');
-    var url = base_url + "/get_index_keynames/" + project + "/" + tablename;
-    console.log("getting index_keys from " + url);
-    $.getJSON(url, function(result) {
-        $('body').css('cursor','wait');
-        result.forEach(function(item) {
-            index_keynames.append('<option value=' + item + '>' + item + '</option>');
-            console.log("got index key: " + item);
-        });
-        $('body').css('cursor','default');
-    });
-}
- 
-/*
-// get value keys for this particular project, tablename combination
-*/
-function get_value_keynames(project, tablename) {
-    var value_keynames = $("#value_keynames");
-    value_keynames.empty();
-    var url = base_url + "/get_value_keynames/" + project + "/" + tablename;
-    console.log("getting value_keys from " + url);
-    $.getJSON(url, function(result) {
-        $('body').css('cursor','wait');
-        result.sort(); // sort value_keys
-        result.forEach(function(item) {
-            value_keynames.append('<option value=' + item + '>' + item + '</option>');
-            console.log("got value key: " + item);
-        });
-        $('body').css('cursor','default');
-    });
-}
-
-/*
-get keys of caches timeseries for this project/tablename/datestring combination
-*/
-function get_ts_caches(project, tablename, datestring) {
-    var url = base_url + "/get_ts_caches/" + project + "/" + tablename + "/" + datestring
-    console.log("Getting Data from url " + url);
-    var keys = [];
-    $.getJSON(url).then(function(data) {
-        $('body').css('cursor','wait');
-        data.forEach( function(rowdata) {
-            console.log(rowdata);
-            if (rowdata[2] == null) {
-                keys.push(JSON.stringify(rowdata[1]));
-            }
-        });
-        $('body').css('cursor','default');
-    });
-    return keys;
-}
 
 /*
 Add new drawing container ad end of graphs container
