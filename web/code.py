@@ -140,6 +140,7 @@ class DataLoggerWeb(object):
             "get_longtime_data" : self.get_longtime_data,
             "get_tsastats_table" : self.get_tsastats_table,
             "get_tsastats_func" : self.get_tsastats_func,
+            "sr_vicenter_unused_cpu_cores" : self.sr_vicenter_unused_cpu_cores,
         }
         try:
             return method_func_dict[method](method_args)
@@ -855,6 +856,22 @@ class DataLoggerWeb(object):
                 "data" : ((tsstat[value_key1]["avg"], tsstat[value_key2]["avg"]), )
             })
         return json.dumps(hc_scatter_data)
+
+    @staticmethod
+    def sr_vicenter_unused_cpu_cores(args):
+        datestring = args[0]
+        datalogger = DataLogger(basedir, "vicenter", "virtualMachineCpuStats")
+        tsastat = datalogger.load_tsastats(datestring)
+        tsastat_g = datalogger.tsastat_group_by(tsastat, ("hostname", ))
+        data = []
+        data.append(("hostname", "avg_idle_min", "avg_used_avg", "avg_used_max"))
+        for key in tsastat_g.keys():
+            num_cpu = sum([key[0] in index_key for index_key in tsastat.keys()])
+            if num_cpu < 3 :
+                continue
+            data.append((key[0], "%0.2f" % tsastat_g[key]["cpu.idle.summation"]["min"], "%0.2f" % tsastat_g[key]["cpu.used.summation"]["avg"], "%0.2f" % tsastat_g[key]["cpu.used.summation"]["max"]))
+        return json.dumps(data)
+
 
 if __name__ == "__main__":
     app = web.application(urls, globals())
