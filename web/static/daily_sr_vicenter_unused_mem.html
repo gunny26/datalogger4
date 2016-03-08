@@ -36,7 +36,7 @@ get data from json and create a graph on actual container
 */
 function getData() {
     var datestring = $("#datestring").val();
-    var url = base_url + "/sr_vicenter_unused_cpu_cores/" + datestring;
+    var url = base_url + "/sr_vicenter_unused_mem/" + datestring;
     console.log("Getting Data from url " + url);
     ticker("Fetching data, this could last for some time, if this is the first request");
     $.getJSON(url).then(function(data) {
