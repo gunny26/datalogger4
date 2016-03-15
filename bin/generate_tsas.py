@@ -6,6 +6,7 @@ import gc
 import datetime
 import logging
 logging.basicConfig(level=logging.INFO)
+import argparse
 # own modules
 from datalogger import DataLogger as DataLogger
 
@@ -38,9 +39,26 @@ def main(project, tablename, datestring):
 if __name__ == "__main__":
     basedir = "/var/rrd"
     yesterday_datestring = (datetime.date.today() - datetime.timedelta(1)).isoformat()
-    two_weeks_ago_daetstring = (datetime.date.today() - datetime.timedelta(28)).isoformat()
-    for datestring in tuple(DataLogger.datewalker(two_weeks_ago_daetstring, yesterday_datestring)):
-        for project in DataLogger.get_projects(basedir):
-            for tablename in DataLogger.get_tablenames(basedir, project):
+    parser = argparse.ArgumentParser(description='generate TimeseriesArrays on local backend')
+    parser.add_argument('--basedir', default="/var/rrd", help="basedirectory of datalogger data on local machine")
+    parser.add_argument("-b", '--back', help="how many days back from now")
+    parser.add_argument("-s", '--startdate', help="start date in isoformat YYY-MM-DD")
+    parser.add_argument("-e", '--enddate', default=yesterday_datestring, help="stop date in isoformat YYY-MM-DD")
+    args = parser.parse_args()
+    print(args)
+    if (args.back is not None) == (args.startdate is not None):
+        print("option -b and -e are mutual exclusive, use only one")
+        sys.exit(1)
+    startdate = None
+    if args.back is not None:
+        startdate = (datetime.date.today() - datetime.timedelta(int(args.back))).isoformat()
+    elif args.startdate is not None:
+        startdate = args.startdate
+    else:
+        print("you have to provide either -b or -s")
+        sys.exit(1)
+    for datestring in tuple(DataLogger.datewalker(startdate, args.enddate)):
+        for project in DataLogger.get_projects(args.basedir):
+            for tablename in DataLogger.get_tablenames(args.basedir, project):
                 main(project, tablename, datestring)
     #cProfile.run("main()")
