@@ -140,6 +140,9 @@ class DataLoggerWeb(object):
             "get_longtime_data" : self.get_longtime_data,
             "get_tsastats_table" : self.get_tsastats_table,
             "get_tsastats_func" : self.get_tsastats_func,
+            "sr_vicenter_unused_cpu_cores" : self.sr_vicenter_unused_cpu_cores,
+            "sr_vicenter_unused_mem" : self.sr_vicenter_unused_mem,
+            "sr_hrstorageram_unused" : self.sr_hrstorageram_unused,
         }
         try:
             return method_func_dict[method](method_args)
@@ -855,6 +858,73 @@ class DataLoggerWeb(object):
                 "data" : ((tsstat[value_key1]["avg"], tsstat[value_key2]["avg"]), )
             })
         return json.dumps(hc_scatter_data)
+
+    @staticmethod
+    def sr_vicenter_unused_cpu_cores(args):
+        """
+        special report to find virtual machine which re not used their virtual core entirely
+        on this machine there is a possibility to save some virtual cores
+
+        works only for VMware machines, in special virtualMachineCpuStats
+        """
+        datestring = args[0]
+        datalogger = DataLogger(basedir, "vicenter", "virtualMachineCpuStats")
+        tsastat = datalogger.load_tsastats(datestring)
+        tsastat_g = datalogger.tsastat_group_by(tsastat, ("hostname", ))
+        data = []
+        data.append(("hostname", "avg_idle_min", "avg_used_avg", "avg_used_max"))
+        for key in tsastat_g.keys():
+            num_cpu = sum([key[0] in index_key for index_key in tsastat.keys()])
+            if num_cpu < 3 :
+                continue
+            data.append((key[0], "%0.2f" % tsastat_g[key]["cpu.idle.summation"]["min"], "%0.2f" % tsastat_g[key]["cpu.used.summation"]["avg"], "%0.2f" % tsastat_g[key]["cpu.used.summation"]["max"]))
+        return json.dumps(data)
+
+    @staticmethod
+    def sr_vicenter_unused_mem(args):
+        """
+        special resport to find virtual machine which are not used their ram entirely
+        on this machines there is a possibility to save some virtual memory
+
+        works only for VMware machine, in special virtualMachineMemoryStats
+        """
+        datestring = args[0]
+        datalogger = DataLogger(basedir, "vicenter", "virtualMachineMemoryStats")
+        tsastat = datalogger.load_tsastats(datestring)
+        tsastat_g = datalogger.tsastat_group_by(tsastat, ("hostname", ))
+        data = []
+        data.append(("hostname", "avg_active_max", "avg_granted_min", "avg_notused_min"))
+        for key in tsastat_g.keys():
+            not_used = tsastat_g[key]["mem.granted.average"]["min"] - tsastat_g[key]["mem.active.average"]["max"]
+            data.append((key[0], "%0.2f" % tsastat_g[key]["mem.active.average"]["max"], "%0.3f" % tsastat_g[key]["mem.granted.average"]["min"], "%0.2f" % not_used))
+        return json.dumps(data)
+
+    @staticmethod
+    def sr_hrstorageram_unused(args):
+        """
+        special report to find servers which are not using their ram entirely
+        specially on virtual machines are is a huge saving potential
+
+        works only for snmp data especially hrStorageTable
+        """
+        datestring = args[0]
+        datalogger = DataLogger(basedir, "snmp", "hrStorageTable")
+        tsastat = datalogger.load_tsastats(datestring)
+        data = []
+        data.append(("hostname", "hrStorageSizeKb", "hrStorageUsedKb", "hrStorageNotUsedKbMin", "hrStorageNotUsedPct"))
+        for index_key in tsastat.keys():
+            # (u'srvcacdbp1.tilak.cc', u'Physical Memory',
+            # u'HOST-RESOURCES-TYPES::hrStorageRam')
+            if u'HOST-RESOURCES-TYPES::hrStorageRam' not in index_key:
+                del tsastat[index_key]
+        for key, tsstat in datalogger.tsastat_group_by(tsastat, ("hostname", )).items():
+            sizekb = tsstat["hrStorageSize"]["min"] * tsstat["hrStorageAllocationUnits"]["max"] / 1024
+            usedkb = tsstat["hrStorageUsed"]["max"] * tsstat["hrStorageAllocationUnits"]["max"] / 1024
+            notused = sizekb - usedkb
+            notused_pct = 100.0 *  notused / sizekb
+            data.append((key[0], "%0.2f" % sizekb, "%0.2f" % usedkb, "%0.2f" % notused, "%0.2f" % notused_pct))
+        return json.dumps(data)
+
 
 if __name__ == "__main__":
     app = web.application(urls, globals())

@@ -678,6 +678,67 @@ class DataLogger(object):
             tsa2.group_add(data, group_func)
         return tsa2
 
+    def tsastat_group_by(self, tsastat, subkey):
+        """
+        group tsastat array by some subkey
+        TODO: return TimeseriesArrayStats Object to be consistent
+
+        parameters:
+        tsastat <TimeseriesArrayStats>
+        subkey <tuple> subkey to group by
+
+        returns:
+        <dict>
+        """
+        # how to aggregate statistical values
+        group_funcs = {
+            u'count' : lambda a, b: a + b,
+            u'std' : lambda a, b: (a + b)/2,
+            u'avg': lambda a, b: (a + b)/2,
+            u'last' : lambda a, b: -1.0, # theres no meaning
+            u'min' : min,
+            u'max' : max,
+            u'sum' : lambda a, b: (a + b) / 2,
+            u'median' : lambda a, b: (a + b)/2,
+            u'mean' : lambda a, b: (a + b)/2,
+            u'diff' : lambda a, b: (a + b)/2,
+            u'dec' : lambda a, b: (a + b)/2,
+            u'inc' : lambda a, b: (a + b)/2,
+            u'first' : lambda a, b: -1.0, # theres no meaning
+        }
+        #tsastat = datalogger.load_tsastats("2016-02-08")
+        #print(datalogger.index_keynames)
+        #print(datalogger.value_keynames)
+        #groupby = ("hostname", )
+        newdata = {}
+        for index_key, tsstat in tsastat.items():
+            #print("index_key :", index_key)
+            key_dict = dict(zip(self.index_keynames, index_key))
+            newkey = None
+            if len(subkey) == 0:
+                newkey = ("__total__", )
+            else:
+                newkey = tuple([key_dict[key] for key in subkey])
+            #print("grouped key: ", newkey)
+            if newkey not in newdata:
+                #print("first appearance of this index_key")
+                newdata[newkey] = {}
+            for value_key in self.value_keynames:
+                if value_key not in newdata[newkey]:
+                    #print("first appearance of this value_key")
+                    newdata[newkey][value_key] = dict(tsstat[value_key])
+                else:
+                    #print("grouping data")
+                    for stat_funcname in tsstat[value_key].keys():
+                        #print("statistical function: ", stat_funcname)
+                        existing = float(newdata[newkey][value_key][stat_funcname])
+                        #print("existing data: ", existing)
+                        to_group = float(tsstat[value_key][stat_funcname])
+                        #print("to add data  : ", to_group)
+                        newdata[newkey][value_key][stat_funcname] = group_funcs[stat_funcname](existing, to_group)
+                        #print("calculated value: ", newdata[newkey][value_key][stat_funcname])
+        return newdata
+
     def get_wikiname(self):
         """
         returns:
@@ -820,6 +881,7 @@ class DataLogger(object):
 
     @staticmethod
     def get_yesterday_datestring():
+        """return datestring from yesterday (24h ago)"""
         return datetime.date.fromtimestamp(time.time() - 60 * 60 * 24).isoformat()
 
     @staticmethod

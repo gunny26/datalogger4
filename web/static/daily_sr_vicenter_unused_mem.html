@@ -1,0 +1,71 @@
+<html>
+<head>
+    <link rel="stylesheet" href="jquery-ui.css" />
+    <link rel="stylesheet" href="datalogger.css" />
+    <!--jquery itself-->
+    <script type="text/javascript" src="jquery-2.1.3.js"></script>
+    <!-- used for autofill feature -->
+    <script text="text/javascript" src="jquery-ui.js"></script>
+    <!-- used for autofill feature -->
+    <script text="text/javascript" src="datalogger.js"></script>
+    <!-- 
+    <script src="jquery-ui.js"></script>
+    <link rel="stylesheet" href="jquery-ui.css" />
+    -->
+    <script type="text/javascript" src="jquery.tablesorter.js"></script> 
+    <meta name="viewport" content="width=device-width, initial-scale=0.9">
+</head>
+<body>
+<script>
+// base url for datalogger JSOn calls
+var base_url = "/DataLogger";
+var ticker;
+
+$(document).ready(function(){
+    ticker = tickerGenerator($("#status"));
+    ticker("document loaded");
+    // set some meaningful default values
+    fillDatestring($("#datestring")); // get last business datestring
+    // datatype select box
+    $("#getData").click(function() {
+        getData();
+    });
+});
+/*
+get data from json and create a graph on actual container
+*/
+function getData() {
+    var datestring = $("#datestring").val();
+    var url = base_url + "/sr_vicenter_unused_mem/" + datestring;
+    console.log("Getting Data from url " + url);
+    ticker("Fetching data, this could last for some time, if this is the first request");
+    $.getJSON(url).then(function(data) {
+        $('#reports').html(renderTable(data, "reportTable")); 
+        //console.log(data);
+        //$('#report_table').html(data);
+        $("#reportTable").tablesorter();
+        /* little helper so right align numerical td values
+        $('#reportTable tr').each( function () { 
+            $(this).children('td:gt(0)').filter(function() {
+                return this.innerHTML.match(/^[0-9\s\.,]+$/);
+            }).css('text-align','right')
+        });
+        */
+        ticker("Got data, finished, maybe you select another one?");
+    });
+}
+</script>
+<div class="datalogger-mandatories">
+    <ul>
+        <li>Mandatory Parameters</li>
+        <li class="datalogger-datestring"><input id="datestring" type="date"></li>
+    </ul>
+</div>
+<div class="datalogger-btn">
+    <button id="getData" type="button">Fetch Data</button>
+</div>
+<div class="datalogger-status" id="status"></div>
+<div class="datalogger-report" id="reports">
+</div>
+</body>
+</html>
