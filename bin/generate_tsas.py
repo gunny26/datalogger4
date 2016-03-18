@@ -5,7 +5,7 @@ import sys
 import gc
 import datetime
 import logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 import argparse
 # own modules
 from datalogger import DataLogger as DataLogger
