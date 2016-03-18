@@ -146,7 +146,7 @@ if __name__ == "__main__":
     # get switchnames from centreon database
     for row in centreon.getCentreonHostGroupMembersSnmp(nagios_group):
         hostname, community, version = row
-        if hostname[0:3] in ("vmw", "nss"):
+        if hostname[0:2] in ("vm", ):
             continue
         if community is None:
             community = "tango97"
