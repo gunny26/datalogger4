@@ -215,7 +215,7 @@ Highcharts.setOptions({
 /*
  * Draw Daily Timeseries Graphics
  */
-function drawDailyGraph(canvas, title, data, max) {
+function drawDailyGraph(canvas, title, data, min, max) {
     //var chart = new Highcharts.Chart({
     $("#" + canvas).highcharts({
         chart: {
@@ -239,7 +239,7 @@ function drawDailyGraph(canvas, title, data, max) {
             title: {
                 text: 'unit according to measured counter'
             },
-            min: null,
+            min: min,
             max: max
         },
         tooltip: {

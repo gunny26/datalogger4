@@ -81,6 +81,10 @@ function getData() {
     if (yAxisMax == "") {
         yAxisMax = null;
     }
+    var yAxisMin = $('#yAxisMin').val()
+    if (yAxisMin == "") {
+        yAxisMin = null;
+    }
     var url = base_url + "/get_chart_data_ungrouped/" + project + "/" + tablename + "/" + datestring + "/" + Base64.encode(keys) + "/" + JSON.stringify(selected) + "/" + JSON.stringify(datatype) + "/" + JSON.stringify(index_keynames);
     console.log("Getting Data from url " + url);
     ticker("Fetching data, this could last for some time, if this is the first request");
@@ -90,7 +94,7 @@ function getData() {
         console.log(data.stats);
         console.log("Drawing to actual_container = #" + actual_container);
         title = "timeseries " + project + "/" + tablename + "/" + datestring+"<br>used index_key:" + keys + "<br>grouped by " + index_keynames + "<br>shown values:" + JSON.stringify(selected);
-        drawDailyGraph(actual_container, title, data.data, yAxisMax);
+        drawDailyGraph(actual_container, title, data.data, yAxisMin, yAxisMax);
         ticker("Got data, finished, maybe you select another one?");
     });
 }
@@ -121,8 +125,10 @@ function getData() {
                         <label title="depends on kind of value_key, absolut : draw as is, counter : use per_s or derive">Datatype</label>
                         <div><select id="datatype"></select></div>
                     </td><td>
-                        <label title="max value of yAxis, if nothing is given autoscale">y-Max</label>
-                        <div><input id="yAxisMax" type=text size=5></div>
+                        <label title="max value of yAxis, leave blank for autoscale">y-Max</label>
+                        <input id="yAxisMax" type=text size=5>
+                        <label title="min value of yAxis, leave blank for autoscale">y-Min</label>
+                        <input id="yAxisMin" type=text size=5>
                     </td></tr>
             </table>
         </td>
