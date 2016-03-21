@@ -5,7 +5,7 @@ import sys
 import gc
 import datetime
 import logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 import argparse
 # own modules
 from datalogger import DataLogger as DataLogger
@@ -16,21 +16,21 @@ def main(project, tablename, datestring):
     suffix = "%s/%s/%s\t" % (datestring, project, tablename)
     data = None
     if caches["tsa"]["raw"] is None:
-        print(suffix, "Nothing could be done without RAW data")
+        logging.info("%s Nothing could be done without RAW data", suffix)
     else:
         if len(caches["tsa"]["keys"]) == 0:
-            print(suffix, "TSA Archive missing, calling get_tsa and get_tsastats")
+            logging.info("%s TSA Archive missing, calling get_tsa and get_tsastats", suffix)
             data = datalogger.load_tsa(datestring)
         else:
             if len(caches["tsastat"]["keys"]) == 0:
-                print(suffix, "TSASTAT Archive missing, calling get_tsastats")
+                logging.info("%s TSASTAT Archive missing, calling get_tsastats", suffix)
                 data = datalogger.load_tsastats(datestring)
             else:
                 if len(caches["ts"]["keys"]) == 0:
-                    print(suffix, "there are no ts archives, something went wrong, or tsa is completely empty, calling get_tsastats")
+                    logging.info("%s there are no ts archives, something went wrong, or tsa is completely empty, calling get_tsastats", suffix)
                     data = datalogger.load_tsa(datestring)
                 else:
-                    print(suffix, "All fine")
+                    logging.info("%s All fine", suffix)
     del data
     del caches
     del datalogger
@@ -44,10 +44,15 @@ if __name__ == "__main__":
     parser.add_argument("-b", '--back', help="how many days back from now")
     parser.add_argument("-s", '--startdate', help="start date in isoformat YYY-MM-DD")
     parser.add_argument("-e", '--enddate', default=yesterday_datestring, help="stop date in isoformat YYY-MM-DD")
+    parser.add_argument("-q", '--quiet', action='store_true', help="set to loglevel ERROR")
+    parser.add_argument("-v", '--verbose', action='store_true', help="set to loglevel DEBUG")
     args = parser.parse_args()
-    print(args)
+    if args.quiet is True:
+        logging.getLogger("").setLevel(logging.ERROR)
+    if args.verbose is True:
+        logging.getLogger("").setLevel(logging.DEBUG)
     if (args.back is not None) == (args.startdate is not None):
-        print("option -b and -e are mutual exclusive, use only one")
+        logging.error("option -b and -e are mutual exclusive, use only one")
         sys.exit(1)
     startdate = None
     if args.back is not None:
@@ -55,7 +60,7 @@ if __name__ == "__main__":
     elif args.startdate is not None:
         startdate = args.startdate
     else:
-        print("you have to provide either -b or -s")
+        logging.error("you have to provide either -b or -s")
         sys.exit(1)
     for datestring in tuple(DataLogger.datewalker(startdate, args.enddate)):
         for project in DataLogger.get_projects(args.basedir):

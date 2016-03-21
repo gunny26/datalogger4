@@ -125,7 +125,7 @@ class CorrelationMatrixTime(object):
             return True
         except AssertionError as exc:
             logging.exception(exc)
-            print self.__data.keys(), other.data.keys()
+            logging.debug("%s, %s", self.__data.keys(), other.data.keys())
         return False
 
     def __getitem__(self, key):

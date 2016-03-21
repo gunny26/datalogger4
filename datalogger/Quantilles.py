@@ -50,8 +50,8 @@ class QuantillesArray(object):
                 assert self.__data[key] == other[key]
             return True
         except AssertionError as exc:
-            print self.__keys, other.keys
-            print self.__value_keys, other.value_keys
+            logging.debug("%s, %s", self.__keys, other.keys)
+            logigng.debug("%s, %s", self.__value_keys, other.value_keys)
             logging.exception(exc)
             return False
 
