@@ -349,9 +349,12 @@ class TimeseriesArrayStats(object):
     def to_csv(self, stat_func_name, sortkey=None, reverse=True):
         """
         return csv table of data for one specific statistical function
+
+        first column is always the identifying key of this TimseriesStat as string
+        mainly to use in websites to get easier to the key of this row
         """
         outbuffer = []
-        outbuffer.append(self.__index_keys + self.__value_keys)
+        outbuffer.append((u"#key", ) + self.__index_keys + self.__value_keys)
         data = None
         if sortkey is not None:
             data = sorted(self.__stats.items(), key=lambda item: item[1][sortkey][stat_func_name], reverse=True)
@@ -359,7 +362,7 @@ class TimeseriesArrayStats(object):
             data = self.__stats.items()
         for key, value in data:
             values = list(key) + [value[value_key][stat_func_name] for value_key in self.__value_keys]
-            outbuffer.append(values)
+            outbuffer.append([unicode(key), ] + values)
         return outbuffer
 
 
