@@ -89,11 +89,13 @@ function getData() {
     console.log("Getting Data from url " + url);
     ticker("Fetching data, this could last for some time, if this is the first request");
     $.getJSON(url).then(function(data) {
+        console.log("url: " + url + " data " + data)
         //deprecated, fetch json data, and render table in JS
         $('#stats').html(data.stats);
         console.log(data.stats);
         console.log("Drawing to actual_container = #" + actual_container);
         title = "timeseries " + project + "/" + tablename + "/" + datestring+"<br>used index_key:" + keys + "<br>grouped by " + index_keynames + "<br>shown values:" + JSON.stringify(selected);
+        console.log("actual_container " + actual_container + " title " + title + " data.data: " + data.data + " -data " + data + " ymin " + yAxisMin + " ymax " + yAxisMax)
         drawDailyGraph(actual_container, title, data.data, yAxisMin, yAxisMax);
         ticker("Got data, finished, maybe you select another one?");
     });
