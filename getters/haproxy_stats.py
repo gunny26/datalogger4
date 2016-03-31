@@ -102,7 +102,7 @@ def main():
         os.mkdir(meta_basedir)
     # get DATA
     configfilename = "%s.json" % sys.argv[0].split(".")[0]
-    logging.error("configfilename: %s", configfilename)
+    logging.info("configfilename: %s", configfilename)
     if not os.path.isfile(configfilename):
         logging.error("config file %s not found", configfilename)
         sys.exit(1)
