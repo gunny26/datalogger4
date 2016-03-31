@@ -133,6 +133,7 @@ class DataLoggerWeb(object):
             "get_quantilles" : self.get_quantilles,
             "get_quantilles_web" : self.get_quantilles_web,
             "get_chart_data_ungrouped" : self.get_chart_data_ungrouped,
+            "get_hc_daily_data" : self.get_hc_daily_data,
             "get_ts_caches" : self.get_ts_caches,
             "get_tsstat_caches" : self.get_tsstat_caches,
             "get_caches_dict" : self.get_caches_dict,
@@ -709,6 +710,90 @@ class DataLoggerWeb(object):
             )
         return json.dumps(result)
 
+    def get_hc_daily_data(self, args):
+        """
+        get values(min 1) from TimeseriesArray to use for highcharts graphing
+
+        parameters:
+        /project/tablename/datestring/index_key/value_keynames/index_keyname
+
+        <b>poject</b> <str> defines which project to use
+        <b>tablename</b> <str> defines which tablename to use
+        <b>datestring</b> <str> in form of YYYY-MM-DD to define whih day to use
+        <b>index_key</b> base64 encoded tuple, defines which Timeseries to use, ex. (u'srvcl14db2.tilak.cc', u'DB2', u'ablagsys', u'data only')
+        <b>value_keynames</b> json encoded list of value_keynames to show in graph
+            each value_keyname will be a separate highchart line
+        <b>index_keynam</b> json encoded <str> or null
+            if given, the data will be grouped on this given index_keyname
+            if hostname is given the above example will be gruped by hostname=u'srvcl14db2.tilak.cc'
+            and all possible Timeseries will be summed up
+
+        return data json encoded like this
+        [
+            {   name : "timeseries value_name 1",
+                data : [[ts, value], ...]
+            },
+            {   name : "timeseries value name 2",
+                data : [[ts, value], ...]
+            }
+            ...
+        ]
+        this structure could already be used in highcharts.data
+        """
+        assert len(args) == 6
+        project, tablename, datestring, index_key_b64, value_keynames_str, index_keyname_str = args
+        # key_str should be a tuple string, convert to unicode tuple
+        index_key = tuple([unicode(key_value) for key_value in eval(base64.b64decode(index_key_b64))])
+        value_keynames = ()
+        if json.loads(value_keynames_str) is not None:
+            value_keynames = tuple(json.loads(value_keynames_str))
+        index_keyname = ()
+        if json.loads(index_keyname_str) is not None:
+            index_keyname = (json.loads(index_keyname_str),)
+        logging.info("project : %s", project)
+        logging.info("tablename : %s", tablename)
+        logging.info("datestring : %s", datestring)
+        logging.info("index_key : %s", index_key)
+        logging.info("value_keynames : %s", value_keynames)
+        logging.info("index_keyname : %s", index_keyname)
+        datalogger = DataLogger(basedir, project, tablename)
+        index_key_dict = dict(zip(datalogger.index_keynames, index_key))
+        # build filter if any group_by is given
+        filterkeys = index_key_dict # default
+        if len(index_keyname) > 0:
+            filterkeys = {}
+            for key in index_keyname:
+                filterkeys[key] = index_key_dict[key]
+        logging.info("using filterkeys: %s", filterkeys)
+        tsa = datalogger.load_tsa(datestring, filterkeys=filterkeys)
+        logging.info("got tsa with %d keys", len(tsa))
+        # grouping stuff if necessary
+        data = None # holds finally calculated data
+        if len(index_keyname) > 0:
+            logging.info("generating new key for left possible keys in grouped tsa")
+            new_key = tuple((index_key_dict[key] for key in index_keyname))
+            logging.info("key after grouping would be %s", new_key)
+            logging.info("grouping tsa by %s", index_keyname)
+            new_tsa = datalogger.group_by(datestring, tsa, index_keyname, group_func=lambda a, b : a + b)
+            tsa = new_tsa
+            data = tsa[new_key].dump_dict()
+        else:
+            data = tsa[index_key].dump_dict()
+        # holds return data
+        logging.info("data keys : %s", data[data.keys()[0]].keys())
+        # get in highcharts shape
+        result = []
+        for value_keyname in value_keynames:
+            # its important to sort by timestamp, to not confuse
+            # highcharts
+            result.append(
+                {
+                    "name" : value_keyname,
+                    "data" : tuple(((ts * 1000, row_dict[value_keyname]) for ts, row_dict in sorted(data.items())))
+                }
+            )
+        return json.dumps(result)
+
     def get_longtime_data(self, args):
         """
         get values from RAW Archive
@@ -809,20 +894,14 @@ class DataLoggerWeb(object):
 
     def get_tsastats_func(self, args):
         """
-        return jason data to render html table from it
+        return json data to render html table from it
+
+        parameters:
+        <b>project</b> project string
+        <b>tablename</b> tablename string
+        <b>datestring</b> datestring in YYYY-MM-DD form
+        <b>stat_func_name</b> statistical function
         """
-        def csv_to_table(csvdata, keys):
-            outbuffer = []
-            outbuffer.append("<thead><tr>")
-            [outbuffer.append("<th>%s</th>" % header) for header in csvdata[0]]
-            outbuffer.append("</tr></thead><tbody>")
-            for values in csvdata[1:]:
-                outbuffer.append("<tr>")
-                [outbuffer.append("<td >%s</td>" % value) for value in values[0:keys]]
-                [outbuffer.append("<td type=numeric>%0.2f</td>" % value) for value in values[keys:]]
-                outbuffer.append("</tr>")
-            outbuffer.append("</tbody>")
-            return outbuffer
         project, tablename, datestring, stat_func_name = args
         datalogger = DataLogger(basedir, project, tablename)
         tsastats = datalogger.load_tsastats(datestring)
