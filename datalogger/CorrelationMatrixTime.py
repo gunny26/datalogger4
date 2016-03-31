@@ -98,12 +98,14 @@ def get_mse_sorted_norm_missing(series1, series2):
     return mse
 
 
-class CorrelationMatrixTime(object):
+class CorrelationMatrixTimeWeb(object):
     """
     for all available Timeseries Objects in TimeseriesArray
     compare the Timeseries with the Timeseries for this key on another date
 
     to find out, which Timeseries differ most
+
+    this version uses the DataLoggerWeb API
     """
 
     def __init__(self, dataloggerweb, project, tablename, datestring1, datestring2, value_key):
@@ -169,3 +171,69 @@ class CorrelationMatrixTime(object):
         cm = CorrelationMatrixTime.__new__(CorrelationMatrixTime)
         cm.__data = eval(json.loads(data))
         return cm
+
+
+class CorrelationMatrixTime(object):
+    """
+    comparing to Timeseries of the same index_key and same value_keyname
+    but two different datestrings
+
+    to detect anomalities in usage over time
+
+    this version works with native DataLogger API, on DataLogger Server
+    """
+
+    def __init__(self, tsa1, tsa2, value_key):
+        self.__data = self.__get_correlation_matrix(tsa1, tsa2, value_key)
+
+    @property
+    def data(self):
+        return self.__data
+
+    def __eq__(self, other):
+        try:
+            assert self.__data == other.data
+            return True
+        except AssertionError as exc:
+            logging.exception(exc)
+            print self.__data.keys(), other.data.keys()
+        return False
+
+    def __getitem__(self, key):
+        print key
+        return self.__data[key]
+
+    def keys(self):
+        return self.__data.keys()
+
+    def values(self):
+        return self.__data.values()
+
+    def items(self):
+        return self.__data.items()
+
+    @staticmethod
+    def __get_correlation_matrix(tsa1, tsa2, value_key):
+        """
+        search for correlating series in all other series available
+        """
+        print "Searching for correlation in value_key %s)" % value_key
+        matrix = {}
+        for key in tsa1.keys():
+            other = None
+            if key in tsa2.keys():
+                matrix[key] = get_mse_sorted_norm_missing(tsa1[key][value_key], tsa2[key][value_key])
+            else:
+                logging.debug("skipping %s key not in older TSA", key)
+            #print key, matrix[key]
+        return matrix
+
+    def dumps(self):
+        return json.dumps(str(self.__data))
+
+    @staticmethod
+    def loads(data):
+        cm = CorrelationMatrix.__new__(CorrelationMatrix)
+        cm.__data = eval(json.loads(data))
+        return cm
+

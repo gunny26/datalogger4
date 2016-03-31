@@ -28,12 +28,14 @@ __date__ = "$Date: 2013/04/16 06:50:15 $"
 from DataLogger import DataLogger as DataLogger
 from DataLogger import DataLoggerRawFileMissing as DataLoggerRawFileMissing
 from Timeseries import Timeseries as Timeseries
-from TimeseriesArray import TimeseriesArray as TimeseriesArray
-from TimeseriesArrayLazy import TimeseriesArrayLazy as TimeseriesArrayLazy
+#from TimeseriesArray import TimeseriesArray as TimeseriesArray
+from TimeseriesArrayLazy import TimeseriesArrayLazy as TimeseriesArray
 from TimeseriesStats import TimeseriesStats as TimeseriesStats
 from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 from Quantilles import QuantillesArray as QuantillesArray
 from CorrelationMatrix import CorrelationMatrixArray as CorrelationMatrixArray
 from CorrelationMatrixTime import CorrelationMatrixTime as CorrelationMatrixTime
 from CustomExceptions import *
+# classes to use with webapplication API
 from DataLoggerWeb import DataLoggerWeb as DataLoggerWeb
+from CorrelationMatrixTime import CorrelationMatrixTimeWeb as CorrelationMatrixTimeWeb

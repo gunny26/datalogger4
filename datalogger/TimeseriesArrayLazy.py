@@ -56,8 +56,11 @@ class TimeseriesArrayLazy(object):
         return len(self.__data.keys())
 
     def __getitem__(self, key):
-        """mimic dict, honor lazy reloading of Timeseries"""
-        return self.__autoload_ts(key)
+        """mimic dict, honor lazy reloading of Timeseries if value is None"""
+        if self.__data[key] is None:
+            return self.__autoload_ts(key)
+        else:
+            return self.__data[key]
 
     def __setitem__(self, key, value):
         """mimic dict"""

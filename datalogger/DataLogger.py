@@ -639,7 +639,7 @@ class DataLogger(object):
         returns:
         <TimeseriesArray> object wich holds all data of this day
         """
-        tsa = TimeseriesArray(self.__index_keynames, self.__value_keynames)
+        tsa = TimeseriesArray(self.__index_keynames, self.__value_keynames, datatypes=self.__datatypes)
         for rowdict in self.__get_raw_data_dict(datestring, timedelta):
             try:
                 tsa.add(rowdict)
@@ -669,7 +669,7 @@ class DataLogger(object):
         <TimeseriesArray>
         """
         # intermediated tsa
-        tsa2 = TimeseriesArray(index_keys=subkeys, value_keys=tsa.value_keys, ts_key=tsa.ts_key)
+        tsa2 = TimeseriesArray(index_keys=subkeys, value_keys=tsa.value_keys, ts_key=tsa.ts_key, datatypes=self.__datatypes)
         start_ts, _ = DataLogger.get_ts_for_datestring(datestring)
         ts_keyname = tsa.ts_key
         for data in tsa.export():
