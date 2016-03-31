@@ -50,6 +50,8 @@ class TimeseriesArrayLazy(object):
         self.__data = {} # holds data
         self.ts_autoload = {} # holds key to ts filename dict
         self.datatypes = datatypes
+        self.__group_keyname = None # for future use
+        self.__group_func = None # for future use
 
     def __len__(self):
         """mimic dict"""
@@ -61,6 +63,21 @@ class TimeseriesArrayLazy(object):
             return self.__autoload_ts(key)
         else:
             return self.__data[key]
+
+    def getitem_grouped__(self, key):
+        """
+        ALPHA code to implement grouping while reading lazy
+        DON NOT USE
+        """
+        assert self.__group_keyname is not None
+        assert self.__group_func is not None
+        logging.debug("searching for key %s", key)
+        if self.__group_keyname is not None:
+            get_key_dict = dict(zip(self.__index_keys, key))
+            logging.debug("converted to key_dict: %s", get_key_dict)
+            dict_keys = [dict(zip(self.__index_keys, my_key)) for my_key in self.keys()]
+            load_keys = [dict_key for dict_key in dict_keys if dict_key[self.__group_keyname] == get_key_dict[self.__group_keyname]]
+            logging.debug("keys to load : %s", load_keys)
 
     def __setitem__(self, key, value):
         """mimic dict"""
@@ -144,6 +161,19 @@ class TimeseriesArrayLazy(object):
         """set this to True to get more debug messages, like raw data value errors"""
         assert isinstance(value, bool)
         self.__debug = value
+
+    def set_group_keyname(self, index_keyname, group_func):
+        """
+        set index_keyname to group values for
+
+        index_keyname <basestring> in self.index_keynames
+        group_func <func> function to group multiple values by
+
+        if set every __getitem__ call will group data automatically
+        """
+        assert index_keyname in self.__index_keys
+        self.__group_keyname = index_keyname
+        self.__group_func = group_func
 
     def add(self, data, group_func=None):
         """

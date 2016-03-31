@@ -14,8 +14,10 @@ from datalogger import Timeseries as Timeseries
 
 def main():
     tsa = datalogger["2016-02-08"]
+    tsa.set_group_keyname("hostname", lambda a, b: a + b)
     for key in tsa.keys():
-        print(key, tsa[key])
+        tsa.getitem_grouped__(key)
+        #print(key, tsa[key])
 
 if __name__ == "__main__":
     project = "ucs"
