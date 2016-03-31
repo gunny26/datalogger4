@@ -7,19 +7,20 @@ import gc
 import logging
 logging.basicConfig(level=logging.DEBUG)
 from datalogger import DataLogger as DataLogger
-from datalogger import TimeseriesArray as TimeseriesArray
+from datalogger import TimeseriesArrayLazy as TimeseriesArray
 from datalogger import TimeseriesArrayStats as TimeseriesArrayStats
 from datalogger import Timeseries as Timeseries
 #from commons import *
 
 def main():
     tsa = datalogger["2016-02-08"]
-    print(tsa)
+    for key in tsa.keys():
+        print(key, tsa[key])
 
 if __name__ == "__main__":
     project = "ucs"
     tablename = "ifXTable"
     datalogger = DataLogger("/var/rrd", project, tablename)
     datestring = DataLogger.get_last_business_day_datestring()
-    #main()
+    main()
     cProfile.run("main()")

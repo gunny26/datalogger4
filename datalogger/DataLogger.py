@@ -14,7 +14,7 @@ import time
 import gzip
 import base64
 # own modules
-from datalogger.TimeseriesArray import TimeseriesArray as TimeseriesArray
+from datalogger.TimeseriesArrayLazy import TimeseriesArrayLazy as TimeseriesArray
 from datalogger.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 from datalogger.Quantilles import QuantillesArray as QuantillesArray
 from datalogger.CorrelationMatrix import CorrelationMatrixArray as CorrelationMatrixArray
@@ -459,7 +459,7 @@ class DataLogger(object):
             """
             tsa = self.load_tsa_raw(datestring, timedelta)
             tsa.dump_split(cachedir) # save full data
-            tsa = self.iconvert(TimeseriesArray.load_split(cachedir, self.__index_keynames, filterkeys=filterkeys, index_pattern=index_pattern))
+            tsa = TimeseriesArray.load_split(cachedir, self.__index_keynames, filterkeys=filterkeys, index_pattern=index_pattern, datatypes=self.__datatypes)
             return tsa
         if not os.path.isfile(cachefilename):
             logging.info("cachefile %s does not exist, fallback read from raw", cachefilename)
@@ -470,7 +470,7 @@ class DataLogger(object):
             return fallback()
         logging.debug("loading stored TimeseriesArray object file %s", cachefilename)
         try:
-            tsa = self.iconvert(TimeseriesArray.load_split(cachedir, self.__index_keynames, filterkeys=filterkeys, index_pattern=index_pattern))
+            tsa = TimeseriesArray.load_split(cachedir, self.__index_keynames, filterkeys=filterkeys, index_pattern=index_pattern, datatypes=self.__datatypes)
             return tsa
         except IOError:
             logging.error("IOError while reading from %s, using fallback", cachefilename)
@@ -483,6 +483,8 @@ class DataLogger(object):
 
     def iconvert(self, tsa):
         """
+        DEPRECTAED: will be done in TimeseriesArray
+
         convert given tsa to defined datatypes
         modifies tsa object and return the modified version
 

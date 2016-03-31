@@ -3,7 +3,7 @@ import cProfile
 import time
 import json
 import logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(levelname)s %(filename)s:%(funcName)s:%(lineno)s %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)-15s %(levelname)s %(filename)s:%(funcName)s:%(lineno)s %(message)s')
 from datalogger import DataLogger as DataLogger
 from datalogger import DataLoggerWeb as DataLoggerWeb
 from commons import *

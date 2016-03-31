@@ -29,6 +29,7 @@ from DataLogger import DataLogger as DataLogger
 from DataLogger import DataLoggerRawFileMissing as DataLoggerRawFileMissing
 from Timeseries import Timeseries as Timeseries
 from TimeseriesArray import TimeseriesArray as TimeseriesArray
+from TimeseriesArrayLazy import TimeseriesArrayLazy as TimeseriesArrayLazy
 from TimeseriesStats import TimeseriesStats as TimeseriesStats
 from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 from Quantilles import QuantillesArray as QuantillesArray
