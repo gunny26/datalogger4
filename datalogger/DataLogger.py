@@ -13,6 +13,7 @@ import calendar
 import time
 import gzip
 import base64
+import pwd
 # own modules
 from datalogger.TimeseriesArrayLazy import TimeseriesArrayLazy as TimeseriesArray
 from datalogger.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
@@ -77,6 +78,7 @@ class DataLogger(object):
         tablename <str> specific raw data  in project,
             there should be some files in <basedir>/<project>/raw/<tablename>_<isodate>.csv
         """
+        self.__basedir = basedir
         self.__project = project
         self.__tablename = tablename
         project_dir = os.path.join(basedir, project)
@@ -333,6 +335,17 @@ class DataLogger(object):
         subdir = os.path.join(self.__global_cachedir, datestring, self.__project, self.__tablename)
         if not os.path.exists(subdir):
             os.makedirs(subdir)
+        # try to set ownership of created directories
+        username = self.get_user(self.__basedir)
+        try:
+            uid = pwd.getpwnam(username).pw_uid
+            gid = pwd.getpwnam(username).pw_gid
+            os.chown(os.path.join(self.__global_cachedir, datestring), uid, gid)
+            os.chown(os.path.join(self.__global_cachedir, datestring, self.__project), uid, gid)
+            os.chown(os.path.join(self.__global_cachedir, datestring, self.__project, self.__tablename), uid, gid)
+        except KeyError as exc:
+            logging.exception(exc)
+            logging.error("User %s does not exist on this systemi, default permission will be applied to created directories", username)
         return subdir
 
     def get_caches(self, datestring):
@@ -873,13 +886,25 @@ class DataLogger(object):
     def get_projects(basedir):
         """return available project, defined in datalogger.json"""
         data = json.load(open(os.path.join(basedir, "datalogger.json"), "rb"))
-        return data.keys()
+        return data["projects"].keys()
 
     @staticmethod
     def get_tablenames(basedir, project):
         """return available tablenames for projects, defined in datalogger.json"""
         data = json.load(open(os.path.join(basedir, "datalogger.json"), "rb"))
-        return data[unicode(project)].keys()
+        return data["projects"][unicode(project)].keys()
+
+    @staticmethod
+    def get_user(basedir):
+        """return OS user to use for file permissions, defined in datalogger.json"""
+        data = json.load(open(os.path.join(basedir, "datalogger.json"), "rb"))
+        return data["user"]
+
+    @staticmethod
+    def get_group(basedir):
+        """return OS group to use for file permissions, defined in datalogger.json"""
+        data = json.load(open(os.path.join(basedir, "datalogger.json"), "rb"))
+        return data["group"]
 
     @staticmethod
     def get_yesterday_datestring():
