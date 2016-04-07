@@ -303,7 +303,7 @@ class DataLogger(object):
             if len(row) == 0 or row[0] == "#":
                 continue
             try:
-                data = self.__parse_line(row, timedelta)
+                data = self.__parse_line(unicode(row, "utf-8"), timedelta)
                 if self.__ts_keyname not in data:
                     logging.info("Format Error in row: %s, got %s", row, data)
                     continue
@@ -320,6 +320,14 @@ class DataLogger(object):
             except UnicodeDecodeError as exc:
                 logging.exception(exc)
                 logging.error("UnicodeDecodeError in File %s, line %s, on row: %s, skipping", filename, lineno, row)
+
+    def raw_reader(self, datestring):
+        """
+        kind of debugging method to read from raw file, like load_tsa does,
+        but report every line as is, only converted into dict
+        """
+        for row in self.__get_raw_data_dict(datestring, 0):
+            yield row
 
     def __get_cachedir(self, datestring):
         """
