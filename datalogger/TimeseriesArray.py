@@ -10,8 +10,8 @@ import json
 import os
 import gzip
 # own modules
-from Timeseries import Timeseries as Timeseries
-from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
+from datalogger.Timeseries import Timeseries as Timeseries
+from datalogger.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 
 
 def is_near(value, target_value, pct=0.05):
@@ -24,16 +24,20 @@ def is_near(value, target_value, pct=0.05):
     return minimum < float(value) < maximum
 
 
+class TimeseriesArrayAddError(Exception):
+    pass
+
+
 class TimeseriesArray(object):
     """
     holds dictionary of Timeseries objects
     """
     group_funcs = {
-        "sum" : lambda a: sum(a),
-        "min" : lambda a: min(a),
-        "max" : lambda a: max(a),
+        "sum" : sum,
+        "min" : min,
+        "max" : max,
         "avg" : lambda a: sum(a) / len(a),
-        "len" : lambda a: len(a),
+        "len" : len,
     }
 
     def __init__(self, index_keys, value_keys, ts_key="ts"):
@@ -46,7 +50,7 @@ class TimeseriesArray(object):
         self.__value_keys = list([unicode(value) for value in value_keys])
         self.__ts_key = unicode(ts_key)
         # define instance data
-        self.__debug = False
+        self.__debug = True
         self.__data = {} # holds data
 
     def __len__(self):
@@ -139,6 +143,17 @@ class TimeseriesArray(object):
         assert isinstance(value, bool)
         self.__debug = value
 
+    @staticmethod
+    def to_float(value_str):
+        """
+        try to convert strint to float, honor "," als decimal point if possible
+        otherwise raise ValueError
+        """
+        try:
+            return float(value_str) # first best
+        except ValueError:
+            return float(value_str.replace(u",", u".")) # try to replace colon with point
+
     def add(self, data, group_func=None):
         """
         data must have following keys
@@ -155,8 +170,8 @@ class TimeseriesArray(object):
         # create key from data
         try:
             key = tuple([unicode(data[key]) for key in self.__index_keys])
-        except KeyError:
-            #logging.exception(exc)
+        except KeyError as exc:
+            logging.exception(exc)
             logging.error("there are index_keys missing in this dataset %s, skipping this dataset", data.keys())
             return
         # add data to this timeseries object
@@ -164,8 +179,16 @@ class TimeseriesArray(object):
             # timestamp and values has to be converted to float
             # made the next explicit to avoid empty keys if there is no
             # valueable data -> will result in ValueError
-            ts = float(data[self.__ts_key])
-            values = tuple((float(data[key]) for key in self.__value_keys))
+            try:
+                ts = float(data[self.__ts_key])
+            except ValueError:
+                logging.error("timestamp %s column is not float convertiblei, skipping data", self.ts_key)
+                raise TimeseriesArrayAddError("timestamp %s column is not float convertiblei, skipping data" % self.ts_key)
+            try:
+                values = tuple((self.to_float(data[key]) for key in self.__value_keys)) # custom float converter
+            except ValueError:
+                logging.error("some value_key (%s) in %s is not float convertible", self.value_keys, data)
+                raise TimeseriesArrayAddError("some value_key (%s) in %s is not float convertible" % (self.value_keys, data))
             if key not in self.__data:
                 # if this key is new, create empty Timeseries object
                 self.__data[key] = Timeseries(self.__value_keys)
@@ -174,13 +197,13 @@ class TimeseriesArray(object):
             else:
                 self.__data[key].add(ts, values)
         except KeyError as exc:
-            #logging.exception(exc)
+            logging.exception(exc)
             if self.__debug: # some datasources have incorrect data
                 logging.error("there is some key missing in %s, should be %s and %s, skipping this dataset, skipping this dataset", data.keys(), self.__ts_key, self.__value_keys)
-        except ValueError as exc:
-            #logging.exception(exc)
-            if self.__debug: # some datasources have incorrect data
-                logging.error("some value_keys or ts_keyname are not numeric and float convertible, skipping this dataset: %s", data)
+#        except ValueError as exc:
+#            logging.exception(exc)
+#            if self.__debug: # some datasources have incorrect data
+#                logging.error("some value_keys or ts_keyname are not numeric and float convertible, skipping this dataset: %s", data)
 
     def group_add(self, data, group_func):
         """wrapper to be api consistent, DEPRECATED"""
@@ -251,7 +274,8 @@ class TimeseriesArray(object):
         """
         call convert method of every stored Timeseries, with given parameter
         """
-        [timeseries.convert(colname, datatype, newcolname) for timeseries in self.__data.values()]
+        for timeseries in self.__data.values():
+            timeseries.convert(colname, datatype, newcolname)
 
     def add_derive_col(self, colname, newcolname):
         """
@@ -342,6 +366,15 @@ class TimeseriesArray(object):
         self.__value_keys.remove(colname)
 
     def slice(self, colnames):
+        """
+        return copy of TimeseriesArray, but only defined value_keynames
+
+        parameters:
+        colnames <list> of value_keynames in returned TimeseriesArray
+
+        returns:
+        TimeseriesArray
+        """
         ret_data = TimeseriesArray(index_keys=self.__index_keys, value_keys=colnames, ts_key=self.__ts_key)
         for key, value in self.__data.items():
             ret_data.data[key] = value.slice(colnames)
@@ -402,10 +435,28 @@ class TimeseriesArray(object):
 
     @staticmethod
     def get_ts_dumpfilename(key):
+        """
+        return filename of Timeseries dump File
+
+        parameters:
+        key <tuple> index_key of this particular Timeseries
+
+        returns:
+        <str>
+        """
         return "ts_%s.csv.gz" % base64.urlsafe_b64encode(unicode(key))
 
     @staticmethod
     def get_dumpfilename(index_keys):
+        """
+        return filename of TimseriesArray dump file
+
+        parameters:
+        index_keys <tuple> of particular index_keys of this Timeseries
+
+        returns:
+        <str>
+        """
         return "tsa_%s.json" % base64.urlsafe_b64encode(unicode(index_keys))
 
     @staticmethod
