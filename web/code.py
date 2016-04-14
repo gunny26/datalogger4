@@ -770,24 +770,32 @@ class DataLoggerWeb(object):
         logging.info("got tsa with %d keys", len(tsa))
         # grouping stuff if necessary
         data = None # holds finally calculated data
+        stats = None # holds tsstats informations
         if len(index_keyname) > 0:
+            # grouping by key named
             logging.info("generating new key for left possible keys in grouped tsa")
             new_key = tuple((index_key_dict[key] for key in index_keyname))
             logging.info("key after grouping would be %s", new_key)
             logging.info("grouping tsa by %s", index_keyname)
-            new_tsa = datalogger.group_by(datestring, tsa, index_keyname, group_func=lambda a, b : a + b)
+            new_tsa = datalogger.group_by(datestring, tsa, index_keyname, group_func=lambda a, b: a + b)
             tsa = new_tsa
             data = tsa[new_key].dump_dict()
+            stats = tsa[new_key].stats.get_stats()
         else:
+            # not grouping, simple
             data = tsa[index_key].dump_dict()
+            stats = tsa[index_key].stats.get_stats()
         # holds return data
         logging.info("data keys : %s", data[data.keys()[0]].keys())
         # get in highcharts shape
-        result = []
+        result = {
+            "stats" : stats,
+            "data" : [], # holds highchart data
+        }
         for value_keyname in value_keynames:
             # its important to sort by timestamp, to not confuse
             # highcharts
-            result.append(
+            result["data"].append(
                 {
                     "name" : value_keyname,
                     "data" : tuple(((ts * 1000, row_dict[value_keyname]) for ts, row_dict in sorted(data.items())))
@@ -955,7 +963,7 @@ class DataLoggerWeb(object):
         data.append(("hostname", "avg_idle_min", "avg_used_avg", "avg_used_max"))
         for key in tsastat_g.keys():
             num_cpu = sum([key[0] in index_key for index_key in tsastat.keys()])
-            if num_cpu < 3 :
+            if num_cpu < 3:
                 continue
             data.append((key[0], "%0.2f" % tsastat_g[key]["cpu.idle.summation"]["min"], "%0.2f" % tsastat_g[key]["cpu.used.summation"]["avg"], "%0.2f" % tsastat_g[key]["cpu.used.summation"]["max"]))
         return json.dumps(data)
@@ -1015,7 +1023,7 @@ class DataLoggerWeb(object):
         datalogger = DataLogger(basedir, "snmp", "hrStorageTable")
         tsastat = datalogger.load_tsastats(datestring)
         data = []
-        data.append(("hostname","hrStorageDescr", "hrStorageSizeKb", "hrStorageUsedKb", "hrStorageNotUsedKbMin", "hrStorageNotUsedPct"))
+        data.append(("hostname", "hrStorageDescr", "hrStorageSizeKb", "hrStorageUsedKb", "hrStorageNotUsedKbMin", "hrStorageNotUsedPct"))
         for index_key in tsastat.keys():
             # (u'srvcacdbp1.tilak.cc', u'Physical Memory',
             # u'HOST-RESOURCES-TYPES::hrStorageRam')
