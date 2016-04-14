@@ -54,6 +54,40 @@ function renderTable(data, id) {
     return html;
 }
 /*
+ * render table from TimeseriesStats json data
+ * 
+ * data comes in object form
+ *
+ */
+function renderTsStatTable(data) {
+    html = "<table><tbody>";
+    /* identify rownames to put in first columns */
+    var rownames = [];
+    for ( var rowname in data ) {
+        if (data.hasOwnProperty(rowname)) {
+            rownames.push(rowname);
+        }
+    }
+    /* build up table row by row */
+    var colnames = [];
+    rownames.forEach(function(rowname) {
+        if (colnames.length == 0) {
+            /* only true for first row, build header */
+            Object.keys(data[rowname]).forEach(function(colname) {
+                colnames.push(colname)
+            });
+            html += "<tr><th>" + "key</th><th>" + colnames.join("</th><th>") + "</th></tr>";
+        }
+        /* build value rows */
+        var values = [rowname, ];
+        colnames.forEach(function(colname) {
+            values.push(data[rowname][colname])
+        });
+        html += "<tr><td>" + values.join("</td><td>") + "</td></tr>";
+    });
+    return html + "<tbody></table>";
+}
+/*
  * fill select box with data from backend using JSON AJAX call
  * uiObj - Jquery Select object to fill
  */
@@ -68,6 +102,8 @@ function fillIndexKeynames(uiObj) {
             uiObj.append('<option value=' + item + '>' + item + '</option>');
         });
     });
+    /* adding special value __total__ to indicate total grouping of al available values */
+    uiObj.append("<option value=__total__>__total__</option>");
 }
 /*
  * fill select box with data from backend using JSON AJAX call
