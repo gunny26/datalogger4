@@ -28,21 +28,24 @@ $(document).ready(function(){
     fillDatestring($("#datestring")); // get last business datestring
     // datatype select box
     $("#getData1").click(function() {
-        getData("sr_vicenter_unused_cpu_cores");
+        getData("sr_vicenter_unused_cpu_cores", null);
     });
     $("#getData2").click(function() {
-        getData("sr_vicenter_unused_mem");
+        getData("sr_vicenter_unused_mem", null);
     });
     $("#getData3").click(function() {
-        getData("sr_hrStorageRam_unused");
+        getData("sr_hrStorageRam_unused", null);
+    });
+    $("#getData4").click(function() {
+        getData("sr_hrStorage_unused", "hrStorageFixedDisk");
     });
 });
 /*
 get data from json and create a graph on actual container
 */
-function getData(methodname) {
+function getData(methodname, parameters) {
     var datestring = $("#datestring").val();
-    var url = base_url + "/" + methodname + "/" + datestring;
+    var url = [base_url, methodname, datestring, parameters].join("/");
     console.log("Getting Data from url " + url);
     ticker("Fetching data, this could last for some time, if this is the first request");
     $.getJSON(url).then(function(data) {
@@ -62,6 +65,7 @@ function getData(methodname) {
     <button id="getData1" type="button">unused virtual cpus</button>
     <button id="getData2" type="button">unused virtual memory</button>
     <button id="getData3" type="button">unused physical memory</button>
+    <button id="getData4" type="button">unused fixed disk space</button>
 </div>
 <div class="datalogger-status" id="status"></div>
 <div class="datalogger-report" id="reports">

@@ -144,6 +144,7 @@ class DataLoggerWeb(object):
             "sr_vicenter_unused_cpu_cores" : self.sr_vicenter_unused_cpu_cores,
             "sr_vicenter_unused_mem" : self.sr_vicenter_unused_mem,
             "sr_hrstorageram_unused" : self.sr_hrstorageram_unused,
+            "sr_hrstorage_unused" : self.sr_hrstorage_unused,
         }
         try:
             return method_func_dict[method](method_args)
@@ -1002,6 +1003,36 @@ class DataLoggerWeb(object):
             notused = sizekb - usedkb
             notused_pct = 100.0 *  notused / sizekb
             data.append((key[0], "%0.2f" % sizekb, "%0.2f" % usedkb, "%0.2f" % notused, "%0.2f" % notused_pct))
+        return json.dumps(data)
+
+    @staticmethod
+    def sr_hrstorage_unused(args):
+        """
+        special report to get a report of unused SNMP Host Storage
+        works only with snmp/hrStorageTable
+        """
+        datestring, storage_type = args[:2]
+        datalogger = DataLogger(basedir, "snmp", "hrStorageTable")
+        tsastat = datalogger.load_tsastats(datestring)
+        data = []
+        data.append(("hostname","hrStorageDescr", "hrStorageSizeKb", "hrStorageUsedKb", "hrStorageNotUsedKbMin", "hrStorageNotUsedPct"))
+        for index_key in tsastat.keys():
+            # (u'srvcacdbp1.tilak.cc', u'Physical Memory',
+            # u'HOST-RESOURCES-TYPES::hrStorageRam')
+            if (u"HOST-RESOURCES-TYPES::%s" % storage_type) not in index_key:
+                del tsastat[index_key]
+            if index_key[1][:4] in (u"/run", u"/dev", u"/sys"):
+                del tsastat[index_key]
+        for key, tsstat in tsastat.items():
+            sizekb = tsstat["hrStorageSize"]["min"] * tsstat["hrStorageAllocationUnits"]["max"] / 1024
+            usedkb = tsstat["hrStorageUsed"]["max"] * tsstat["hrStorageAllocationUnits"]["max"] / 1024
+            notused = sizekb - usedkb
+            notused_pct = 0.0
+            try:
+                notused_pct = 100.0 *  notused / sizekb
+            except ZeroDivisionError:
+                pass
+            data.append((key[0], key[1], "%0.2f" % sizekb, "%0.2f" % usedkb, "%0.2f" % notused, "%0.2f" % notused_pct))
         return json.dumps(data)
 
 
