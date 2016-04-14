@@ -10,8 +10,8 @@ import json
 import os
 import gzip
 # own modules
-from Timeseries import Timeseries as Timeseries
-from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
+from datalogger.Timeseries import Timeseries as Timeseries
+from datalogger.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 
 
 def is_near(value, target_value, pct=0.05):
@@ -29,11 +29,11 @@ class TimeseriesArrayLazy(object):
     holds dictionary of Timeseries objects
     """
     group_funcs = {
-        "sum" : lambda a: sum(a),
-        "min" : lambda a: min(a),
-        "max" : lambda a: max(a),
+        "sum" : sum,
+        "min" : min,
+        "max" : max,
         "avg" : lambda a: sum(a) / len(a),
-        "len" : lambda a: len(a),
+        "len" : len,
     }
 
     def __init__(self, index_keys, value_keys, ts_key="ts", datatypes=None):
@@ -175,6 +175,17 @@ class TimeseriesArrayLazy(object):
         self.__group_keyname = index_keyname
         self.__group_func = group_func
 
+    @staticmethod
+    def to_float(value_str):
+        """
+        try to convert strint to float, honor "," als decimal point if possible
+        otherwise raise ValueError
+        """
+        try:
+            return float(value_str) # first best
+        except ValueError:
+            return float(value_str.replace(u",", u".")) # try to replace colon with point
+
     def add(self, data, group_func=None):
         """
         data must have following keys
@@ -201,7 +212,7 @@ class TimeseriesArrayLazy(object):
             # made the next explicit to avoid empty keys if there is no
             # valueable data -> will result in ValueError
             ts = float(data[self.__ts_key])
-            values = tuple((float(data[key]) for key in self.__value_keys))
+            values = tuple((self.to_float(data[key]) for key in self.__value_keys))
             if key not in self.keys():
                 # if this key is new, create empty Timeseries object
                 self[key] = Timeseries(self.__value_keys)
@@ -382,10 +393,18 @@ class TimeseriesArrayLazy(object):
         self.__value_keys.remove(colname)
 
     def slice(self, colnames):
-        ret_data = TimeseriesArray(index_keys=self.__index_keys, value_keys=colnames, ts_key=self.__ts_key)
+        """
+        return copy of TimeseriesArray, but only defined value_keynames
+
+        parameters:
+        colnames <list> of value_keynames in returned TimeseriesArray
+
+        returns:
+        TimeseriesArray
+        """
+        ret_data = TimeseriesArrayLazy(index_keys=self.__index_keys, value_keys=colnames, ts_key=self.__ts_key)
         for key in self.keys():
-            timeseries = self[key]
-            ret_data.data[key] = value.slice(colnames)
+            ret_data[key] = self[key].slice(colnames)
         return ret_data
 
     def export(self):
@@ -445,10 +464,28 @@ class TimeseriesArrayLazy(object):
 
     @staticmethod
     def get_ts_dumpfilename(key):
+        """
+        return filename of Timeseries dump File
+
+        parameters:
+        key <tuple> index_key of this particular Timeseries
+
+        returns:
+        <str>
+        """
         return "ts_%s.csv.gz" % base64.urlsafe_b64encode(unicode(key))
 
     @staticmethod
     def get_dumpfilename(index_keys):
+        """
+        return filename of TimseriesArray dump file
+
+        parameters:
+        index_keys <tuple> of particular index_keys of this Timeseries
+
+        returns:
+        <str>
+        """
         return "tsa_%s.json" % base64.urlsafe_b64encode(unicode(index_keys))
 
     @staticmethod
