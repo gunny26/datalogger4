@@ -235,9 +235,9 @@ def main():
     print date1
     date2 = date1 - datetime.timedelta(days=7)
     print date2.isoformat()
-    report_group("vicenter", "virtualMachineCpuStats", datestring, date2.isoformat(), "cpu.used.summation")
+    #report_group("vicenter", "virtualMachineCpuStats", datestring, date2.isoformat(), "cpu.used.summation")
     #report(project, tablename, datestring, date2.isoformat(), "mem.active.average")
-    #report("vicenter", "virtualMachineDatastoreStats", datestring, date2.isoformat(), "datastore.totalReadLatency.average")
+    report("vicenter", "virtualMachineDatastoreStats", datestring, date2.isoformat(), "datastore.totalReadLatency.average")
     #report("vicenter", "virtualMachineDatastoreStats", datestring, date2.isoformat(), "datastore.write.average")
     #report("vicenter", "virtualMachineNetworkStats", datestring, date2.isoformat(), "net.usage.average")
     #report("sanportperf", "fcIfC3AccountingTable", datestring, date2.isoformat(), "fcIfC3InOctets")
