@@ -17,7 +17,8 @@ import pwd
 # own modules
 from datalogger.TimeseriesArrayLazy import TimeseriesArrayLazy as TimeseriesArray
 from datalogger.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
-from datalogger.Quantilles import QuantillesArray as QuantillesArray
+from datalogger.TimeseriesStats import TimeseriesStats as TimeseriesStats
+from datalogger.Quantile import QuantileArray as QuantileArray
 from datalogger.CorrelationMatrix import CorrelationMatrixArray as CorrelationMatrixArray
 from datalogger.CustomExceptions import *
 
@@ -95,28 +96,30 @@ class DataLogger(object):
         # combination
         metafile = os.path.join(meta_basedir, "%s.json" % self.__tablename)
         try:
-            meta = self.__load_metainfo(metafile)
+            self.__meta = self.__load_metainfo(metafile)
         except StandardError as exc:
             logging.exception(exc)
             logging.error("error while loading meta informations from file %s", metafile)
             raise exc
         # to local __dict__
-        self.__delimiter = meta["delimiter"]
-        self.__ts_keyname = meta["ts_keyname"]
-        self.__headers = tuple(meta["headers"])
+        self.__delimiter = self.__meta["delimiter"]
+        self.__ts_keyname = self.__meta["ts_keyname"]
+        self.__headers = tuple(self.__meta["headers"])
         # transitional hook to implement datatypes without correcting
         # all meta files at once
-        if isinstance(meta["value_keynames"], dict):
-            self.__value_keynames = tuple(meta["value_keynames"].keys())
-            self.__datatypes = meta["value_keynames"]
-        elif isinstance(meta["value_keynames"], list):
+        if isinstance(self.__meta["value_keynames"], dict):
+            self.__value_keynames = tuple(self.__meta["value_keynames"].keys())
+            self.__datatypes = self.__meta["value_keynames"]
+        elif isinstance(self.__meta["value_keynames"], list):
             # if old stype, keep all datatype asis, and print warning
-            self.__value_keynames = tuple(meta["value_keynames"])
-            self.__datatypes = dict(zip(meta["value_keynames"], ("asis",) * len(meta["value_keynames"])))
+            self.__value_keynames = tuple(self.__meta["value_keynames"])
+            self.__datatypes = dict(zip(self.__meta["value_keynames"], ("asis",) * len(self.__meta["value_keynames"])))
             logging.error("You should define value_keynames as dict with datatypes")
-        self.__index_keynames = tuple(meta["index_keynames"])
-        self.__blacklist = tuple(meta["blacklist"])
-        self.__interval = meta["interval"]
+        self.__index_keynames = tuple(self.__meta["index_keynames"])
+        self.__blacklist = tuple(self.__meta["blacklist"])
+        self.__interval = self.__meta["interval"]
+        # add available Statistical function names to meta structure
+        self.__meta["stat_func_names"] = TimeseriesStats.stat_funcs.keys()
         # make some assertions
         # every index_keyname has to be in headers
         assert all((key in self.__headers for key in self.__index_keynames))
@@ -179,6 +182,11 @@ class DataLogger(object):
     def global_cachedir(self):
         """subdirectory where to put caches"""
         return self.__global_cachedir
+
+    @property
+    def meta(self):
+        """definition of this particular project/tablename configuration"""
+        return self.__meta
 
     def __getitem__(self, key):
         """
@@ -567,38 +575,38 @@ class DataLogger(object):
             os.unlink(cachefilename)
             return fallback()
 
-    def load_quantilles(self, datestring):
+    def load_quantile(self, datestring):
         """
-        retuns quantilles for this specific tsa, either load cache version,
+        retuns quantile for this specific tsa, either load cache version,
         or recreate from tsa
 
         parameters:
         datestring <str>
 
         returns:
-        <QuantillesArray>
+        <QuantileArray>
         """
         cachedir = self.__get_cachedir(datestring)
-        cachefilename = os.path.join(cachedir, "quantilles.json")
+        cachefilename = os.path.join(cachedir, "quantile.json")
         qa = None
         if os.path.isfile(cachefilename):
-            qa = QuantillesArray.load(open(cachefilename, "rb"))
+            qa = QuantileArray.load(open(cachefilename, "rb"))
         else:
             tsa = self.load_tsa(datestring)
-            qa = QuantillesArray(tsa)
+            qa = QuantileArray(tsa)
             qa.dump(open(cachefilename, "wb"))
         return qa
 
     def load_correlationmatrix(self, datestring):
         """
-        retuns quantilles for this specific tsa, either load cache version,
+        retuns correlattion matrix for this specific tsa, either load cache version,
         or recreate from tsa
 
         parameters:
         datestring <str>
 
         returns:
-        <QuantillesArray>
+        <CorrelationMatrixArray>
         """
         cachedir = self.__get_cachedir(datestring)
         cachefilename = os.path.join(cachedir, "correlationmatrix.json")

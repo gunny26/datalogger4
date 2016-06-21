@@ -1,4 +1,5 @@
 #!/usr/bin/pypy
+# pylint: disable=line-too-long
 """
 compare Timeseries Data in Time for the same value_keys
 

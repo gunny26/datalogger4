@@ -13,7 +13,7 @@ from datalogger import Timeseries as Timeseries
 from datalogger import TimeseriesArray as TimeseriesArray
 from datalogger import TimeseriesArrayStats as TimeseriesArrayStats
 from datalogger import TimeseriesStats as TimeseriesStats
-from datalogger import QuantillesArray as QuantillesArray
+from datalogger import QuantileArray as QuantileArray
 
 DATALOGGER_URL = "http://srvmgdata1.tilak.cc/DataLogger"
 
@@ -433,9 +433,9 @@ class DataLoggerWeb(object):
         data = self.__get_json("get_stat_func_names", uri_params, query_params)
         return data
 
-    def get_quantilles(self, project, tablename, datestring):
+    def get_quantile(self, project, tablename, datestring):
         """
-        get QuantillesArray object for this particular project/tablename/datestring combination
+        get QuantileArray object for this particular project/tablename/datestring combination
 
         parameters:
         project <str>
@@ -443,7 +443,7 @@ class DataLoggerWeb(object):
         datestring <str>
 
         returns:
-        <QuantillesArray>
+        <QuantileArray>
         """
         uri_params = {
             "project" : project,
@@ -451,9 +451,9 @@ class DataLoggerWeb(object):
             "datestring" : datestring,
         }
         query_params = {}
-        data = self.__get_raw_data("get_quantilles", uri_params, query_params)
-        quantilles = QuantillesArray.from_json(data)
-        return quantilles
+        data = self.__get_raw_data("get_quantile", uri_params, query_params)
+        quantile = QuantileArray.from_json(data)
+        return quantile
 
 
 class Test(unittest.TestCase):
@@ -562,9 +562,9 @@ class Test(unittest.TestCase):
         assert len(data) > 1
         assert data == [u'std', u'count', u'last', u'min', u'mean', u'max', u'sum', u'avg', u'median', u'first']
 
-    def test_get_quantilles(self):
-        qa = self.datalogger.get_quantilles("ucs", "ifTable", "2015-11-06")
-        assert isinstance(qa, QuantillesArray)
+    def test_get_quantile(self):
+        qa = self.datalogger.get_quantile("ucs", "ifTable", "2015-11-06")
+        assert isinstance(qa, QuantileArray)
         # TODO: do more checking
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# pylint: disable=line-too-long
 """
 Modules deals with timeseries statistics
 """
@@ -256,6 +257,7 @@ class TimeseriesStats(object):
         <None>
         """
         json.dump(self.__stats, filehandle)
+        filehandle.flush()
 
     @staticmethod
     def load(filehandle):

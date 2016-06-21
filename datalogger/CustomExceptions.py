@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# pylint: disable=line-too-long
 
 class TimeseriesEmptyError(Exception):
     """raise if the specific Timeseries is length zero"""

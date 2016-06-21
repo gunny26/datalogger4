@@ -1,4 +1,5 @@
 #!/usr/bin/pypy
+# pylint: disable=line-too-long
 import json
 import logging
 
@@ -89,6 +90,7 @@ class CorrelationMatrixArray(object):
     def dump(self, filehandle):
         data = dict(((key, self.__data[key].dumps()) for key in self.__data.keys()))
         json.dump(data, filehandle)
+        filehandle.flush()
 
     @staticmethod
     def load(filehandle):

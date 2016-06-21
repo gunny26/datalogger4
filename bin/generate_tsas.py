@@ -21,6 +21,8 @@ def main(project, tablename, datestring):
         if len(caches["tsa"]["keys"]) == 0:
             logging.info("%s TSA Archive missing, calling get_tsa and get_tsastats", suffix)
             data = datalogger.load_tsastats(datestring)
+            logging.info("%s generating also Quantile", suffix)
+            data = datalogger.load_quantile(datestring)
         else:
             if len(caches["tsastat"]["keys"]) == 0:
                 logging.info("%s TSASTAT Archive missing, calling get_tsastats", suffix)
@@ -46,6 +48,8 @@ if __name__ == "__main__":
     parser.add_argument("-e", '--enddate', default=yesterday_datestring, help="stop date in isoformat YYY-MM-DD")
     parser.add_argument("-q", '--quiet', action='store_true', help="set to loglevel ERROR")
     parser.add_argument("-v", '--verbose', action='store_true', help="set to loglevel DEBUG")
+    parser.add_argument("-p", '--project', help="process only this project name")
+    parser.add_argument("-t", '--tablename', help="process only this tablename")
     args = parser.parse_args()
     if args.quiet is True:
         logging.getLogger("").setLevel(logging.ERROR)
@@ -64,6 +68,14 @@ if __name__ == "__main__":
         sys.exit(1)
     for datestring in tuple(DataLogger.datewalker(startdate, args.enddate)):
         for project in DataLogger.get_projects(args.basedir):
+            if args.project is not None:
+                if project != args.project:
+                    logging.info("skipping project %s", project)
+                    continue
             for tablename in DataLogger.get_tablenames(args.basedir, project):
+                if args.tablename is not None:
+                    if tablename != args.tablename:
+                        logging.info("skipping tablename %s", tablename)
+                        continue
                 main(project, tablename, datestring)
     #cProfile.run("main()")

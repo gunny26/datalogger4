@@ -459,7 +459,10 @@ class TimeseriesArrayLazy(object):
                 timeseries.dump_to_csv(ts_filehandle)
                 ts_filehandle.close() # close to not get too many open files
             outbuffer["ts_filenames"].append(ts_filename)
-        json.dump(outbuffer, open(outfile, "wb"))
+        filehandle = open(outfile, "wb")
+        json.dump(outbuffer, filehandle)
+        # flush explicit to make sure the data can be read immediately
+        filehandle.flush()
     dump_split = dump
 
     @staticmethod

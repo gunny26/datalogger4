@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# pylint: disable=line-too-long
 import json
 import base64
 import os
@@ -224,9 +225,11 @@ class TimeseriesArrayStats(object):
             if (not os.path.isfile(fullfilename)) or (overwrite is True):
                 filehandle = open(fullfilename, "wb")
                 tsstats.dump(filehandle)
-                filehandle.close()
+                filehandle.flush()
             outdata["tsstat_filenames"].append(filename)
-        json.dump(outdata, open(outfilename, "wb"))
+        filehandle = open(outfilename, "wb")
+        json.dump(outdata, filehandle)
+        filehandle.flush()
 
     @staticmethod
     def filtermatch(key_dict, filterkeys, matchtype):
@@ -295,7 +298,8 @@ class TimeseriesArrayStats(object):
         #logging.info("index_keys: %s", index_keys)
         infilename = os.path.join(path, TimeseriesArrayStats.get_dumpfilename(index_keys))
         try:
-            indata = json.load(open(infilename, "rb"))
+            fh = open(infilename, "rb")
+            indata = json.load(fh)
         except StandardError as exc:
             logging.exception(exc)
             logging.error("something went wrong while loading %s", infilename)

@@ -1,9 +1,10 @@
 #!/usr/bin/python
 # pylint: disable=line-too-long
 """Module for class Timeseries"""
-#import array
 import logging
-from TimeseriesStats import TimeseriesStats as TimeseriesStats
+# own modules
+from datalogger.TimeseriesStats import TimeseriesStats as TimeseriesStats
+
 
 def datatype_percent(times, series):
     """
@@ -402,7 +403,27 @@ class Timeseries(object):
         self.__add(timestamp, values)
 
     def __add(self, timestamp, values):
+        """
+        private method to add data to internal data storage
+        timstamp should be float
+        values should be array of float
+
+        while adding the timstamp index will be updated
+        if the timestamp is already in the internal array,
+        this data will be skipped
+
+        parameters:
+        timestamp <float>
+        values <iterable> of float
+
+        raises:
+        DataformatError if TypeError occurs
+        """
         try:
+            # skip this data if timeseries already in data
+            if timestamp in self.__ts_index:
+                logging.debug("skipping new data, timestamp already stored")
+                return
             #logging.error("timstamp : %s", timestamp)
             row = [timestamp,  ] + list(values)
             #logging.error("data_list : %s", ["%s(%s)" % (item, str(type(item))) for item in row])
