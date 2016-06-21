@@ -1,0 +1,201 @@
+<!DOCTYPE>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="author"
+	content="Christoph Sereinig (christoph.sereinig@tirol-kliniken.at)" />
+<link rel="shortcut icon" href="../img/favicon.ico" type="image/x-icon" />
+
+<title>Datalogger</title>
+
+<!-- Bootstrap CSS -->
+<link href="css/bootstrap.min.css" rel="stylesheet" />
+<link href="css/bootstrap-datepicker.min.css" rel="stylesheet" />
+<link href="css/jquery-ui.min.css" rel="stylesheet" />
+<!-- MetisMenu CSS -->
+<!-- <link href="css/metisMenu.min.css" rel="stylesheet">-->
+<link href="css/style.css" rel="stylesheet" />
+</head>
+<body>
+	<div class="container">
+		<div class="logo img-responsive"></div>
+		<div class="header"></div>
+		<div class="container-fluid">
+			<div class="row content">
+				<div class="col-sm-3 sidenav">
+					<nav class="navbar navbar-default navbar-static-top"
+						role="navigation">
+						<ul class="nav nav-pills nav-stacked">
+							<li class="active"><a href="index.html"><span
+									class="glyphicon glyphicon-cog"> </span> Übersicht</a></li>
+							<li><a href="pages/dailyreport.html"><span
+									class="glyphicon glyphicon-th-list"> </span> tägliche Reports</a></li>
+							<li><a href="pages/dailygraphics.html"><span
+									class="glyphicon glyphicon-random"> </span> tägliche Graphen</a></li>
+							<li><a href="pages/quantiles.html"><span
+									class="glyphicon glyphicon-equalizer"> </span> tägliche
+									Quantiles</a></li>
+							<li><a href="pages/scatterplot.html"><span
+									class="glyphicon glyphicon-equalizer"> </span> tägliche
+									Scatterplots</a></li>
+							<li><a href="pages/monthlygraphics.html"><span
+									class="glyphicon glyphicon-random"> </span> monatliche Graphen</a></li>
+						</ul>
+						<br>
+					</nav>
+				</div>
+
+				<div class="col-sm-9">
+					<h1>Datalogger Übersicht</h1>
+					<hr>
+					<br>
+
+					<!-- Dashbord Pannels -->
+					<div class="row">
+						<div class="col-lg-4 col-md-4">
+							<div class="panel panel-blue">
+								<a href="pages/dailyreport.html">
+									<div class="panel-heading">
+										<div class="row">
+											<div class="col-xs-3">
+												<i class="glyphicon glyphicon-th-list"></i>
+											</div>
+											<div class="col-sm-12 col-xs-12 text-right">
+												<div class="huge">tägliche Reports</div>
+												<div>Report für einzelne Tage.</div>
+											</div>
+										</div>
+									</div>
+									<div class="panel-footer">
+										<span class="pull-left">Detailansicht</span> <span
+											class="pull-right"><i
+											class="glyphicon glyphicon-chevron-right"></i></span>
+										<div class="clearfix"></div>
+									</div>
+								</a>
+							</div>
+						</div>
+
+						<div class="col-lg-4 col-md-4">
+							<div class="panel panel-green">
+								<a href="pages/dailygraphics.html">
+									<div class="panel-heading">
+										<div class="row">
+											<div class="col-xs-3">
+												<i class="glyphicon glyphicon-random"></i>
+											</div>
+											<div class="col-sm-12 col-xs-12 text-right">
+												<div class="huge">tägliche Graphen</div>
+												<div>Graphen für einzelne Tage.</div>
+											</div>
+										</div>
+									</div>
+									<div class="panel-footer">
+										<span class="pull-left">Detailansicht</span> <span
+											class="pull-right"><i
+											class="glyphicon glyphicon-chevron-right"></i></span>
+										<div class="clearfix"></div>
+									</div>
+								</a>
+							</div>
+						</div>
+
+						<div class="col-lg-4 col-md-4">
+							<div class="panel panel-red">
+								<a href="pages/quantiles.html">
+									<div class="panel-heading">
+										<div class="row">
+											<div class="col-xs-3">
+												<i class="glyphicon glyphicon-equalizer"></i>
+											</div>
+											<div class="col-sm-12 col-xs-12 text-right">
+												<div class="huge">tägliche Quantiles</div>
+												<div>Quantile für einzelne Tage.</div>
+											</div>
+										</div>
+									</div>
+
+									<div class="panel-footer">
+										<span class="pull-left">Detailansicht</span> <span
+											class="pull-right"><i
+											class="glyphicon glyphicon-chevron-right"></i></span>
+										<div class="clearfix"></div>
+									</div>
+								</a>
+							</div>
+						</div>
+
+						<div class="col-lg-4 col-md-4">
+							<div class="panel panel-yellow">
+								<a href="pages/scatterplot.html">
+									<div class="panel-heading">
+										<div class="row">
+											<div class="col-xs-3">
+												<i class="glyphicon glyphicon-random"></i>
+											</div>
+											<div class="col-sm-12 col-xs-12 text-right">
+												<div class="huge">tägliche Scatterplots</div>
+												<div>Streudiagramme für einzelne Tage.</div>
+											</div>
+										</div>
+									</div>
+									<div class="panel-footer">
+										<span class="pull-left">Detailansicht</span> <span
+											class="pull-right"><i
+											class="glyphicon glyphicon-chevron-right"></i></span>
+										<div class="clearfix"></div>
+									</div>
+								</a>
+							</div>
+						</div>
+
+						<div class="col-lg-4 col-md-4">
+							<div class="panel panel-lila">
+								<a href="pages/monthlygraphics.html">
+									<div class="panel-heading">
+										<div class="row">
+											<div class="col-xs-3">
+												<i class="glyphicon glyphicon-equalizer"></i>
+											</div>
+											<div class="col-sm-12 col-xs-12 text-right">
+												<div class="huge">monatliche Graphen</div>
+												<div>Graphen für monatliche Auswertungen.</div>
+											</div>
+										</div>
+									</div>
+									<div class="panel-footer">
+										<span class="pull-left">Detailansicht</span> <span
+											class="pull-right"><i
+											class="glyphicon glyphicon-chevron-right"></i></span>
+										<div class="clearfix"></div>
+									</div>
+								</a>
+							</div>
+						</div>
+
+						<!-- End Dashbord Pannels -->
+
+					</div>
+
+				</div>
+			</div>
+		</div>
+		<div class="footer container-fluid">
+			<p>
+				Copyright &copy; <strong>2016</strong>
+			</p>
+		</div>
+	</div>
+
+	<!-- Include javascript files-->
+	<script type="text/javascript" src="js/jquery-2.2.0.min.js"></script>
+	<script type="text/javascript" src="js/jquery-ui.min.js"></script>
+	<script type="text/javascript" src="js/jquery-dataTables.js"></script>
+	<script type="text/javascript" src="js/dataTables.bootstrap.min.js"></script>
+	<script type="text/javascript" src="js/bootstrap.min.js"></script>
+	<script type="text/javascript" src="js/bootstrap-datepicker.min.js"></script>
+	<script type="text/javascript" src="js/main.js"></script>
+	<!--<script type="text/javascript" src="js/metisMenu.min.js"></script>-->
+</body>
+</html>
