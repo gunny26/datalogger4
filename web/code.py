@@ -130,8 +130,10 @@ class DataLoggerWeb(object):
             "get_ts" : self.get_ts,
             "get_tsastats" : self.get_tsastats,
             "get_stat_func_names" : self.get_stat_func_names,
-            "get_quantilles" : self.get_quantilles,
-            "get_quantilles_web" : self.get_quantilles_web,
+            "get_quantilles" : self.get_quantile, # deprecated
+            "get_quantile" : self.get_quantile,
+            "get_quantilles_web" : self.get_quantile_web, # deprecated
+            "get_quantile_web" : self.get_quantile_web,
             "get_chart_data_ungrouped" : self.get_chart_data_ungrouped,
             "get_hc_daily_data" : self.get_hc_daily_data,
             "get_ts_caches" : self.get_ts_caches,
@@ -563,52 +565,52 @@ class DataLoggerWeb(object):
         stat_func_names = TimeseriesStats.stat_funcs.keys()
         return json.dumps(stat_func_names)
 
-    def get_quantilles(self, args):
+    def get_quantile(self, args):
         """
-        return exported QuantillesArray json formatted
+        return exported QuantileArray json formatted
 
-        ex: Datalogger/get_quantilles/{projectname}/{tablename}/{datestring}
+        ex: Datalogger/get_quantile/{projectname}/{tablename}/{datestring}
 
         [
-            dict of index_keys : dict of quantilles,
+            dict of index_keys : dict of quantile,
             list of index_keys,
             list of value_names,
         ]
 
         returns:
-        json(quantilles_dict)
+        json(quantile_dict)
         """
         project, tablename, datestring = args[:3]
         datalogger = DataLogger(basedir, project, tablename)
-        quantilles = datalogger.load_quantilles(datestring)
-        return quantilles.to_json()
+        quantile = datalogger.load_quantile(datestring)
+        return quantile.to_json()
 
-    def get_quantilles_web(self, args):
+    def get_quantile_web(self, args):
         """
-        return exported QuantillesArray json formatted, special
+        return exported QuantileArray json formatted, special
         version for use in webpages to render with tablesorter
 
-        in difference to get_quantilles the value_keyname has to be given
+        in difference to get_quantile the value_keyname has to be given
 
-        ex: Datalogger/get_quantilles/{projectname}/{tablename}/{datestring}
+        ex: Datalogger/get_quantile/{projectname}/{tablename}/{datestring}
 
         [
-            dict of index_keys : dict of quantilles,
+            dict of index_keys : dict of quantile,
             list of index_keys,
             list of value_names,
         ]
 
         returns:
-        json(quantilles_dict)
+        json(quantile_dict)
         """
         project, tablename, datestring, value_keyname = args[:4]
         datalogger = DataLogger(basedir, project, tablename)
-        qa = datalogger.load_quantilles(datestring)
+        qa = datalogger.load_quantile(datestring)
         ret_data = []
         # build header
         ret_data.append(list(datalogger.index_keynames) + ["Q0", "Q1", "Q2", "Q3", "Q4"])
         # data part
-        for k, v  in qa[value_keyname].quantilles.items():
+        for k, v  in qa[value_keyname].quantile.items():
             ret_data.append(list(k) + v.values())
         return json.dumps(ret_data)
 
@@ -882,7 +884,7 @@ class DataLoggerWeb(object):
 
     def get_tsastats_table(self, args):
         """
-        return exported QuantillesArray json formatted
+        return html renderer table from tsatstats data
         """
         def csv_to_table(csvdata, keys):
             outbuffer = []

@@ -10,7 +10,7 @@ import argparse
 # own modules
 from datalogger import DataLogger as DataLogger
 
-def main(project, tablename, datestring):
+def gen_caches(project, tablename, datestring):
     datalogger = DataLogger(basedir, project, tablename)
     caches = datalogger.get_caches(datestring)
     suffix = "%s/%s/%s\t" % (datestring, project, tablename)
@@ -38,23 +38,44 @@ def main(project, tablename, datestring):
     del datalogger
     #print(gc.get_count())
 
+def main():
+    for datestring in tuple(DataLogger.datewalker(startdate, args.enddate)):
+        logging.info("working on datestring %s", datestring)
+        start_ts, stop_ts = DataLogger.get_ts_for_datestring(datestring)
+        logging.info("appropriate timestamps for this datestring are between %s and %s", start_ts, stop_ts)
+        for project in DataLogger.get_projects(args.basedir):
+            if args.project is not None:
+                if project != args.project:
+                    logging.debug("skipping project %s", project)
+                    continue
+            logging.info("working on project %s", project)
+            for tablename in DataLogger.get_tablenames(args.basedir, project):
+                if args.tablename is not None:
+                    if tablename != args.tablename:
+                        logging.debug("skipping tablename %s", tablename)
+                        continue
+                    logging.info("working on tablename %s", tablename)
+                gen_caches(project, tablename, datestring)
+
 if __name__ == "__main__":
     basedir = "/var/rrd"
     yesterday_datestring = (datetime.date.today() - datetime.timedelta(1)).isoformat()
     parser = argparse.ArgumentParser(description='generate TimeseriesArrays on local backend')
     parser.add_argument('--basedir', default="/var/rrd", help="basedirectory of datalogger data on local machine")
     parser.add_argument("-b", '--back', help="how many days back from now")
-    parser.add_argument("-s", '--startdate', help="start date in isoformat YYY-MM-DD")
-    parser.add_argument("-e", '--enddate', default=yesterday_datestring, help="stop date in isoformat YYY-MM-DD")
+    parser.add_argument("-s", '--startdate', help="start date in isoformat YYYY-MM-DD")
+    parser.add_argument("-e", '--enddate', default=yesterday_datestring, help="stop date in isoformat YYYY-MM-DD")
     parser.add_argument("-q", '--quiet', action='store_true', help="set to loglevel ERROR")
     parser.add_argument("-v", '--verbose', action='store_true', help="set to loglevel DEBUG")
     parser.add_argument("-p", '--project', help="process only this project name")
     parser.add_argument("-t", '--tablename', help="process only this tablename")
+    parser.add_argument("--profile", action="store_true", help="use cProfile to start main")
     args = parser.parse_args()
     if args.quiet is True:
         logging.getLogger("").setLevel(logging.ERROR)
     if args.verbose is True:
         logging.getLogger("").setLevel(logging.DEBUG)
+    logging.debug(args)
     if (args.back is not None) == (args.startdate is not None):
         logging.error("option -b and -e are mutual exclusive, use only one")
         sys.exit(1)
@@ -66,16 +87,8 @@ if __name__ == "__main__":
     else:
         logging.error("you have to provide either -b or -s")
         sys.exit(1)
-    for datestring in tuple(DataLogger.datewalker(startdate, args.enddate)):
-        for project in DataLogger.get_projects(args.basedir):
-            if args.project is not None:
-                if project != args.project:
-                    logging.info("skipping project %s", project)
-                    continue
-            for tablename in DataLogger.get_tablenames(args.basedir, project):
-                if args.tablename is not None:
-                    if tablename != args.tablename:
-                        logging.info("skipping tablename %s", tablename)
-                        continue
-                main(project, tablename, datestring)
-    #cProfile.run("main()")
+    if args.profile is True:
+        logging.info("profiling enabled")
+        cProfile.run('main()')
+    else:
+        main()

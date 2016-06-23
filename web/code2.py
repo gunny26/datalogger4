@@ -110,7 +110,7 @@ class DataLoggerWeb(object):
         /<projectname>/<tablename>/ -> return table specification (index_keynames, headers, value_keynames, ts_keyname)
         /<projectname>/<tablename>/tsa/<datestring> -> get tsa of this datestring
         /<projectname>/<tablename>/ts/<datestring> -> get ts of this datestring
-        /<projectname>/<tablename>/quantilles/<datestring> -> get quantilles of this datestring
+        /<projectname>/<tablename>/quantile/<datestring> -> get quantile of this datestring
         /<projectname>/<tablename>/tsastat/<datestring> -> get tsastat of this datestring
         """
         web.header('Access-Control-Allow-Origin', '*')
@@ -148,52 +148,11 @@ class DataLoggerWeb(object):
                     return self.get_ts(project, tablename, datestring, args)
                 elif function == "tsastats":
                     return self.get_tsastats(project, tablename, datestring, args)
-                elif function == "quantiles":
-                    return self.get_quantiles(project, tablename, datestring, args)
+                elif function == "quantile":
+                    return self.get_quantile(project, tablename, datestring, args)
         else:
             logging.debug("unknown method called %s", method)
             return "unknown call %s" % parameters
-
-        logging.info("calling method %s", method)
-        web.header('Content-type', 'text/html')
-        method_args = args.split("/")[1:] # all without method name
-        method_func_dict = {
-            "doc" : self.doc,
-            "index_keynames" : self.get_index_keynames,
-            "value_keynames" : self.get_value_keynames,
-            "ts_keyname" : self.get_ts_keyname,
-            "projects" : self.get_projects,
-            "tablenames" : self.get_tablenames,
-            "headers" : self.get_headers,
-            "get_last_business_day_datestring" : self.get_last_business_day_datestring,
-            "get_datewalk" : self.get_datewalk,
-            "get_caches" : self.get_caches,
-            "get_tsa" : self.get_tsa,
-            "get_tsa_adv" : self.get_tsa_adv,
-            "get_ts" : self.get_ts,
-            "get_tsastats" : self.get_tsastats,
-            "get_stat_func_names" : self.get_stat_func_names,
-            "get_quantilles" : self.get_quantilles,
-            "get_quantilles_web" : self.get_quantilles_web,
-            "get_chart_data_ungrouped" : self.get_chart_data_ungrouped,
-            "get_hc_daily_data" : self.get_hc_daily_data,
-            "get_ts_caches" : self.get_ts_caches,
-            "get_tsstat_caches" : self.get_tsstat_caches,
-            "get_caches_dict" : self.get_caches_dict,
-            "get_scatter_data" : self.get_scatter_data,
-            "get_longtime_data" : self.get_longtime_data,
-            "get_tsastats_table" : self.get_tsastats_table,
-            "get_tsastats_func" : self.get_tsastats_func,
-            "sr_vicenter_unused_cpu_cores" : self.sr_vicenter_unused_cpu_cores,
-            "sr_vicenter_unused_mem" : self.sr_vicenter_unused_mem,
-            "sr_hrstorageram_unused" : self.sr_hrstorageram_unused,
-            "sr_hrstorage_unused" : self.sr_hrstorage_unused,
-        }
-        try:
-            return method_func_dict[method](method_args)
-        except KeyError as exc:
-            logging.debug("unknown method called %s", method)
-            return "There is no method called %s" % method
 
     def POST(self, args):
         """
@@ -451,34 +410,34 @@ class DataLoggerWeb(object):
             return json.dumps(tsastats.to_csv(args[0]))
         return tsastats.to_json()
 
-    def get_quantiles(self, project, tablename, datestring, args):
+    def get_quantile(self, project, tablename, datestring, args):
         """
-        return exported QuantillesArray json formatted
+        return exported QuantileArray json formatted
 
-        ex: Datalogger/get_quantilles/{projectname}/{tablename}/{datestring}
+        ex: Datalogger/get_quantile/{projectname}/{tablename}/{datestring}
 
         [
-            dict of index_keys : dict of quantilles,
+            dict of index_keys : dict of quantile,
             list of index_keys,
             list of value_names,
         ]
 
         returns:
-        json(quantilles_dict)
+        json(quantile_dict)
         """
         logging.info("optional arguments received: %s", args)
         datalogger = DataLogger(basedir, project, tablename)
-        quantiles = datalogger.load_quantilles(datestring)
+        quantiles = datalogger.load_quantile(datestring)
         if len(args) > 0:
             value_keyname = args[0]
             ret_data = []
             # build header
             ret_data.append(list(datalogger.index_keynames) + ["Q0", "Q1", "Q2", "Q3", "Q4"])
             # data part
-            for k, v  in quantiles[value_keyname].quantilles.items():
+            for k, v  in quantile[value_keyname].quantile.items():
                 ret_data.append(list(k) + v.values())
             return json.dumps(ret_data)
-        return quantiles.to_json()
+        return quantile.to_json()
 
     def get_chart_data_ungrouped(self, args):
         """

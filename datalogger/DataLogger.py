@@ -303,7 +303,9 @@ class DataLogger(object):
         <dict> of every row
         """
         filename = self.__get_raw_filename(datestring)
+        logging.debug("reading raw data from file %s", filename)
         start_ts, stop_ts = self.get_ts_for_datestring(datestring) # get first and last timestamp of this date
+        logging.debug("appropriate tiemstamps for this date are between %s and %s", start_ts, stop_ts)
         #data = self.__get_file_handle(filename, "rb").read().split("\n")
         filehandle = self.__get_file_handle(filename, "rb")
         next(filehandle) # skip header line

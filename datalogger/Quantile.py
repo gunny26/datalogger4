@@ -131,7 +131,7 @@ class Quantile(object):
         4 : 0,
     }
 
-    def __init__(self, tsa, value_key, maxx=None):
+    def __init__(self, tsa, value_key, maxx=None, minn=0.0):
         """
         parameters:
         tsa <TimeseriesArray>
@@ -142,13 +142,17 @@ class Quantile(object):
         self.__quantile = {}
         self.__sortlist = None
         if len(tsa) == 0:
-            raise QuantileError("EmptyTsaException detected, not posisble to calculate anything with nothing")
+            raise QuantileError("EmptyTsaException detected, not possible to calculate anything with nothing")
         if maxx is None:
             maxx_tsa = (max(ts[value_key]) for key, ts in tsa.items())
             self.__maxx = max(maxx_tsa)
+            minn_tsa = (min(ts[value_key]) for key, ts in tsa.items())
+            self.__minn = min(minn_tsa)
         else:
             self.__maxx = maxx
+            self.__minn = minn
         # do the calculations
+        # width of each quantile
         width = int(100 / (len(self.__quants.keys()) - 1))
         # if __maxx or width is equal zero, empty Data
         if (self.__maxx == 0.0) or  (width == 0):
@@ -160,10 +164,12 @@ class Quantile(object):
 
     @property
     def quantile(self):
+        """get internal data"""
         return self.__quantile
 
     @property
     def maxx(self):
+        """get maximum overall Timeseries defined or calculated"""
         return self.__maxx
 
     def dumps(self):
@@ -202,8 +208,11 @@ class Quantile(object):
         actually do the calculations
         """
         quants = self.__quants.copy()
+        # TODO: Performance Optimization needed
         for value in series:
-            quant = int((100 * min(value, self.__maxx) / self.__maxx) / width)
+            # skip negative values
+            quant = int((100 * (value + abs(self.__minn)) / (self.__maxx + abs(self.__minn))) / width)
+            # quant = int((100 * min(value, self.__maxx) / self.__maxx) / width)
             quants[quant] += 1
         return quants
 
