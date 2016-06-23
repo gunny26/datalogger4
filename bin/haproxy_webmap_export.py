@@ -40,13 +40,14 @@ def main():
     vhosts = [eval(key)[0].split(":")[0] for key in caches["ts"]["keys"].keys()]
     index = 1
     out_data = []
-    out_data.append(("index", "vhost", "fqdn", "ip", "ip_reverse_hostname", "status_code", "x_backend_server", "duration"))
+    out_data.append(("index", "vhost", "domain", "fqdn", "ip", "ip_reverse_hostname", "status_code", "x_backend_server", "duration"))
     for vhost in vhosts:
         ip = "unknown"
         hostname = "unknown"
         duration = -1.0
         status_code = 0
         x_backend_server = None
+        domain = vhost.split(".")[1:]
         try:
             fqdn = socket.getfqdn(vhost)
             ip = socket.gethostbyname(vhost)
@@ -78,8 +79,8 @@ def main():
                 x_backend_server = socket.getfqdn(x_backend_server)
         except KeyError:
             pass
-        logging.debug("%40s : %40s : %15s : %40s : %d : %s : %02f", vhost, fqdn, ip, hostname, status_code, x_backend_server, duration)
-        out_data.append((index, vhost, fqdn, ip, hostname, status_code, x_backend_server, duration))
+        logging.debug("%40s : %20s : %40s : %15s : %40s : %d : %s : %02f", vhost, domain, fqdn, ip, hostname, status_code, x_backend_server, duration)
+        out_data.append((index, vhost, domain, fqdn, ip, hostname, status_code, x_backend_server, duration))
         index += 1
     json.dump({"last_update_ts" : str(datetime.date.today()), "data" : out_data}, open("/var/www/webapps/webmap/webmap.json", "w"))
 

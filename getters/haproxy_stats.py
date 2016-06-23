@@ -52,7 +52,11 @@ def get_data(haproxies, index_keynames):
                         dict_values[key] = value
                     #print dict_values
                     index_value = tuple((dict_values[keyname] for keyname in index_keynames))
-                    assert index_value not in ret_data.keys() # index must be unique
+                    try:
+                        assert index_value not in ret_data.keys() # index must be unique
+                    except AssertionError as exc:
+                        logging.error("AssertionError at %s/%s index_value=%s, ret_data=%s", clustername, servername, index_value, ret_data)
+                        raise exc
                     ret_data[index_value] = dict_values
     return ret_data
 

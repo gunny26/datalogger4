@@ -152,7 +152,9 @@ def main():
         "virtualMachineCpuStats" : ( # datalogger tablename
             "cpu.idle.summation", # vicenter counter names in this table
             "cpu.ready.summation",
-            "cpu.system.summation",
+            # "cpu.system.summation", vicenter 6 delivers this counter
+            # only with all instance, so not mixable with the other
+            # counters
             "cpu.used.summation",
             "cpu.wait.summation",
             ),
@@ -184,14 +186,13 @@ def main():
         "virtualMachinePowerStats" : (
             "power.power.average",
             ),
-# known issue as of vicenter 5.5, these counters are not available
-#        "virtualMachineNetworkStats" : (
-#            "net.usage.average",
-#            "net.received.average",
-#            "net.transmitted.average",
-#            "net.droppedRx.summation",
-#            "net.droppedTx.summation",
-#            ),
+        "virtualMachineNetworkStats" : (
+            "net.usage.average",
+            "net.received.average",
+            "net.transmitted.average",
+            "net.droppedRx.summation",
+            "net.droppedTx.summation",
+            ),
     }
     basedir = "/var/rrd"
     project = "vdi6"

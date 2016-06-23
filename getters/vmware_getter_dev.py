@@ -149,13 +149,13 @@ def main():
     #import cProfile
     #cProfile.run("main()")
     counter_dict = {
-#        "virtualMachineCpuStats" : ( # datalogger tablename
-#            "cpu.idle.summation", # vicenter counter names in this table
-#            "cpu.ready.summation",
-#            "cpu.system.summation",
-#            "cpu.used.summation",
-#            "cpu.wait.summation",
-#            ),
+        "virtualMachineCpuStats" : ( # datalogger tablename
+            "cpu.idle.summation", # vicenter counter names in this table
+            "cpu.ready.summation",
+            #"cpu.system.summation", not usable at vmware 6
+            "cpu.used.summation",
+            "cpu.wait.summation",
+            ),
 #        "virtualMachineMemoryStats": (
 #            "mem.consumed.average",
 #            "mem.overhead.average",
@@ -181,32 +181,32 @@ def main():
 #            "disk.commands.summation",
 #            "disk.busResets.summation",
 #            ),
-        "virtualPowerStats" : (
-            "power.power.average",
-            ),
-# known issue as of vicenter 5.5, these counters are not available
-#        "virtualMachineNetworkStats" : (
-#            "net.usage.average",
-#            "net.received.average",
-#            "net.transmitted.average",
-#            "net.droppedRx.summation",
-#            "net.droppedTx.summation",
+#        "virtualPowerStats" : (
+#            "power.power.average",
 #            ),
+# known issue as of vicenter 5.5, these counters are not available
+        "virtualMachineNetworkStats" : (
+            "net.usage.average",
+            "net.received.average",
+            "net.transmitted.average",
+            "net.droppedRx.summation",
+            "net.droppedTx.summation",
+            ),
     }
-    basedir = "/var/rrd"
-    project = "vdi"
+    #basedir = "/var/rrd"
+    #project = "vdi"
     interval = 35 # get 35 minutes of performance counters
     for tablename, counters in counter_dict.items():
         logging.info("fetching table %s", tablename)
         # create basic directory structure
-        if not os.path.exists(os.path.join(basedir, project)):
-            os.mkdir(os.path.join(basedir, project))
-        basedir_raw = os.path.join(basedir, project, "raw")
-        basedir_rrd = os.path.join(basedir, project, "rrd")
-        basedir_gfx = os.path.join(basedir, project, "gfx")
-        for directory in (basedir_raw, basedir_rrd, basedir_gfx):
-            if not os.path.exists(directory):
-                os.mkdir(directory)
+        #if not os.path.exists(os.path.join(basedir, project)):
+        #    os.mkdir(os.path.join(basedir, project))
+        #basedir_raw = os.path.join(basedir, project, "raw")
+        #basedir_rrd = os.path.join(basedir, project, "rrd")
+        #basedir_gfx = os.path.join(basedir, project, "gfx")
+        #for directory in (basedir_raw, basedir_rrd, basedir_gfx):
+        #    if not os.path.exists(directory):
+        #        os.mkdir(directory)
         # get data
         data = get_data(vim.VirtualMachine, interval, counters)
         if len(data) > 0:
@@ -218,5 +218,5 @@ def main():
             logging.info("no data receiveed")
 
 if __name__ == "__main__":
-    tvsp = tilak_vimomi.TilakVdi()
+    tvsp = tilak_vimomi.TilakVdi6()
     main()
