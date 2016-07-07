@@ -398,10 +398,13 @@ class DataLogger(object):
                 "keys" : {},
             }
         }
+        # the original raw file could be deleted, and only the
+        # calculated TSA/TSASTATS and so on are available. In this case
+        # define None
         try:
             caches["tsa"]["raw"] = self.__get_raw_filename(datestring) # raises exception if no file was found
         except DataLoggerRawFileMissing:
-            return caches
+            caches["tsa"]["raw"] = None
         except StandardError as exc:
             logging.exception(exc)
             raise
@@ -411,6 +414,11 @@ class DataLogger(object):
                 filename = os.path.basename(abs_filename)
                 key = self.__decode_filename(filename)
                 caches[cachetype]["keys"][unicode(key)] = filename
+        # add quantile part
+        caches["quantile"] = {
+            "pattern" : "quantile.json",
+            "exists" : os.path.isfile(os.path.join(self.__get_cachedir(datestring), "quantile.json"))
+        }
         return caches
 
     def list_ts_caches(self, datestring):
@@ -490,7 +498,17 @@ class DataLogger(object):
             """
             tsa = self.load_tsa_raw(datestring, timedelta)
             tsa.dump_split(cachedir) # save full data
+            # read the data afterwards to make sure there is no problem,
+            # TODO but also a performance penalty
             tsa = TimeseriesArray.load_split(cachedir, self.__index_keynames, filterkeys=filterkeys, index_pattern=index_pattern, datatypes=self.__datatypes)
+            # also generate TSASTATS and dump to cahce directory
+            tsastats = TimeseriesArrayStats(tsa) # generate full Stats
+            tsastats.dump(cachedir) # save
+            # and at last but not least quantile
+            qantile = QuantileArray(tsa)
+            cachefilename = os.path.join(cachedir, "quantile.json")
+            qantile.dump(open(cachefilename, "wb"))
+            # finally return tsa
             return tsa
         if not os.path.isfile(cachefilename):
             logging.info("cachefile %s does not exist, fallback read from raw", cachefilename)
