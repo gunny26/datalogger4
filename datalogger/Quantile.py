@@ -156,7 +156,8 @@ class Quantile(object):
         width = int(100 / (len(self.__quants.keys()) - 1))
         # if __maxx or width is equal zero, empty Data
         if (self.__maxx == 0.0) or  (width == 0):
-            raise QuantileError("either length of data or maximum is zero")
+            self.__quantile = self.__quants.copy()
+            logging.debug("either length of data or maximum is zero, so all quantile values will be zero")
         self.__quantile = dict(((key, self.__calculate(ts[value_key], width)) for key, ts in tsa.items()))
         #for key, ts in tsa.items():
         #    self.__quantile[key] =  self.__calculate(ts[value_key], width)
