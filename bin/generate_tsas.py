@@ -1,6 +1,7 @@
 #!/usr/bin/python
 from __future__ import print_function
 import cProfile
+import pstats
 import sys
 import gc
 import datetime
@@ -16,23 +17,24 @@ def gen_caches(project, tablename, datestring):
     suffix = "%s/%s/%s\t" % (datestring, project, tablename)
     data = None
     if caches["tsa"]["raw"] is None:
-        logging.info("%s Nothing could be done without RAW data", suffix)
+        logging.info("%s RAW Data is missing, maybe archived", suffix)
     else:
         if len(caches["tsa"]["keys"]) == 0:
-            logging.info("%s TSA Archive missing, calling get_tsa and get_tsastats", suffix)
-            data = datalogger.load_tsastats(datestring)
-            logging.info("%s generating also Quantile", suffix)
-            data = datalogger.load_quantile(datestring)
+            logging.info("%s TSA Archive missing, calling get_tsa and load_tsastats", suffix)
+            data = datalogger.load_tsa(datestring)
         else:
             if len(caches["tsastat"]["keys"]) == 0:
-                logging.info("%s TSASTAT Archive missing, calling get_tsastats", suffix)
+                logging.info("%s TSASTAT Archive missing, calling load_tsastats", suffix)
                 data = datalogger.load_tsastats(datestring)
             else:
                 if len(caches["ts"]["keys"]) == 0:
-                    logging.info("%s there are no ts archives, something went wrong, or tsa is completely empty, calling get_tsastats", suffix)
+                    logging.info("%s there are no ts archives, something went wrong, or tsa is completely empty, calling load_tsastats", suffix)
                     data = datalogger.load_tsastats(datestring)
                 else:
                     logging.info("%s All fine", suffix)
+            if caches["quantile"]["exists"] is not True:
+                logging.info("%s Quantile archive is missing, calling load_quantile", suffix)
+                data = datalogger.load_quantile(datestring)
     del data
     del caches
     del datalogger
@@ -40,9 +42,8 @@ def gen_caches(project, tablename, datestring):
 
 def main():
     for datestring in tuple(DataLogger.datewalker(startdate, args.enddate)):
-        logging.info("working on datestring %s", datestring)
         start_ts, stop_ts = DataLogger.get_ts_for_datestring(datestring)
-        logging.info("appropriate timestamps for this datestring are between %s and %s", start_ts, stop_ts)
+        logging.info("working on datestring %s (from %s to %s)", datestring, start_ts, stop_ts)
         for project in DataLogger.get_projects(args.basedir):
             if args.project is not None:
                 if project != args.project:
@@ -89,6 +90,15 @@ if __name__ == "__main__":
         sys.exit(1)
     if args.profile is True:
         logging.info("profiling enabled")
-        cProfile.run('main()')
+        pstatfilename = "profile.stat"
+        cProfile.run('main()', pstatfilename)
+        stats = pstats.Stats(pstatfilename)
+        stats.strip_dirs()
+        stats.sort_stats("cumulative")
+        stats.print_stats()
+        logging.info("INCOMING CALLERS")
+        stats.print_callers()
+        logging.info("OUTGOING CALLEES")
+        stats.print_callees()
     else:
         main()
