@@ -34,6 +34,7 @@ from TimeseriesArrayLazy import TimeseriesArrayLazy as TimeseriesArray
 from TimeseriesStats import TimeseriesStats as TimeseriesStats
 from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 from Quantile import QuantileArray as QuantileArray
+from Quantile import Quantile as Quantile
 from CorrelationMatrix import CorrelationMatrixArray as CorrelationMatrixArray
 from CorrelationMatrixTime import CorrelationMatrixTime as CorrelationMatrixTime
 from CustomExceptions import *
