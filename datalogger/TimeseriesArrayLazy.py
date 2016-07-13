@@ -36,15 +36,18 @@ class TimeseriesArrayLazy(object):
         "len" : len,
     }
 
-    def __init__(self, index_keys, value_keys, ts_key="ts", datatypes=None):
+    def __init__(self, index_keys, value_keys, ts_key="ts", datatypes=None, cache=False):
         """
         index_keys <tuple> column names of index columns
         value_keys <tuple> column names of value columns
         ts_key <str> name of timestamp column
+        datatypes <list> list of used datatypes
+        cache <bool> should already loaded timeseries be cached, useful to calculate quantiles
         """
         self.__index_keys = tuple([unicode(value) for value in index_keys])
         self.__value_keys = list([unicode(value) for value in value_keys])
         self.__ts_key = unicode(ts_key)
+        self.__cache = cache
         # define instance data
         self.__debug = False
         self.__data = {} # holds data
@@ -60,7 +63,10 @@ class TimeseriesArrayLazy(object):
     def __getitem__(self, key):
         """mimic dict, honor lazy reloading of Timeseries if value is None"""
         if self.__data[key] is None:
-            return self.__autoload_ts(key)
+            timeseries = self.__autoload_ts(key)
+            if self.__cache is True:
+                self.__data[key] = timeseries
+            return timeseries
         else:
             return self.__data[key]
 
@@ -162,6 +168,17 @@ class TimeseriesArrayLazy(object):
         assert isinstance(value, bool)
         self.__debug = value
 
+    @property
+    def cache(self):
+        """True if timeseries will be cached in memory"""
+        return self.__cache
+
+    @cache.setter
+    def cache(self, value):
+        """set to True if every loaded timeseries should be cached in memory"""
+        assert isinstance(value, bool)
+        self.__cache = value
+
     def set_group_keyname(self, index_keyname, group_func):
         """
         set index_keyname to group values for
@@ -212,7 +229,7 @@ class TimeseriesArrayLazy(object):
             # made the next explicit to avoid empty keys if there is no
             # valueable data -> will result in ValueError
             ts = float(data[self.__ts_key])
-            values = tuple((self.to_float(data[key]) for key in self.__value_keys))
+            values = [self.to_float(data[key]) for key in self.__value_keys] # must be list not tuple, to be added to another list
             if key not in self.keys():
                 # if this key is new, create empty Timeseries object
                 self[key] = Timeseries(self.__value_keys)
