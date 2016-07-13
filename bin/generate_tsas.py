@@ -17,7 +17,10 @@ def gen_caches(project, tablename, datestring):
     suffix = "%s/%s/%s\t" % (datestring, project, tablename)
     data = None
     if caches["tsa"]["raw"] is None:
-        logging.info("%s RAW Data is missing, maybe archived", suffix)
+        if len(caches["tsa"]["keys"]) == 0:
+            logging.info("%s RAW Data is archived, tsa exists already", suffix)
+        else:
+            logging.info("%s RAW Data is missing, no tsa archive exists", suffix)
     else:
         if len(caches["tsa"]["keys"]) == 0:
             logging.info("%s TSA Archive missing, calling get_tsa and load_tsastats", suffix)
