@@ -15,7 +15,7 @@ import gzip
 import base64
 import pwd
 # own modules
-from datalogger.TimeseriesArrayLazy import TimeseriesArrayLazy as TimeseriesArray
+from datalogger.TimeseriesArrayLazy import TimeseriesArrayLazy as TimeseriesArrayLazy
 from datalogger.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 from datalogger.TimeseriesStats import TimeseriesStats as TimeseriesStats
 from datalogger.Quantile import QuantileArray as QuantileArray
@@ -215,7 +215,7 @@ class DataLogger(object):
                 tsa = self.load_tsa(datestring, filterkeys=tsa_key_dict)
                 return tsa[tsa_key].__getitem__(ts_key)
         else:
-            raise KeyError("key must be supplied as tuple (datestring, TimeseriesArray key, Timeseries key) or single value (datestring)")
+            raise KeyError("key must be supplied as tuple (datestring, TimeseriesArrayLazy key, Timeseries key) or single value (datestring)")
 
     def __load_metainfo(self, metafile):
         """
@@ -469,7 +469,7 @@ class DataLogger(object):
             calls.append((self.load_tsastats, (datestring, key)))
         return calls
 
-    def load_tsa(self, datestring, filterkeys=None, index_pattern=None, timedelta=0, cleancache=False):
+    def load_tsa(self, datestring, filterkeys=None, index_pattern=None, timedelta=0, cleancache=False, validate=False):
         """
         caching version to load_tsa_raw
         if never called, get ts from load_tsa_raw, and afterwards dump_tsa
@@ -482,16 +482,19 @@ class DataLogger(object):
         index_pattern <str> or None default None
         timedelta <int> default 0
         cleancache <bool> default False
+        validate <bool> if data is read from raw, dump it after initail read,
+            and reread it afterwards to make sure the stored tsa is OK
+            thats an performance issue
 
         returns
-        <TimeseriesArray> object read from cachefile or from raw data
+        <TimeseriesArrayLazy> object read from cachefile or from raw data
         """
         try:
             assert not_today(datestring)
         except AssertionError:
             raise DataLoggerLiveDataError("Reading from live data is not allowed")
         cachedir = self.__get_cachedir(datestring)
-        cachefilename = os.path.join(cachedir, TimeseriesArray.get_dumpfilename(self.__index_keynames))
+        cachefilename = os.path.join(cachedir, TimeseriesArrayLazy.get_dumpfilename(self.__index_keynames))
         def fallback():
             """
             fallback method to use, if reading from cache data is not possible
@@ -499,27 +502,27 @@ class DataLogger(object):
             tsa = self.load_tsa_raw(datestring, timedelta)
             tsa.dump_split(cachedir) # save full data
             # read the data afterwards to make sure there is no problem,
-            # TODO but also a performance penalty
-            tsa = TimeseriesArray.load_split(cachedir, self.__index_keynames, filterkeys=filterkeys, index_pattern=index_pattern, datatypes=self.__datatypes)
+            if validate is True:
+                tsa = TimeseriesArrayLazy.load_split(cachedir, self.__index_keynames, filterkeys=filterkeys, index_pattern=index_pattern, datatypes=self.__datatypes)
             # also generate TSASTATS and dump to cahce directory
             tsastats = TimeseriesArrayStats(tsa) # generate full Stats
             tsastats.dump(cachedir) # save
             # and at last but not least quantile
-            qantile = QuantileArray(tsa)
+            qantile = QuantileArray(tsa, tsastats)
             cachefilename = os.path.join(cachedir, "quantile.json")
             qantile.dump(open(cachefilename, "wb"))
             # finally return tsa
             return tsa
         if not os.path.isfile(cachefilename):
-            logging.info("cachefile %s does not exist, fallback read from raw", cachefilename)
+            logging.info("cachefile %s does not exist, fallback read from raw data file", cachefilename)
             return fallback()
         if (os.path.isfile(cachefilename)) and (cleancache == True):
-            logging.info("deleting cachefile %s and read from raw", cachefilename)
+            logging.info("deleting cachefile %s and read from raw data file", cachefilename)
             os.unlink(cachefilename)
             return fallback()
-        logging.debug("loading stored TimeseriesArray object file %s", cachefilename)
+        logging.debug("loading stored TimeseriesArrayLazy object file %s", cachefilename)
         try:
-            tsa = TimeseriesArray.load_split(cachedir, self.__index_keynames, filterkeys=filterkeys, index_pattern=index_pattern, datatypes=self.__datatypes)
+            tsa = TimeseriesArrayLazy.load_split(cachedir, self.__index_keynames, filterkeys=filterkeys, index_pattern=index_pattern, datatypes=self.__datatypes)
             return tsa
         except IOError:
             logging.error("IOError while reading from %s, using fallback", cachefilename)
@@ -532,13 +535,13 @@ class DataLogger(object):
 
     def iconvert(self, tsa):
         """
-        DEPRECTAED: will be done in TimeseriesArray
+        DEPRECTAED: will be done in TimeseriesArrayLazy
 
         convert given tsa to defined datatypes
         modifies tsa object and return the modified version
 
         parameters:
-        tsa <TimeseriesArray>
+        tsa <TimeseriesArrayLazy>
         """
         for colname, datatype in self.__datatypes.items():
             if datatype != "asis":
@@ -558,7 +561,7 @@ class DataLogger(object):
         cleancache <bool>
 
         returns
-        <TimeseriesArray> object read from cachefile or from raw data
+        <TimeseriesArrayLazy> object read from cachefile or from raw data
         """
         try:
             assert not_today(datestring)
@@ -576,13 +579,13 @@ class DataLogger(object):
             tsastats = TimeseriesArrayStats.load(cachedir, self.__index_keynames, filterkeys=filterkeys) # read specific
             return tsastats
         if not os.path.isfile(cachefilename):
-            logging.info("cachefile %s does not exist, fallback read from raw", cachefilename)
+            logging.info("cachefile %s does not exist, fallback read from tsa archive", cachefilename)
             return fallback()
         if (os.path.isfile(cachefilename)) and (cleancache == True):
             logging.info("deleting cachefile %s and read from raw", cachefilename)
             os.unlink(cachefilename)
             return fallback()
-        logging.debug("loading stored TimeseriesArray object file %s", cachefilename)
+        logging.debug("loading stored TimeseriesArrayLazy object file %s", cachefilename)
         try:
             tsastats = TimeseriesArrayStats.load(cachedir, self.__index_keynames, filterkeys=filterkeys)
             return tsastats
@@ -608,14 +611,18 @@ class DataLogger(object):
         """
         cachedir = self.__get_cachedir(datestring)
         cachefilename = os.path.join(cachedir, "quantile.json")
-        qa = None
+        quantile_array = None
         if os.path.isfile(cachefilename):
-            qa = QuantileArray.load(open(cachefilename, "rb"))
+            quantile_array = QuantileArray.load(open(cachefilename, "rb"))
         else:
+            logging.info("cachefile %s does not exist, fallback read from tsa archive", cachefilename)
             tsa = self.load_tsa(datestring)
-            qa = QuantileArray(tsa)
-            qa.dump(open(cachefilename, "wb"))
-        return qa
+            tsa.cache = True # to enable in memory caching of timeseries
+            # huge performance improvement, from 500s to 70s
+            tsastats = self.load_tsastats(datestring)
+            quantile_array = QuantileArray(tsa, tsastats)
+            quantile_array.dump(open(cachefilename, "wb"))
+        return quantile_array
 
     def load_correlationmatrix(self, datestring):
         """
@@ -634,6 +641,7 @@ class DataLogger(object):
         if os.path.isfile(cachefilename):
             cma = CorrelationMatrixArray.load(open(cachefilename, "rb"))
         else:
+            logging.info("cachefile %s does not exist, fallback read from tsa archive", cachefilename)
             tsa = self.load_tsa(datestring)
             cma = CorrelationMatrixArray(tsa)
             cma.dump(open(cachefilename, "wb"))
@@ -679,26 +687,26 @@ class DataLogger(object):
 
     def load_tsa_raw(self, datestring, timedelta=0):
         """
-        read data from raw input files and return TimeseriesArray object
+        read data from raw input files and return TimeseriesArrayLazy object
 
         parameters:
         datestring <str> isodate representation of date like 2015-12-31
         timedelta <int> amount second to correct raw input timestamps
 
         returns:
-        <TimeseriesArray> object wich holds all data of this day
+        <TimeseriesArrayLazy> object wich holds all data of this day
         """
-        tsa = TimeseriesArray(self.__index_keynames, self.__value_keynames, datatypes=self.__datatypes)
+        tsa = TimeseriesArrayLazy(self.__index_keynames, self.__value_keynames, datatypes=self.__datatypes)
         for rowdict in self.__get_raw_data_dict(datestring, timedelta):
             try:
                 tsa.add(rowdict)
             except ValueError as exc:
                 logging.exception(exc)
-                logging.error("ValueError by adding this data to TimeseriesArray: %s", rowdict)
+                logging.error("ValueError by adding this data to TimeseriesArrayLazy: %s", rowdict)
                 raise exc
             except AssertionError as exc:
                 logging.exception(exc)
-                logging.error("AssertionError by adding this data to TimeseriesArray: %s", rowdict)
+                logging.error("AssertionError by adding this data to TimeseriesArrayLazy: %s", rowdict)
                 raise exc
         return tsa
     read_day = load_tsa_raw
@@ -709,16 +717,16 @@ class DataLogger(object):
         first all Timeseries will be aligned in time, to get proper points in timeline
 
         parameters:
-        tsa <TimeseriesArray>
+        tsa <TimeseriesArrayLazy>
         subkey <tuple> could also be empty, to aggregate everything
         group_func <func> like lambda a,b : (a+b)/2 to get averages
         slotlength <int> interval in seconds to correct every timeseries to
 
         returns:
-        <TimeseriesArray>
+        <TimeseriesArrayLazy>
         """
         # intermediated tsa
-        tsa2 = TimeseriesArray(index_keys=subkeys, value_keys=tsa.value_keys, ts_key=tsa.ts_key, datatypes=self.__datatypes)
+        tsa2 = TimeseriesArrayLazy(index_keys=subkeys, value_keys=tsa.value_keys, ts_key=tsa.ts_key, datatypes=self.__datatypes)
         start_ts, _ = DataLogger.get_ts_for_datestring(datestring)
         ts_keyname = tsa.ts_key
         for data in tsa.export():
@@ -812,7 +820,7 @@ class DataLogger(object):
         ]
 
         parameters:
-        tsa <TimeseriesArray>
+        tsa <TimeseriesArrayLazy>
         value_keys <tuple> with len 2, represents x- and y-axis
         stat_fuc <str> statistical function to use to aggregate xcolumn and ycolumns
             must exist in Timeseries object
