@@ -203,8 +203,6 @@ class Quantile(object):
             assert self.__maxx == other.maxx
             return True
         except AssertionError as exc:
-            print self.__maxx, other.maxx
-            print self.__quantile, other.quantile
             logging.exception(exc)
             return False
 

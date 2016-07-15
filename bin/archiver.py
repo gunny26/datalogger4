@@ -5,43 +5,49 @@ import pstats
 import sys
 import gc
 import datetime
+import shutil
 import logging
 logging.basicConfig(level=logging.INFO)
+import os
 import argparse
 # own modules
 from datalogger import DataLogger as DataLogger
 
-def gen_caches(project, tablename, datestring):
+def archive(project, tablename, datestring):
     datalogger = DataLogger(basedir, project, tablename)
     caches = datalogger.get_caches(datestring)
     suffix = "%s/%s/%s\t" % (datestring, project, tablename)
-    data = None
     if caches["tsa"]["raw"] is None:
-        if len(caches["tsa"]["keys"]) == 0:
-            logging.info("%s RAW Data is archived, tsa exists already", suffix)
-        else:
-            logging.debug("%s RAW Data is missing, no tsa archive exists", suffix)
+        logging.debug("%s RAW Data not found", suffix)
     else:
-        if len(caches["tsa"]["keys"]) == 0:
-            logging.info("%s TSA Archive missing, calling get_tsa and load_tsastats", suffix)
-            data = datalogger.load_tsa(datestring)
+        if not os.path.isfile(caches["tsa"]["raw"]):
+            logging.info("%s RAW does not exists, maybe archived or deleted", suffix)
+            return
+        logging.info("%s found raw file %s", suffix, caches["tsa"]["raw"])
+        filebasename = os.path.basename(caches["tsa"]["raw"])
+        parts= filebasename.split("_")
+        filetablename = filebasename.replace("_%s" % parts[-1], "")
+        filedatestring = parts[-1].split(".")[0]
+        filesuffix = ".".join(parts[-1].split(".")[1:])
+        logging.info("found tablename %s, datestring %s, ending %s", filetablename, filedatestring, filesuffix)
+        if (filetablename != tablename) or (filedatestring != datestring):
+            logging.error("the references raw file seems not to be the correct one")
         else:
-            if len(caches["tsastat"]["keys"]) == 0:
-                logging.info("%s TSASTAT Archive missing, calling load_tsastats", suffix)
-                data = datalogger.load_tsastats(datestring)
-            else:
-                if len(caches["ts"]["keys"]) == 0:
-                    logging.info("%s there are no ts archives, something went wrong, or tsa is completely empty, calling load_tsastats", suffix)
-                    data = datalogger.load_tsastats(datestring)
+            if filesuffix == "csv.gz":
+                logging.info("raw file already zipped, this seems not to be the actual one")
+                if (len(caches["tsa"]["keys"]) > 0) and (len(caches["tsastat"]["keys"]) > 0) and (len(caches["ts"]["keys"]) > 0) and (caches["quantile"]["exists"] is True):
+                    logging.info("%s all generated archives found, raw data could be archived", suffix)
+                    archivepath = os.path.join(args.archivedir, datestring, project, tablename)
+                    archivefilename = os.path.join(archivepath, os.path.basename(caches["tsa"]["raw"]))
+                    if not os.path.isdir(archivepath):
+                        logging.info("creating directory %s", archivepath)
+                        os.makedirs(archivepath)
+                    logging.info("%s moving raw file to %s", suffix, archivefilename)
+                    shutil.move(caches["tsa"]["raw"], archivefilename)
                 else:
-                    logging.debug("%s All fine", suffix)
-            if caches["quantile"]["exists"] is not True:
-                logging.info("%s Quantile archive is missing, calling load_quantile", suffix)
-                data = datalogger.load_quantile(datestring)
-    del data
+                    logging.info("%s not all archives available, generate them first, before archiving raw data", suffix)
     del caches
     del datalogger
-    #print(gc.get_count())
 
 def main():
     for datestring in tuple(DataLogger.datewalker(startdate, args.enddate)):
@@ -59,20 +65,20 @@ def main():
                         logging.debug("skipping tablename %s", tablename)
                         continue
                     logging.debug("working on tablename %s", tablename)
-                gen_caches(project, tablename, datestring)
+                archive(project, tablename, datestring)
 
 if __name__ == "__main__":
     basedir = "/var/rrd"
     yesterday_datestring = (datetime.date.today() - datetime.timedelta(1)).isoformat()
     parser = argparse.ArgumentParser(description='generate TimeseriesArrays on local backend')
     parser.add_argument('--basedir', default="/var/rrd", help="basedirectory of datalogger data on local machine")
-    parser.add_argument("-b", '--back', help="how many days back from now")
     parser.add_argument("-s", '--startdate', help="start date in isoformat YYYY-MM-DD")
     parser.add_argument("-e", '--enddate', default=yesterday_datestring, help="stop date in isoformat YYYY-MM-DD")
     parser.add_argument("-q", '--quiet', action='store_true', help="set to loglevel ERROR")
     parser.add_argument("-v", '--verbose', action='store_true', help="set to loglevel DEBUG")
     parser.add_argument("-p", '--project', help="process only this project name")
     parser.add_argument("-t", '--tablename', help="process only this tablename")
+    parser.add_argument("-a", '--archivedir', default="/var/rrd/global_cache/raw_archives", help="directory to archive old raw data to")
     parser.add_argument("--profile", action="store_true", help="use cProfile to start main")
     args = parser.parse_args()
     if args.quiet is True:
@@ -80,16 +86,11 @@ if __name__ == "__main__":
     if args.verbose is True:
         logging.getLogger("").setLevel(logging.DEBUG)
     logging.debug(args)
-    if (args.back is not None) == (args.startdate is not None):
-        logging.error("option -b and -e are mutual exclusive, use only one")
-        sys.exit(1)
     startdate = None
-    if args.back is not None:
-        startdate = (datetime.date.today() - datetime.timedelta(int(args.back))).isoformat()
-    elif args.startdate is not None:
+    if args.startdate is not None:
         startdate = args.startdate
     else:
-        logging.error("you have to provide either -b or -s")
+        logging.error("you have to provide -s")
         sys.exit(1)
     if args.profile is True:
         logging.info("profiling enabled")

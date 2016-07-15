@@ -218,7 +218,7 @@ class TimeseriesArrayLazy(object):
         #assert all((value_key in data for value_key in self.__value_keys)) # test if all keys are available
         # create key from data
         try:
-            key = tuple([unicode(data[key]) for key in self.__index_keys])
+            index_key = tuple([unicode(data[key]) for key in self.__index_keys])
         except KeyError:
             #logging.exception(exc)
             logging.error("there are index_keys missing in this dataset %s, skipping this dataset", data.keys())
@@ -230,13 +230,14 @@ class TimeseriesArrayLazy(object):
             # valueable data -> will result in ValueError
             ts = float(data[self.__ts_key])
             values = [self.to_float(data[key]) for key in self.__value_keys] # must be list not tuple, to be added to another list
-            if key not in self.keys():
+            if index_key not in self.keys():
                 # if this key is new, create empty Timeseries object
-                self[key] = Timeseries(self.__value_keys)
+                logging.debug("first entry for index_key : %s", index_key)
+                self[index_key] = Timeseries(self.__value_keys)
             if group_func is not None:
-                self[key].group_add(ts, values, group_func)
+                self[index_key].group_add(ts, values, group_func)
             else:
-                self[key].add(ts, values)
+                self[index_key].add(ts, values)
         except KeyError as exc:
             #logging.exception(exc)
             if self.__debug: # some datasources have incorrect data

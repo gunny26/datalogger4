@@ -67,7 +67,7 @@ class CorrelationMatrixArray(object):
     def __init__(self, tsa):
         self.__data = {}
         for value_key in tsa.value_keys:
-            print "calculating value_key %s" % value_key
+            logging.info("calculating value_key %s", value_key)
             self.__data[value_key] = CorrelationMatrix(tsa, value_key)
 
     def __eq__(self, other):
@@ -78,7 +78,7 @@ class CorrelationMatrixArray(object):
             return True
         except AssertionError as exc:
             logging.exception(exc)
-            print self.__data.keys(), other.keys()
+            logging.debug("self keys : %s, other keys: %s", self.__data.keys(), other.keys())
         return False
 
     def __getitem__(self, key):
@@ -115,7 +115,7 @@ class CorrelationMatrix(object):
             return True
         except AssertionError as exc:
             logging.exception(exc)
-            print self.__data.keys(), other.data.keys()
+            logging.debug("self keys : %s, other keys : %s", self.__data.keys(), other.data.keys())
         return False
 
     def __getitem__(self, key):
@@ -132,7 +132,7 @@ class CorrelationMatrix(object):
         """
         search for corelating series in all other series available
         """
-        print "Searching for correlation in value_key %s)" % value_key
+        logging.info("Searching for correlation in value_key %s)", value_key)
         matrix = {}
         keylist = tsa.keys()
         for key in keylist:
@@ -149,7 +149,7 @@ class CorrelationMatrix(object):
                         matrix[key][otherkey] = get_mse_sorted_norm(series, other)
                         matrix[otherkey][key] = matrix[key][otherkey]
                     else:
-                        print "skipping, dataseries are not of same length"
+                        logging.info("skipping, dataseries are not of same length")
         return matrix
 
     def dumps(self):
