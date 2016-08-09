@@ -381,6 +381,9 @@ class Timeseries(object):
         add new data to timeseries
         ts should be increasing, values have to be numeric
 
+        this method should be used while reading from raw data, where datatypes are not for given
+        for reading from trusted source as dumped CSV file you should use add_from_csv
+
         parameters:
         ts <float> timestamp, has to be increasing, otherwise data will be ignored
         values <tuple> of <float> the actual values for this timestamp
@@ -400,6 +403,21 @@ class Timeseries(object):
         except AssertionError as exc:
             if not suppress_non_steady_ts:
                 logging.debug("timestamp %s is not steadily increasing, ignoring this dataset, last_ts=%s", timestamp, self.data[-1][0])
+        # skip this data if timeseries already in data
+        if timestamp in self.__ts_index:
+            logging.debug("skipping new data, timestamp already stored")
+            return
+        # finally add to datastore
+        self.__add(timestamp, list(values))
+
+    def add_from_csv(self, timestamp, values):
+        """
+        add new data to timeseries, used to add value from trusted sources like CSV files
+
+        parameters:
+        ts <float> timestamp, has to be increasing, otherwise data will be ignored
+        values <tuple> of <float> the actual values for this timestamp
+        """
         self.__add(timestamp, values)
 
     def __add(self, timestamp, values):
@@ -419,24 +437,17 @@ class Timeseries(object):
         raises:
         DataformatError if TypeError occurs
         """
-        try:
-            # skip this data if timeseries already in data
-            if timestamp in self.__ts_index:
-                logging.debug("skipping new data, timestamp already stored")
-                return
-            #logging.error("timstamp : %s", timestamp)
-            row = [timestamp,  ] + list(values)
-            #logging.error("data_list : %s", ["%s(%s)" % (item, str(type(item))) for item in row])
-            #data = array.array("f")
-            #data.fromlist(data_list)
-            #logging.error("Data to append: %s", data)
-            self.data.append(row)
-            self.__ts_index[timestamp] = self.__index
-            self.__index += 1
-        except TypeError as exc:
-            logging.exception(exc)
-            logging.error("ts : %s, values: %s", timestamp, values)
-            raise DataFormatError("TypeError: some values are not of type <float>")
+        # finally add to datastore
+        if timestamp not in self.__ts_index:
+            try:
+                row = [timestamp,  ] + values
+                self.data.append(row)
+                self.__ts_index[timestamp] = self.__index
+                self.__index += 1
+            except TypeError as exc:
+                logging.exception(exc)
+                logging.error("ts : %s, values: %s", timestamp, values)
+                raise DataFormatError("TypeError: some values are not of type <float>")
 
     def group_add(self, timestamp, values, group_func):
         """
@@ -453,6 +464,8 @@ class Timeseries(object):
         None
         """
         assert isinstance(timestamp, float)
+        assert isinstance(values, list)
+        assert all((isinstance(value, float) for value in values))
         if timestamp not in self.__ts_index:
             #logging.error("first data")
             self.__add(timestamp, values)
@@ -841,7 +854,9 @@ class Timeseries(object):
             timeseries = Timeseries(header_line[1:], header_line[0])
             for row in data[1:]:
                 values = row.split(";")
-                timeseries.add(float(values[0]), tuple((float(value) for value in values[1:])))
+                # use faster add_from_csv to avoid time consuming
+                # type checking
+                timeseries.add_from_csv(float(values[0]), [float(value) for value in values[1:]])
             return timeseries
         except IOError as exc:
             logging.exception(exc)

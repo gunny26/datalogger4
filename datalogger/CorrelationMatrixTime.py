@@ -197,11 +197,10 @@ class CorrelationMatrixTime(object):
             return True
         except AssertionError as exc:
             logging.exception(exc)
-            print self.__data.keys(), other.data.keys()
+            logging.debug("self keys : %s, other keys : %s", self.__data.keys(), other.data.keys())
         return False
 
     def __getitem__(self, key):
-        print key
         return self.__data[key]
 
     def keys(self):
@@ -218,7 +217,7 @@ class CorrelationMatrixTime(object):
         """
         search for correlating series in all other series available
         """
-        print "Searching for correlation in value_key %s)" % value_key
+        logging.info("Searching for correlation in value_key %s)", value_key)
         matrix = {}
         for key in tsa1.keys():
             other = None
@@ -226,7 +225,6 @@ class CorrelationMatrixTime(object):
                 matrix[key] = get_mse_sorted_norm_missing(tsa1[key][value_key], tsa2[key][value_key])
             else:
                 logging.debug("skipping %s key not in older TSA", key)
-            #print key, matrix[key]
         return matrix
 
     def dumps(self):

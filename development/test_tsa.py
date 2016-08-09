@@ -13,15 +13,16 @@ from datalogger import Timeseries as Timeseries
 #from commons import *
 
 def main():
-    tsa = datalogger["2016-02-08"]
+    tsa = datalogger["2016-07-13"]
+    print(tsa.keys())
     tsa.set_group_keyname("hostname", lambda a, b: a + b)
     for key in tsa.keys():
         tsa.getitem_grouped__(key)
         #print(key, tsa[key])
 
 if __name__ == "__main__":
-    project = "ucs"
-    tablename = "ifXTable"
+    project = "snmp"
+    tablename = "hrStorageTable"
     datalogger = DataLogger("/var/rrd", project, tablename)
     datestring = DataLogger.get_last_business_day_datestring()
     main()

@@ -2,6 +2,7 @@
 # pylint: disable=line-too-long
 import json
 import logging
+from datalogger.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 
 
 class QuantileArray(object):
@@ -9,7 +10,7 @@ class QuantileArray(object):
     hold a number of Quantile Objects
     """
 
-    def __init__(self, tsa):
+    def __init__(self, tsa, tsastats=None):
         """
         the data will be calculated imediately
 
@@ -21,7 +22,7 @@ class QuantileArray(object):
         self.__value_keys = tuple(tsa.value_keys)
         for value_key in self.__value_keys:
             try:
-                self.__data[value_key] = Quantile(tsa, value_key)
+                self.__data[value_key] = Quantile(tsa, value_key, tsastats=tsastats)
             except QuantileError as exc:
                 logging.exception(exc)
                 logging.error("skipping value_key %s", value_key)
@@ -130,8 +131,9 @@ class Quantile(object):
         3 : 0,
         4 : 0,
     }
+    __width = 20
 
-    def __init__(self, tsa, value_key, maxx=None, minn=0.0):
+    def __init__(self, tsa, value_key, tsastats):
         """
         parameters:
         tsa <TimeseriesArray>
@@ -143,14 +145,9 @@ class Quantile(object):
         self.__sortlist = None
         if len(tsa) == 0:
             raise QuantileError("EmptyTsaException detected, not possible to calculate anything with nothing")
-        if maxx is None:
-            maxx_tsa = (max(ts[value_key]) for key, ts in tsa.items())
-            self.__maxx = max(maxx_tsa)
-            minn_tsa = (min(ts[value_key]) for key, ts in tsa.items())
-            self.__minn = min(minn_tsa)
-        else:
-            self.__maxx = maxx
-            self.__minn = minn
+        # get min and max over all available timeseries
+        self.__maxx = max((tsstats[value_key]["max"] for key, tsstats in tsastats.items()))
+        self.__minn = min((tsstats[value_key]["min"] for key, tsstats in tsastats.items()))
         # do the calculations
         # width of each quantile
         width = int(100 / (len(self.__quants.keys()) - 1))
@@ -158,10 +155,20 @@ class Quantile(object):
         if (self.__maxx == 0.0) or  (width == 0):
             self.__quantile = self.__quants.copy()
             logging.debug("either length of data or maximum is zero, so all quantile values will be zero")
-        self.__quantile = dict(((key, self.__calculate(ts[value_key], width)) for key, ts in tsa.items()))
-        #for key, ts in tsa.items():
-        #    self.__quantile[key] =  self.__calculate(ts[value_key], width)
-        self.sort() # do initial sort
+        try:
+            for key in tsa.keys():
+                try:
+                    # if there is no timeseriesstats value for this particular tsa.
+                    # skip it
+                    tsastats[key][value_key]
+                    self.__quantile[key] = self.__calculate(tsa[key][value_key])
+                except KeyError as exc:
+                    logging.debug("no timeseriesstats available for index_key = %s and value_key = %s, skipping", key, value_key)
+        except StandardError as exc:
+            logging.exception(exc)
+            logging.error("an error occured with value_key %s", value_key)
+            raise exc
+        # self.sort() # do initial sort
 
     @property
     def quantile(self):
@@ -196,25 +203,35 @@ class Quantile(object):
             assert self.__maxx == other.maxx
             return True
         except AssertionError as exc:
-            print self.__maxx, other.maxx
-            print self.__quantile, other.quantile
             logging.exception(exc)
             return False
 
     def __getitem__(self, key):
         return self.__quantile[key]
 
-    def __calculate(self, series, width):
+    def __calculate(self, series):
         """
         actually do the calculations
         """
         quants = self.__quants.copy()
         # TODO: Performance Optimization needed
+        # the range from __minn to __maxx
+        # __maxx and __minn both can be negative
+        value_range = abs(self.__maxx - self.__minn)
+        # if value_range is zero, skip calculations
+        if value_range == 0.0:
+            return quants
         for value in series:
-            # skip negative values
-            quant = int((100 * (value + abs(self.__minn)) / (self.__maxx + abs(self.__minn))) / width)
-            # quant = int((100 * min(value, self.__maxx) / self.__maxx) / width)
-            quants[quant] += 1
+            quant = (100 * abs(value - self.__minn) / value_range) / self.__width
+            try:
+                quants[int(quant)] += 1
+            except KeyError as exc:
+                # this is the case if value == __maxx
+                if int(quant) == len(quants):
+                    quants[int(quant) - 1] += 1
+                else:
+                    logging.error("quant = %s, value = %s, __maxx = %s, __minn = %s, width = %s", quant, value, self.__maxx, self.__minn, self.__width)
+                    raise exc
         return quants
 
     def head(self, maxlines=10):
