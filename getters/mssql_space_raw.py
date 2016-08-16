@@ -93,7 +93,6 @@ def get_credentials(cmdb_con, server):
     and tbl_server.hostname='%s'
     and tbl_logins.fk_server=tbl_server.id
     and tbl_logins.deleted=0
-    and tbl_logins.privilegiert=1
     order by hostname"""
     cur = cmdb_con.cursor()
     cur.execute(sqlstring % server)

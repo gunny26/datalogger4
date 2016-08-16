@@ -26,17 +26,16 @@ __copyright__ = "Copyright (c) 2008 Arthur Messner"
 __license__ = "GPL"
 
 import os
-import sys
 import time
 import datetime
 import json
+import MySQLdb
 import logging
 logging.basicConfig(level=logging.INFO)
 import logging.handlers
 from optparse import OptionParser
 # eigene Module
 import tilak_cmdb
-import tilak_mysql
 import tilak_centreon
 
 NAGIOS_GROUP = u"CHECK_MYSQL_LOGIN"
@@ -117,9 +116,10 @@ def main():
             nagios_hosts.remove(row.host)
         logging.debug(row.toString())
         logging.debug("Teste Server %s" % row.host)
-        mc = tilak_mysql.MySqlConnection(row.host, row.username, row.passwort)
+        #mc = tilak_mysql.MySqlConnection(row.host, row.username, row.passwort)
         try:
-            con = mc.getConnection()
+            #con = mc.getConnection()
+            con = MySQLdb.connect(row.host, row.username, row.passwort, charset="utf8")
             cur = con.cursor()
             cur.execute(SQL_SPACE_STRING)
             ts = time.time()
@@ -140,7 +140,7 @@ if __name__ == "__main__":
         default=False, help="verbose output")
     parser.add_option("-q", "--quiet", dest="quiet", action="store_true", \
         default=False, help="quiet")
-    (options, args)=parser.parse_args()
+    (options, args) = parser.parse_args()
     # set logging level according to commandline switches
     if options.quiet:
         logging.getLogger("").setLevel(logging.ERROR)
