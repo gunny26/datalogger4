@@ -729,7 +729,7 @@ class DataLogger(object):
         <TimeseriesArrayLazy>
         """
         # intermediated tsa
-        tsa2 = TimeseriesArrayLazy(index_keys=subkeys, value_keys=tsa.value_keys, ts_key=tsa.ts_key, datatypes=self.__datatypes)
+        tsa2 = TimeseriesArrayLazy(index_keys=subkeys, value_keys=tsa.value_keys, ts_key=tsa.ts_key, datatypes=tsa.datatypes)
         start_ts, _ = DataLogger.get_ts_for_datestring(datestring)
         ts_keyname = tsa.ts_key
         for data in tsa.export():
@@ -744,7 +744,6 @@ class DataLogger(object):
     def tsastat_group_by(tsastat, subkey):
         """
         group given tsastat array by some subkey
-        TODO: return TimeseriesArrayStats Object to be consistent
 
         parameters:
         tsastat <TimeseriesArrayStats>
@@ -769,38 +768,30 @@ class DataLogger(object):
             u'inc' : lambda a, b: (a + b)/2,
             u'first' : lambda a, b: -1.0, # theres no meaning
         }
-        #tsastat = datalogger.load_tsastats("2016-02-08")
-        #print(datalogger.index_keynames)
-        #print(datalogger.value_keynames)
-        #groupby = ("hostname", )
+        # create new empty TimeseriesArrayStats Object
+        tsastats_new = TimeseriesArrayStats.__new__(TimeseriesArrayStats)
+        tsastats_new.index_keys = subkey # only subkey
+        tsastats_new.value_keys = tsastat.value_keys # same oas original
         newdata = {}
         for index_key, tsstat in tsastat.items():
-            #print("index_key :", index_key)
             key_dict = dict(zip(tsastat.index_keynames, index_key))
             newkey = None
-            if len(subkey) == 0:
+            if len(subkey) == 0: # no subkey means total aggregation
                 newkey = ("__total__", )
             else:
                 newkey = tuple([key_dict[key] for key in subkey])
-            #print("grouped key: ", newkey)
             if newkey not in newdata:
-                #print("first appearance of this index_key")
                 newdata[newkey] = {}
             for value_key in tsastat.value_keynames:
                 if value_key not in newdata[newkey]:
-                    #print("first appearance of this value_key")
                     newdata[newkey][value_key] = dict(tsstat[value_key])
                 else:
-                    #print("grouping data")
                     for stat_funcname in tsstat[value_key].keys():
-                        #print("statistical function: ", stat_funcname)
                         existing = float(newdata[newkey][value_key][stat_funcname])
-                        #print("existing data: ", existing)
                         to_group = float(tsstat[value_key][stat_funcname])
-                        #print("to add data  : ", to_group)
                         newdata[newkey][value_key][stat_funcname] = group_funcs[stat_funcname](existing, to_group)
-                        #print("calculated value: ", newdata[newkey][value_key][stat_funcname])
-        return newdata
+        tsastats_new.stats = newdata
+        return tsastats_new
 
     def get_wikiname(self):
         """
