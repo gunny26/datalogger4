@@ -44,8 +44,8 @@ class TimeseriesArrayLazy(object):
         datatypes <list> list of used datatypes
         cache <bool> should already loaded timeseries be cached, useful to calculate quantiles
         """
-        self.__index_keys = tuple([unicode(value) for value in index_keys])
-        self.__value_keys = list([unicode(value) for value in value_keys])
+        self.__index_keynames = tuple([unicode(value) for value in index_keys])
+        self.__value_keynames = list([unicode(value) for value in value_keys])
         self.__ts_key = unicode(ts_key)
         self.__cache = cache
         # define instance data
@@ -79,9 +79,9 @@ class TimeseriesArrayLazy(object):
         assert self.__group_func is not None
         logging.debug("searching for key %s", key)
         if self.__group_keyname is not None:
-            get_key_dict = dict(zip(self.__index_keys, key))
+            get_key_dict = dict(zip(self.__index_keynames, key))
             logging.debug("converted to key_dict: %s", get_key_dict)
-            dict_keys = [dict(zip(self.__index_keys, my_key)) for my_key in self.keys()]
+            dict_keys = [dict(zip(self.__index_keynames, my_key)) for my_key in self.keys()]
             load_keys = [dict_key for dict_key in dict_keys if dict_key[self.__group_keyname] == get_key_dict[self.__group_keyname]]
             logging.debug("keys to load : %s", load_keys)
 
@@ -96,8 +96,8 @@ class TimeseriesArrayLazy(object):
     def __eq__(self, other):
         """test equality in depth"""
         try:
-            assert self.__index_keys == other.index_keys
-            assert self.__value_keys == other.value_keys
+            assert self.__index_keynames == other.index_keys
+            assert self.__value_keynames == other.value_keys
             assert self.__ts_key == other.ts_key
             assert len(self.__data.keys()) == len(other.keys())
             for key in self.__data.keys():
@@ -130,7 +130,7 @@ class TimeseriesArrayLazy(object):
 
         return <dict> representation of given index_values
         """
-        return dict(zip(self.__index_keys, index_values))
+        return dict(zip(self.__index_keynames, index_values))
 
 #    @property
 #    def data(self):
@@ -139,13 +139,23 @@ class TimeseriesArrayLazy(object):
 
     @property
     def index_keys(self):
+        """DEPRECATED use index_keynames instead"""
+        return self.__index_keynames
+
+    @property
+    def index_keynames(self):
         """keynames which build key for self.data"""
-        return self.__index_keys
+        return self.__index_keynames
 
     @property
     def value_keys(self):
+        """DEPRECATED use value_keynames instead"""
+        return self.__value_keynames
+
+    @property
+    def value_keynames(self):
         """keynames which build value fields for Timeseries objects"""
-        return self.__value_keys
+        return self.__value_keynames
 
     @property
     def ts_key(self):
@@ -188,7 +198,7 @@ class TimeseriesArrayLazy(object):
 
         if set every __getitem__ call will group data automatically
         """
-        assert index_keyname in self.__index_keys
+        assert index_keyname in self.__index_keynames
         self.__group_keyname = index_keyname
         self.__group_func = group_func
 
@@ -215,10 +225,10 @@ class TimeseriesArrayLazy(object):
         """
         #assert self.__ts_key in data # timestamp key has to be in dict
         #assert (type(data[self.__ts_key]) == int) or (type(data[self.__ts_key]) == float) # timestamp should be int
-        #assert all((value_key in data for value_key in self.__value_keys)) # test if all keys are available
+        #assert all((value_key in data for value_key in self.__value_keynames)) # test if all keys are available
         # create key from data
         try:
-            index_key = tuple([unicode(data[key]) for key in self.__index_keys])
+            index_key = tuple([unicode(data[key]) for key in self.__index_keynames])
         except KeyError:
             #logging.exception(exc)
             logging.error("there are index_keys missing in this dataset %s, skipping this dataset", data.keys())
@@ -229,11 +239,11 @@ class TimeseriesArrayLazy(object):
             # made the next explicit to avoid empty keys if there is no
             # valueable data -> will result in ValueError
             ts = float(data[self.__ts_key])
-            values = [self.to_float(data[key]) for key in self.__value_keys] # must be list not tuple, to be added to another list
+            values = [self.to_float(data[key]) for key in self.__value_keynames] # must be list not tuple, to be added to another list
             if index_key not in self.keys():
                 # if this key is new, create empty Timeseries object
                 logging.debug("first entry for index_key : %s", index_key)
-                self[index_key] = Timeseries(self.__value_keys)
+                self[index_key] = Timeseries(self.__value_keynames)
             if group_func is not None:
                 self[index_key].group_add(ts, values, group_func)
             else:
@@ -241,10 +251,12 @@ class TimeseriesArrayLazy(object):
         except KeyError as exc:
             #logging.exception(exc)
             if self.__debug: # some datasources have incorrect data
-                logging.error("there is some key missing in %s, should be %s and %s, skipping this dataset, skipping this dataset", data.keys(), self.__ts_key, self.__value_keys)
+                logging.error(exc)
+                logging.error("there is some key missing in %s, should be %s and %s, skipping this dataset, skipping this dataset", data.keys(), self.__ts_key, self.__value_keynames)
         except ValueError as exc:
             #logging.exception(exc)
             if self.__debug: # some datasources have incorrect data
+                logging.error(exc)
                 logging.error("some value_keys or ts_keyname are not numeric and float convertible, skipping this dataset: %s", data)
 
     def group_add(self, data, group_func):
@@ -326,8 +338,8 @@ class TimeseriesArrayLazy(object):
         which represents the difference between two values in time
         TODO: describe this better
         """
-        assert colname in self.__value_keys
-        assert newcolname not in self.__value_keys
+        assert colname in self.__value_keynames
+        assert newcolname not in self.__value_keynames
         for key, timeseries in self.keys():
             timeseries = self[key]
             try:
@@ -336,7 +348,7 @@ class TimeseriesArrayLazy(object):
                 logging.error("%s does exist in current dataset at key %s", newcolname, key)
                 raise exc
             timeseries.add_derive_col(colname, newcolname)
-        self.__value_keys.append(newcolname)
+        self.__value_keynames.append(newcolname)
 
     def add_per_s_col(self, colname, newcolname):
         """
@@ -344,12 +356,12 @@ class TimeseriesArrayLazy(object):
         which represents the difference between two values in time
         TODO: describe this better
         """
-        assert colname in self.__value_keys
-        assert newcolname not in self.__value_keys
+        assert colname in self.__value_keynames
+        assert newcolname not in self.__value_keynames
         for timeseries in self.values():
             assert newcolname not in timeseries.headers
             timeseries.add_per_s_col(colname, newcolname)
-        self.__value_keys.append(newcolname)
+        self.__value_keynames.append(newcolname)
 
     def add_calc_col_single(self, colname, newcolname, func=lambda a: a):
         """
@@ -364,12 +376,12 @@ class TimeseriesArrayLazy(object):
         return:
         None
         """
-        assert colname in self.__value_keys
-        assert newcolname not in self.__value_keys
+        assert colname in self.__value_keynames
+        assert newcolname not in self.__value_keynames
         for timeseries in self.values():
             assert newcolname not in timeseries.headers
             timeseries.add_calc_col_single(colname, newcolname, func)
-        self.__value_keys.append(newcolname)
+        self.__value_keynames.append(newcolname)
 
     def add_calc_col_full(self, newcolname, func):
         """
@@ -383,11 +395,11 @@ class TimeseriesArrayLazy(object):
         returns:
         None
         """
-        assert newcolname not in self.__value_keys
+        assert newcolname not in self.__value_keynames
         for timeseries in self.values():
             assert newcolname not in timeseries.headers
             timeseries.add_calc_col_full(newcolname, func)
-        self.__value_keys.append(newcolname)
+        self.__value_keynames.append(newcolname)
 
     def remove_col(self, colname):
         """
@@ -399,7 +411,7 @@ class TimeseriesArrayLazy(object):
         returns:
         None
         """
-        assert colname in self.__value_keys
+        assert colname in self.__value_keynames
         for key in self.keys():
             timeseries = self[key]
             try:
@@ -408,7 +420,7 @@ class TimeseriesArrayLazy(object):
                 logging.error("Timeseries with key %s, has no header %s, actually only %s", key, colname, timeseries.headers)
                 raise exc
             timeseries.remove_col(colname)
-        self.__value_keys.remove(colname)
+        self.__value_keynames.remove(colname)
 
     def slice(self, colnames):
         """
@@ -420,7 +432,7 @@ class TimeseriesArrayLazy(object):
         returns:
         TimeseriesArray
         """
-        ret_data = TimeseriesArrayLazy(index_keys=self.__index_keys, value_keys=colnames, ts_key=self.__ts_key)
+        ret_data = TimeseriesArrayLazy(index_keys=self.__index_keynames, value_keys=colnames, ts_key=self.__ts_key)
         for key in self.keys():
             ret_data[key] = self[key].slice(colnames)
         return ret_data
@@ -458,12 +470,12 @@ class TimeseriesArrayLazy(object):
         overwrite <bool> overwrite existing Timeseries files, or not
             the json file is witten nonetheless if this options is set or not
         """
-        tsa_filename = self.get_dumpfilename(self.__index_keys)
+        tsa_filename = self.get_dumpfilename(self.__index_keynames)
         logging.debug("tsa_filename: %s", tsa_filename)
         outfile = os.path.join(outpath, tsa_filename)
         outbuffer = {
-            "index_keys" : self.__index_keys,
-            "value_keys" : self.__value_keys,
+            "index_keys" : self.__index_keynames,
+            "value_keys" : self.__value_keynames,
             "ts_key" : self.__ts_key,
             "ts_filenames" : []
         }
