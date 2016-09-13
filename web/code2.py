@@ -146,7 +146,7 @@ class DataLoggerWeb(object):
                     return self.get_tsa(project, tablename, datestring, args)
                 elif function == "ts":
                     return self.get_ts(project, tablename, datestring, args)
-                elif function == "tsastats":
+                elif (function == "tsastats") or (function == "tsastat"):
                     return self.get_tsastats(project, tablename, datestring, args)
                 elif function == "quantile":
                     return self.get_quantile(project, tablename, datestring, args)
@@ -410,6 +410,7 @@ class DataLoggerWeb(object):
             return json.dumps(tsastats.to_csv(args[0]))
         return tsastats.to_json()
 
+
     def get_quantile(self, project, tablename, datestring, args):
         """
         return exported QuantileArray json formatted
@@ -427,7 +428,7 @@ class DataLoggerWeb(object):
         """
         logging.info("optional arguments received: %s", args)
         datalogger = DataLogger(basedir, project, tablename)
-        quantiles = datalogger.load_quantile(datestring)
+        quantile = datalogger.load_quantile(datestring)
         if len(args) > 0:
             value_keyname = args[0]
             ret_data = []
