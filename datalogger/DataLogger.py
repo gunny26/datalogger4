@@ -20,7 +20,9 @@ from datalogger.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesAr
 from datalogger.TimeseriesStats import TimeseriesStats as TimeseriesStats
 from datalogger.Quantile import QuantileArray as QuantileArray
 from datalogger.CorrelationMatrix import CorrelationMatrixArray as CorrelationMatrixArray
-from datalogger.CustomExceptions import *
+from datalogger.CustomExceptions import DataLoggerRawFileMissing
+from datalogger.CustomExceptions import DataLoggerLiveDataError
+from datalogger.CustomExceptions import DataLoggerFilenameDecodeError
 
 DEBUG = False
 
@@ -713,6 +715,7 @@ class DataLogger(object):
 
     def group_by(self, datestring, tsa, subkeys, group_func):
         """
+        TODO: make this method static
         group given tsa by subkeys, and use group_func to aggregate data
         first all Timeseries will be aligned in time, to get proper points in timeline
 
@@ -737,9 +740,10 @@ class DataLogger(object):
             tsa2.group_add(data, group_func)
         return tsa2
 
-    def tsastat_group_by(self, tsastat, subkey):
+    @staticmethod
+    def tsastat_group_by(tsastat, subkey):
         """
-        group tsastat array by some subkey
+        group given tsastat array by some subkey
         TODO: return TimeseriesArrayStats Object to be consistent
 
         parameters:
@@ -772,7 +776,7 @@ class DataLogger(object):
         newdata = {}
         for index_key, tsstat in tsastat.items():
             #print("index_key :", index_key)
-            key_dict = dict(zip(self.index_keynames, index_key))
+            key_dict = dict(zip(tsastat.index_keynames, index_key))
             newkey = None
             if len(subkey) == 0:
                 newkey = ("__total__", )
@@ -782,7 +786,7 @@ class DataLogger(object):
             if newkey not in newdata:
                 #print("first appearance of this index_key")
                 newdata[newkey] = {}
-            for value_key in self.value_keynames:
+            for value_key in tsastat.value_keynames:
                 if value_key not in newdata[newkey]:
                     #print("first appearance of this value_key")
                     newdata[newkey][value_key] = dict(tsstat[value_key])
