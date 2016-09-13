@@ -1,12 +1,18 @@
 #!/usr/bin/python
 # pylint: disable=line-too-long
+"""
+module to work with TimeseriesArrayStatistics
+
+automatically calculates all TimeseriesStats for every Timeseries in TimeseriesArray
+at initialization
+"""
 import json
 import base64
 import os
 import logging
 # own modules
-from TimeseriesStats import TimeseriesStats as TimeseriesStats
-from CustomExceptions import *
+from datalogger.TimeseriesStats import TimeseriesStats as TimeseriesStats
+from datalogger.CustomExceptions import TimeseriesEmptyError as TimeseriesEmptyError
 
 class TimeseriesArrayStats(object):
     """
@@ -23,18 +29,18 @@ class TimeseriesArrayStats(object):
         """
         # define instance data
         self.__stats = {}
-        self.__index_keys = tuple([unicode(value) for value in tsa.index_keys])
-        self.__value_keys = tuple([unicode(value) for value in tsa.value_keys])
-        for key in tsa.keys():
+        self.__index_keynames = tuple([unicode(value) for value in tsa.index_keys])
+        self.__value_keynames = tuple([unicode(value) for value in tsa.value_keys])
+        for index_key in tsa.keys():
             try:
-                self.__stats[key] = TimeseriesStats(tsa[key])
+                self.__stats[index_key] = TimeseriesStats(tsa[index_key])
             except TimeseriesEmptyError as exc:
-                logging.info("Timeseries for key %s is length zero, skipping", key)
+                logging.info("Timeseries for key %s is length zero, skipping", index_key)
 
     def __eq__(self, other):
         try:
-            assert self.__index_keys == other.index_keys
-            assert self.__value_keys == other.value_keys
+            assert self.__index_keynames == other.index_keynames
+            assert self.__value_keynames == other.value_keynames
             assert len(self.__stats.keys()) == len(other.stats.keys())
             for key in self.__stats.keys():
                 assert self.__stats[key] == other.stats[key]
@@ -71,19 +77,40 @@ class TimeseriesArrayStats(object):
 
     @property
     def index_keys(self):
-        return self.__index_keys
+        """DEPRECATED use index_keynames instead"""
+        return self.__index_keynames
 
     @index_keys.setter
     def index_keys(self, value):
-        self.__index_keys = value
+        """DEPRECATED use index_keynames instead"""
+        self.__index_keynames = value
+
+    @property
+    def index_keynames(self):
+        return self.__index_keynames
+
+    @index_keynames.setter
+    def index_keynames(self, value):
+        self.__index_keynames = value
 
     @property
     def value_keys(self):
-        return self.__value_keys
+        """DEPRECATED use value_keynames instead"""
+        return self.__value_keynames
 
     @value_keys.setter
     def value_keys(self, value):
-        self.__value_keys = value
+        """DEPRECATED use value_keynames instead"""
+        self.__value_keynames = value
+
+    @property
+    def value_keynames(self):
+        return self.__value_keynames
+
+    @value_keynames.setter
+    def value_keynames(self, value):
+        self.__value_keynames = value
+
 
     def group_by_index_keys(self, index_keys):
         """
@@ -111,14 +138,14 @@ class TimeseriesArrayStats(object):
             "first" : lambda a, b: (a + b) / 2,
         }
         try:
-            assert all(index_key in self.__index_keys for index_key in index_keys)
+            assert all(index_key in self.__index_keynames for index_key in index_keys)
         except AssertionError:
             logging.error("All given index_keys have to be in tsastat.index_keys")
             return
         # intermediate data
         data = {}
         for key in self.__stats.keys():
-            key_dict = dict(zip(self.__index_keys, key))
+            key_dict = dict(zip(self.__index_keynames, key))
             group_key = tuple((key_dict[key] for key in index_keys))
             if group_key not in data:
                 data[group_key] = self.__stats[key].stats
@@ -131,7 +158,7 @@ class TimeseriesArrayStats(object):
                         # store
                         data[group_key][value_key][stat_func] = grouped_value
         # get to same format as TimeseriesArrayStats.to_json returns
-        outdata = [self.__index_keys, self.__value_keys, ]
+        outdata = [self.__index_keynames, self.__value_keynames, ]
         outdata.append([(key, json.dumps(value)) for key, value in data.items()])
         # use TimeseriesArrayStats.from_json to get to TimeseriesArrayStats
         # object
@@ -142,9 +169,9 @@ class TimeseriesArrayStats(object):
         """
         remove all values_keys not in value_keys, and return new TimeseriesArrayStats object
         """
-        assert all((value_key in self.__value_keys for value_key in value_keys))
+        assert all((value_key in self.__value_keynames for value_key in value_keys))
         outdata = []
-        outdata.append(self.__index_keys)
+        outdata.append(self.__index_keynames)
         outdata.append(value_keys)
         tsstat_data = []
         for key, tsstat in self.__stats.items():
@@ -167,7 +194,7 @@ class TimeseriesArrayStats(object):
         returns:
         <dict>
         """
-        assert value_key in self.__value_keys
+        assert value_key in self.__value_keynames
         ret_data = {}
         for key, t_stat in self.__stats.items():
             ret_data[key] = t_stat.stats[value_key]
@@ -212,11 +239,11 @@ class TimeseriesArrayStats(object):
         outpath <str> path wehere json file will be placed
         overwrite <bool> wheter or not a existing file should be overwritten
         """
-        #logging.info("index_keys: %s", self.__index_keys)
-        outfilename = os.path.join(outpath, self.get_dumpfilename(self.__index_keys))
+        #logging.info("index_keys: %s", self.__index_keynames)
+        outfilename = os.path.join(outpath, self.get_dumpfilename(self.__index_keynames))
         outdata = {
-            "index_keys" : self.__index_keys,
-            "value_keys" : self.__value_keys,
+            "index_keys" : self.__index_keynames,
+            "value_keys" : self.__value_keynames,
             "tsstat_filenames" : []
         }
         for key, tsstats in self.__stats.items():
@@ -306,8 +333,8 @@ class TimeseriesArrayStats(object):
             raise exc
         #logging.info("loaded JSON data: %s", indata)
         tsastats = TimeseriesArrayStats.__new__(TimeseriesArrayStats)
-        tsastats.__index_keys = tuple(indata["index_keys"])
-        tsastats.__value_keys = tuple(indata["value_keys"])
+        tsastats.__index_keynames = tuple(indata["index_keys"])
+        tsastats.__value_keynames = tuple(indata["value_keys"])
         tsastats.__stats = {}
         #for filename in indata["tsstat_filenames"]:
         for key, filename in tsastats.get_load_filenames(path, index_keys, filterkeys, matchtype).items():
@@ -319,8 +346,8 @@ class TimeseriesArrayStats(object):
 
     def to_json(self):
         outdata = []
-        outdata.append(self.__index_keys)
-        outdata.append(self.__value_keys)
+        outdata.append(self.__index_keynames)
+        outdata.append(self.__value_keynames)
         outdata.append([(key, tsstat.to_json()) for key, tsstat in self.__stats.items()])
         try:
             return json.dumps(outdata)
@@ -333,8 +360,8 @@ class TimeseriesArrayStats(object):
     def from_json(jsondata):
         indata = json.loads(jsondata)
         tsastats = TimeseriesArrayStats.__new__(TimeseriesArrayStats)
-        tsastats.__index_keys = indata[0]
-        tsastats.__value_keys = indata[1]
+        tsastats.__index_keynames = indata[0]
+        tsastats.__value_keynames = indata[1]
         tsastats.__stats = {}
         for key, tsstats in indata[2]:
             # from json there are only list, but these are not hashable,
@@ -358,14 +385,14 @@ class TimeseriesArrayStats(object):
         mainly to use in websites to get easier to the key of this row
         """
         outbuffer = []
-        outbuffer.append((u"#key", ) + self.__index_keys + self.__value_keys)
+        outbuffer.append((u"#key", ) + self.__index_keynames + self.__value_keynames)
         data = None
         if sortkey is not None:
             data = sorted(self.__stats.items(), key=lambda item: item[1][sortkey][stat_func_name], reverse=True)
         else:
             data = self.__stats.items()
         for key, value in data:
-            values = list(key) + [value[value_key][stat_func_name] for value_key in self.__value_keys]
+            values = list(key) + [value[value_key][stat_func_name] for value_key in self.__value_keynames]
             outbuffer.append([unicode(key), ] + values)
         return outbuffer
 
