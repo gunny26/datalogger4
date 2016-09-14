@@ -370,16 +370,15 @@ class DataLogger(object):
 
     def get_caches(self, datestring):
         """
-        search for available Timeseries cachefiles (grouped and ungrouped) and
-        return references to call reading method
+        search for available cachefiles
+        mainly to check if the raw data of this datestring is prosessed already
+        pattern is mainly used only to find the correct files, more for internal use
 
         parameters:
         datestring <str>
 
         returns:
-        <func> <tuple>
-
-        you can use the return values to simple call reading function as <func>(*<tuple>)
+        <dict>
         """
         caches = {
             "tsa" : {
@@ -398,6 +397,10 @@ class DataLogger(object):
             "tsstat" : {
                 "pattern" : "tsstat_*.json",
                 "keys" : {},
+            },
+            "quantile" : {
+                "pattern" : "quantile.json",
+                "exists" : False,
             }
         }
         # the original raw file could be deleted, and only the
@@ -410,21 +413,19 @@ class DataLogger(object):
         except StandardError as exc:
             logging.exception(exc)
             raise
-        for cachetype in caches.keys():
+        for cachetype in ("tsa", "ts", "tsastat", "tsstat"):
             file_pattern = os.path.join(self.__get_cachedir(datestring), caches[cachetype]["pattern"])
             for abs_filename in glob.glob(file_pattern):
                 filename = os.path.basename(abs_filename)
                 key = self.__decode_filename(filename)
                 caches[cachetype]["keys"][unicode(key)] = filename
         # add quantile part
-        caches["quantile"] = {
-            "pattern" : "quantile.json",
-            "exists" : os.path.isfile(os.path.join(self.__get_cachedir(datestring), "quantile.json"))
-        }
+        caches["quantile"]["exists"] = os.path.isfile(os.path.join(self.__get_cachedir(datestring), "quantile.json"))
         return caches
 
     def list_ts_caches(self, datestring):
         """
+        DEPRECATED use get_caches instead
         search for available Timeseries cachefiles (grouped and ungrouped) and
         return references to call reading method
 
@@ -449,6 +450,7 @@ class DataLogger(object):
 
     def list_tsstat_caches(self, datestring):
         """
+        DEPRECATED use get_caches instead
         search for available TimeseriesStats cachefiles (grouped and ungrouped) and
         return references to call reading method
 
@@ -535,20 +537,20 @@ class DataLogger(object):
             os.unlink(cachefilename)
             return fallback()
 
-    def iconvert(self, tsa):
-        """
-        DEPRECTAED: will be done in TimeseriesArrayLazy
-
-        convert given tsa to defined datatypes
-        modifies tsa object and return the modified version
-
-        parameters:
-        tsa <TimeseriesArrayLazy>
-        """
-        for colname, datatype in self.__datatypes.items():
-            if datatype != "asis":
-                tsa.convert(colname, datatype)
-        return tsa
+#    def iconvert(self, tsa):
+#        """
+#        DEPRECTAED: will be done in TimeseriesArrayLazy
+#
+#        convert given tsa to defined datatypes
+#        modifies tsa object and return the modified version
+#
+#        parameters:
+#        tsa <TimeseriesArrayLazy>
+#        """
+#        for colname, datatype in self.__datatypes.items():
+#            if datatype != "asis":
+#                tsa.convert(colname, datatype)
+#        return tsa
 
     def load_tsastats(self, datestring, filterkeys=None, timedelta=0, cleancache=False):
         """
@@ -713,9 +715,9 @@ class DataLogger(object):
         return tsa
     read_day = load_tsa_raw
 
-    def group_by(self, datestring, tsa, subkeys, group_func):
+    def tsa_group_by(self, datestring, tsa, subkeys, group_func):
         """
-        TODO: make this method static
+        TODO: make this method static, inteval should be in tsa
         group given tsa by subkeys, and use group_func to aggregate data
         first all Timeseries will be aligned in time, to get proper points in timeline
 
@@ -739,6 +741,7 @@ class DataLogger(object):
             #data[ts_keyname] = align_timestamp(data[ts_keyname])
             tsa2.group_add(data, group_func)
         return tsa2
+    group_by = tsa_group_by
 
     @staticmethod
     def tsastat_group_by(tsastat, subkey):
@@ -854,7 +857,7 @@ class DataLogger(object):
     @staticmethod
     def monthwalker(monthdatestring):
         """
-        funtion to walkf from first day to last day in given month
+        function to walf from first day to last day in given month
         """
         year, month = monthdatestring.split("-")
         lastday = calendar.monthrange(int(year), int(month))[1]
@@ -864,6 +867,7 @@ class DataLogger(object):
 
     def get_tsastats_longtime_hc(self, monthstring, key, value_key):
         """
+        TODO: do this in webapp, not here, too special
         method to get longtime data from stored TimeseriesArrayStats objects
         and return data usable as higcharts input
         """

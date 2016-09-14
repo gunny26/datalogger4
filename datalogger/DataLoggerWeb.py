@@ -30,14 +30,14 @@ class DataLoggerWeb(object):
         if datalogger_url is not None:
             self.__datalogger_url = datalogger_url
         else:
-            logging.info("reading datalogger_url from config file")
+            logging.debug("reading datalogger_url from config file")
             conffile = "/etc/datalogger/datalogger.conf"
             if os.path.isfile(conffile):
                 for row in open(conffile, "rb").read().split("\n"):
                     if len(row) > 0 and row[0] != "#":
                         key, value = row.split("=")
                         self.__dict__[key.strip()] = value.strip()
-                        logging.info("%s = %s", key.strip(), self.__dict__[key.strip()])
+                        logging.debug("%s = %s", key.strip(), self.__dict__[key.strip()])
                         self.__datalogger_url = self.__dict__[key.strip()]
         logging.info(self.__dict__)
         assert self.__datalogger_url is not None
