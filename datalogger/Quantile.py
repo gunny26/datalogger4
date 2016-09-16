@@ -193,7 +193,7 @@ class Quantile(object):
         """
         quantille = Quantile.__new__(Quantile)
         quantille.__quantile, quantille.__maxx = eval(json.loads(data))
-        quantille.sort()
+        #quantille.sort()
         return quantille
 
     def __eq__(self, other):
