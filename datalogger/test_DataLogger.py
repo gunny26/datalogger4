@@ -2,6 +2,8 @@
 
 import unittest
 import logging
+import datetime
+import os
 # own modules
 from datalogger import Timeseries as Timeseries
 from datalogger import TimeseriesArray as TimeseriesArray
@@ -15,81 +17,74 @@ class Test(unittest.TestCase):
 
 
     def setUp(self):
-        basedir = "/var/rrd"
+        self.basedir = "/var/rrd"
         self.datestring = "2015-11-30"
-        self.project = DataLogger.get_projects(basedir)[0]
-        self.tablename = DataLogger.get_tablenames(basedir, self.project)[0]
-        self.datalogger = DataLogger(basedir, self.project, self.tablename)
+        self.project = DataLogger.get_projects(self.basedir)[0]
+        self.tablename = DataLogger.get_tablenames(self.basedir, self.project)[0]
+        self.datalogger = DataLogger(self.basedir, self.project, self.tablename)
 
-    def test_get_headers(self):
-        data = self.datalogger.get_headers(self.project, self.tablename)
-        assert isinstance(data, list)
+    def test_simple(self):
+        self.assertTrue(self.datalogger.project == self.project)
+        self.assertTrue(self.datalogger.tablename == self.tablename)
+        self.assertTrue(isinstance(self.datalogger.delimiter, basestring))
+        self.assertTrue(isinstance(self.datalogger.ts_keyname, basestring))
+        self.assertTrue(isinstance(self.datalogger.headers, tuple))
+        self.assertTrue(isinstance(self.datalogger.value_keynames, tuple))
+        self.assertTrue(all((keyname in self.datalogger.headers for keyname in self.datalogger.value_keynames)))
+        self.assertTrue(isinstance(self.datalogger.index_keynames, tuple))
+        self.assertTrue(all((keyname in self.datalogger.headers for keyname in self.datalogger.index_keynames)))
+        self.assertTrue(isinstance(self.datalogger.blacklist, tuple))
+        self.assertTrue(all((keyname in self.datalogger.headers for keyname in self.datalogger.blacklist)))
+        self.assertTrue(isinstance(self.datalogger.raw_basedir, basestring))
+        self.assertTrue(os.path.exists(self.datalogger.raw_basedir))
+        self.assertTrue(os.path.isdir(self.datalogger.raw_basedir))
+        self.assertTrue(isinstance(self.datalogger.global_cachedir, basestring))
+        self.assertTrue(os.path.exists(self.datalogger.global_cachedir))
+        self.assertTrue(os.path.isdir(self.datalogger.global_cachedir))
+        # meta is something like this
+        # {u'ts_keyname': u'ts',
+        # 'stat_func_names': [u'count', ... ],
+        # u'interval': 300,
+        # u'blacklist': [],
+        # u'headers': [u'ts', u'http_host', ... ],
+        # u'delimiter': u'\t',
+        # u'value_keynames': {
+        #   u'actconn': u'asis',
+        #   u'hits': u'asis',
+        #   ...
+        #   },
+        # u'index_keynames': [u'http_host']}
+        self.assertTrue(self.datalogger.meta["headers"] == list(self.datalogger.headers))
+        self.assertTrue(self.datalogger.meta["value_keynames"].keys() == list(self.datalogger.value_keynames))
+        self.assertTrue(self.datalogger.meta["index_keynames"] == list(self.datalogger.index_keynames))
+        self.assertTrue(self.datalogger.meta["blacklist"] == list(self.datalogger.blacklist))
+        self.assertTrue(self.datalogger.meta["delimiter"] == self.datalogger.delimiter)
+        self.assertTrue(self.datalogger.meta["ts_keyname"] == self.datalogger.ts_keyname)
+        self.assertTrue(isinstance(self.datalogger.meta["stat_func_names"], list))
 
-    def test_get_index_keynames(self):
-        data = self.datalogger.get_index_keynames(self.project, self.tablename)
-        assert isinstance(data, list)
+    def test_statics(self):
+        self.assertTrue(isinstance(DataLogger.get_user(self.basedir), basestring))
+        self.assertTrue(isinstance(DataLogger.get_group(self.basedir), basestring))
+        self.assertTrue(isinstance(DataLogger.get_yesterday_datestring(), basestring))
+        lbd = DataLogger.get_last_business_day_datestring()
+        self.assertTrue(isinstance(DataLogger.get_last_business_day_datestring(), basestring))
+        self.assertTrue(isinstance(DataLogger.datestring_to_date(lbd), datetime.date))
+        for datestring in DataLogger.datewalker("2016-01-01", "2016-02-29"):
+            self.assertTrue(isinstance(datestring, basestring))
+        for datestring in DataLogger.monthwalker("2016-02"):
+            self.assertTrue(isinstance(datestring, basestring))
+        self.assertEqual(list(DataLogger.monthwalker("2016-02"))[-1], "2016-02-29")
+        self.assertTrue(isinstance(DataLogger.get_ts_for_datestring("2016-01-01"), tuple))
+        self.assertTrue(isinstance(DataLogger.get_ts_for_datestring("2016-01-01")[0], float))
+        self.assertTrue(isinstance(DataLogger.get_ts_for_datestring("2016-01-01")[1], float))
 
-    def test_get_value_keynames(self):
-        data = self.datalogger.get_value_keynames(self.project, self.tablename)
-        assert isinstance(data, list)
 
-    def test_get_ts_keyname(self):
-        data = self.datalogger.get_ts_keyname(self.project, self.tablename)
-        assert isinstance(data, basestring)
+    def test_data(self):
+        self.datalogger.load_tsa(self.datestring)
+        self.datalogger.load_tsastats(self.datestring)
+        self.datalogger.load_correlationmatrix(self.datestring)
+        self.datalogger.load_quantile(self.datestring)
 
-    def test_get_last_business_day_datestring(self):
-        data = self.datalogger.get_last_business_day_datestring()
-        assert isinstance(data, basestring)
-
-    def test_get_datewalk(self):
-        data = self.datalogger.datewalk("2015-11-01", "2015-11-30")
-        self.assertGreater(len(data), 1)
-
-    def test_get_caches(self):
-        caches = self.datalogger.get_caches(self.project, self.tablename, self.datestring)
-        self.assertTrue(isinstance(caches, dict))
-        self.assertTrue(all((key in caches.keys() for key in [u'tsa', u'tsstat', u'tsastat', u'ts', u"quantile"])))
-        for key, filename in caches["ts"]["keys"].items()[:10]:
-            tsa = self.datalogger.get_ts(self.project, self.tablename, self.datestring, key)
-            assert isinstance(tsa, TimeseriesArray)
-            ts = tsa[tsa.keys()[0]]
-            assert isinstance(ts, Timeseries)
-            assert len(ts) > 0
-
-    def test_get_tsa(self):
-        tsa = self.datalogger.get_tsa(self.project, self.tablename, self.datestring)
-        assert isinstance(tsa, TimeseriesArray)
-
-    def test_get_tsa_adv(self):
-        tsa = self.datalogger.get_tsa_adv(self.project, self.tablename, self.datestring, None, "avg", "(.*)")
-        assert isinstance(tsa, TimeseriesArray)
-        assert len(tsa.keys()) > 0
-
-    def test_get_ts(self):
-        tsa = self.datalogger.get_tsa(self.project, self.tablename, self.datestring)
-        self.assertTrue(isinstance(tsa, TimeseriesArray))
-        self.assertGreater(len(tsa.keys()), 0)
-        ts = self.datalogger.get_ts(self.project, self.tablename, self.datestring, tsa.keys()[0])
-        self.assertTrue(isinstance(ts, TimeseriesArray))
-        self.assertGreater(len(ts.keys()), 0)
-
-    def test_get_tsastats(self):
-        tsastats = self.datalogger.get_tsastats(self.project, self.tablename, self.datestring)
-        assert isinstance(tsastats, TimeseriesArrayStats)
-        assert len(tsastats.keys()) > 0
-        tsstat = tsastats[tsastats.keys()[0]]
-        assert isinstance(tsstat, TimeseriesStats)
-
-    def test_get_stat_func_names(self):
-        data = self.datalogger.get_stat_func_names()
-        assert isinstance(data, list)
-        assert len(data) > 1
-        assert all((key in data for key in [u'count', u'max', u'diff', u'avg', u'inc', u'std', u'dec', u'last', u'min', u'sum', u'median', u'first', u'mean']))
-
-    def test_get_quantile(self):
-        qa = self.datalogger.get_quantile(self.project, self.tablename, self.datestring)
-        assert isinstance(qa, QuantileArray)
-        # TODO: do more checking
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

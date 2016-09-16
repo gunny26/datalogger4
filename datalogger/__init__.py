@@ -39,4 +39,5 @@ from datalogger.CorrelationMatrixTime import CorrelationMatrixTime as Correlatio
 from datalogger.CustomExceptions import *
 # classes to use with webapplication API
 from datalogger.DataLoggerWeb import DataLoggerWeb as DataLoggerWeb
+from datalogger.DataLoggerRest import DataLoggerRest as DataLoggerRest
 from datalogger.CorrelationMatrixTime import CorrelationMatrixTimeWeb as CorrelationMatrixTimeWeb

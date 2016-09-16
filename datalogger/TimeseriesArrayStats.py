@@ -111,59 +111,58 @@ class TimeseriesArrayStats(object):
     def value_keynames(self, value):
         self.__value_keynames = value
 
-
-    def group_by_index_keys(self, index_keys):
-        """
-        group tsastat by index_keys, which are a subset of the original index_keys
-
-        the grouping functions are predefined, it makes no sense to make this variable
-
-        parameters:
-        tsastat <TimeseriesArrayStats>
-        index_keys <tuple>
-
-        returns:
-        <TimeseriesArrayStats>
-        """
-        group_funcs = {
-            "sum" : lambda a, b: a + b,
-            "avg" : lambda a, b: (a + b) / 2,
-            "min" : min,
-            "max" : max,
-            "count" : lambda a, b: a + b,
-            "std" : lambda a, b: (a + b) / 2,
-            "median" : lambda a, b: (a + b) / 2,
-            "mean" : lambda a, b: (a + b) / 2,
-            "last" : lambda a, b: (a + b) / 2,
-            "first" : lambda a, b: (a + b) / 2,
-        }
-        try:
-            assert all(index_key in self.__index_keynames for index_key in index_keys)
-        except AssertionError:
-            logging.error("All given index_keys have to be in tsastat.index_keys")
-            return
-        # intermediate data
-        data = {}
-        for key in self.__stats.keys():
-            key_dict = dict(zip(self.__index_keynames, key))
-            group_key = tuple((key_dict[key] for key in index_keys))
-            if group_key not in data:
-                data[group_key] = self.__stats[key].stats
-            else:
-                # there is something to group
-                for value_key in self.__stats[key].keys():
-                    for stat_func, value in self.__stats[key][value_key].items():
-                        # group values by function
-                        grouped_value = group_funcs[stat_func](value, data[group_key][value_key][stat_func])
-                        # store
-                        data[group_key][value_key][stat_func] = grouped_value
-        # get to same format as TimeseriesArrayStats.to_json returns
-        outdata = [self.__index_keynames, self.__value_keynames, ]
-        outdata.append([(key, json.dumps(value)) for key, value in data.items()])
-        # use TimeseriesArrayStats.from_json to get to TimeseriesArrayStats
-        # object
-        new_tsastat = TimeseriesArrayStats.from_json(json.dumps(outdata))
-        return new_tsastat
+#    def group_by_index_keys(self, index_keys):
+#        """
+#        group tsastat by index_keys, which are a subset of the original index_keys
+#
+#        the grouping functions are predefined, it makes no sense to make this variable
+#
+#        parameters:
+#        tsastat <TimeseriesArrayStats>
+#        index_keys <tuple>
+#
+#        returns:
+#        <TimeseriesArrayStats>
+#        """
+#        group_funcs = {
+#            "sum" : lambda a, b: a + b,
+#            "avg" : lambda a, b: (a + b) / 2,
+#            "min" : min,
+#            "max" : max,
+#            "count" : lambda a, b: a + b,
+#            "std" : lambda a, b: (a + b) / 2,
+#            "median" : lambda a, b: (a + b) / 2,
+#            "mean" : lambda a, b: (a + b) / 2,
+#            "last" : lambda a, b: (a + b) / 2,
+#            "first" : lambda a, b: (a + b) / 2,
+#        }
+#        try:
+#            assert all(index_key in self.__index_keynames for index_key in index_keys)
+#        except AssertionError:
+#            logging.error("All given index_keys have to be in tsastat.index_keys")
+#            return
+#        # intermediate data
+#        data = {}
+#        for key in self.__stats.keys():
+#            key_dict = dict(zip(self.__index_keynames, key))
+#            group_key = tuple((key_dict[key] for key in index_keys))
+#            if group_key not in data:
+#                data[group_key] = self.__stats[key].stats
+#            else:
+#                # there is something to group
+#                for value_key in self.__stats[key].keys():
+#                    for stat_func, value in self.__stats[key][value_key].items():
+#                        # group values by function
+#                        grouped_value = group_funcs[stat_func](value, data[group_key][value_key][stat_func])
+#                        # store
+#                        data[group_key][value_key][stat_func] = grouped_value
+#        # get to same format as TimeseriesArrayStats.to_json returns
+#        outdata = [self.__index_keynames, self.__value_keynames, ]
+#        outdata.append([(key, json.dumps(value)) for key, value in data.items()])
+#        # use TimeseriesArrayStats.from_json to get to TimeseriesArrayStats
+#        # object
+#        new_tsastat = TimeseriesArrayStats.from_json(json.dumps(outdata))
+#        return new_tsastat
 
     def slice(self, value_keys):
         """

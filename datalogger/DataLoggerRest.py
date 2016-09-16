@@ -1,28 +1,19 @@
 #!/usr/bin/python
-
-import urllib
-import urllib2
-from collections import OrderedDict as OrderedDict
-import json
+# pylint: disable=line-too-long
+"""
+Python Module to work with corresponding RestFUL Api on datalogger bakend
+this module in contrast to DataLogerWeb will give mostly data no Objects
+"""
 import base64
-import unittest
 import logging
 import os
 import requests
 import calendar
 import datetime
-# own modules
-from datalogger import Timeseries as Timeseries
-from datalogger import TimeseriesArray as TimeseriesArray
-from datalogger import TimeseriesArrayStats as TimeseriesArrayStats
-from datalogger import TimeseriesStats as TimeseriesStats
-from datalogger import QuantileArray as QuantileArray
-
-DATALOGGER_URL = "http://srvmgdata1.tilak.cc/rest/v2"
 
 class DataLoggerRest(object):
     """
-    class wot work with DataLogger Web Application
+    class wot work with DataLogger RestFUL Web Backend
     """
 
     def __init__(self, datalogger_url=None):
@@ -251,87 +242,3 @@ class DataLoggerRest(object):
         stop = "%04d-%02d-%02d" % (int(year), int(month), lastday)
         return cls.datewalker(start, stop)
 
-class Test(unittest.TestCase):
-
-    datalogger = DataLoggerRest("http://srvmgdata1.tilak.cc/rest/v2")
-
-    def test_projects(self):
-        data = self.datalogger.get_projects()
-        #logging.error(data)
-        self.assertTrue(isinstance(data, list))
-        assert u"ucs" in data
-
-    def test_stat_func_names(self):
-        data = self.datalogger.get_stat_func_names()
-        #logging.error(data)
-        self.assertTrue(isinstance(data, list))
-        assert u"max" in data
-
-    def test_last_businessday_datestring(self):
-        data = self.datalogger.get_last_businessday_datestring()
-        #logging.error(data)
-        self.assertTrue(isinstance(data, basestring))
-
-    def test_caches(self):
-        datestring = "2016-01-01"
-        for project in self.datalogger.get_projects():
-            tablenames = self.datalogger.get_tablenames(project)
-            #logging.error(tablenames)
-            for tablename in tablenames:
-                cache = self.datalogger.get_cache(project, tablename, datestring)
-                #logging.error(cache)
-                index_keys = self.datalogger.get_ts_index_keys(project, tablename, datestring)
-                #logging.error(index_keys.keys())
-
-    def test_tablenames(self):
-        for project in self.datalogger.get_projects():
-            tablenames = self.datalogger.get_tablenames(project)
-            #logging.error(tablenames)
-            for tablename in tablenames:
-                tabledata = self.datalogger.get_meta(project, tablename)
-                #logging.error(tabledata)
-
-    def test_ts(self):
-        project = "glt"
-        tablename = "energiemonitor"
-        datestring = "2016-08-01"
-        index_key = (u'LKI', u'Strom_LKI_Gesamt')
-        index_key_b64 = "KHUnTEtJJywgdSdTdHJvbV9MS0lfR2VzYW10Jyk="
-        ts1 = self.datalogger.get_ts(project, tablename, datestring, index_key)
-        #logging.error(ts1)
-        ts2 = self.datalogger.get_ts(project, tablename, datestring, index_key_b64)
-        self.assertEqual(ts1, ts2)
-        tsastat = self.datalogger.get_tsastat(project, tablename, datestring)
-        #logging.error(tsastat)
-        tsastat_max = self.datalogger.get_tsastat(project, tablename, datestring, "max")
-        #logging.error(tsastat_max)
-        quantile = self.datalogger.get_quantile(project, tablename, datestring)
-        #logging.error(quantile)
-
-    def test_monthly(self):
-        project = "glt"
-        tablename = "energiemonitor"
-        monthstring = "2016-07"
-        index_key = (u'LKI', u'Strom_LKI_Gesamt')
-        value_key = "wert"
-        stat_func_name = "max"
-        stats = self.datalogger.get_monthstats(project, tablename, monthstring)
-        for datestring, data in stats.items():
-            logging.error("%s : %d", datestring, data[index_key][value_key][stat_func_name])
-
-    def test_yearly(self):
-        project = "ipstor"
-        tablename = "vrsClientTable"
-        yearstring = "2016"
-        index_key = (u'vsanapp3', u'VMWSR226', u'VMWARE_PROD3_SATA_RAW_srvapbrain')
-        value_key = "vrsclReadError"
-        stat_func_name = "max"
-        stats = self.datalogger.get_yearstats(project, tablename, yearstring, index_key, value_key)
-        for datestring, data in stats.items():
-            if data[index_key] is not None:
-                logging.error("%s : %d", datestring, data[index_key][stat_func_name])
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    unittest.main()
