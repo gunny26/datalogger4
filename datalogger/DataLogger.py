@@ -473,6 +473,32 @@ class DataLogger(object):
             calls.append((self.load_tsastats, (datestring, key)))
         return calls
 
+    def import_tsa(self, datestring, tsa):
+        """
+        store tsa given in parameter in global_cache to make the data available
+
+        usually this could be modfied existing tsa extended by some keys, or filtered or ...
+        the structure has to be predefined in meta data
+
+        the tsa can afterwards be accessed via normal frontends (web, api)
+
+        parameters:
+        tsa <TimeseriesArrayLazy> object
+        """
+        assert self.__index_keynames == tsa.index_keynames
+        assert self.__value_keynames == tuple(tsa.value_keynames)
+        cachedir = self.__get_cachedir(datestring)
+        cachefilename = os.path.join(cachedir, TimeseriesArrayLazy.get_dumpfilename(tsa.index_keynames))
+        if not os.path.isfile(cachefilename):
+            tsa.dump_split(cachedir)
+            tsastats = TimeseriesArrayStats(tsa)
+            tsastats.dump(cachedir)
+            qantile = QuantileArray(tsa, tsastats)
+            q_cachefilename = os.path.join(cachedir, "quantile.json")
+            qantile.dump(open(q_cachefilename, "wb"))
+        else:
+            raise StandardError("TSA Archive %s exists already in cache" % cachefilename)
+
     def load_tsa(self, datestring, filterkeys=None, index_pattern=None, timedelta=0, cleancache=False, validate=False):
         """
         caching version to load_tsa_raw
