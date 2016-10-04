@@ -15,7 +15,7 @@ logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.CRITICAL)
 # own modules
 from datalogger import DataLoggerWeb as DataLoggerWeb
-from commons import *
+#from commons import *
 
 
 ca_certs = "/etc/ssl/certs/ca-certificates.crt"  # Or wherever it lives.
@@ -32,7 +32,7 @@ def decode_ip(encoded):
 def main():
     project = "haproxy"
     tablename = "http_host"
-    datalogger = DataLoggerWeb(DATALOGGER_URL)
+    datalogger = DataLoggerWeb("https://datalogger-api.tirol-kliniken.cc/DataLogger")
     datestring = datalogger.get_last_business_day_datestring()
     # two days back for haproxy logs
     datestring = (datetime.date.today() - datetime.timedelta(int(2))).isoformat()
