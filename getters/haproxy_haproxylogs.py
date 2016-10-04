@@ -125,7 +125,7 @@ def main():
     """
     yesterday_datestring = (datetime.date.today() - datetime.timedelta(1)).isoformat()
     parser = argparse.ArgumentParser(description='generate TimeseriesArrays on local backend')
-    parser.add_argument('--url', default="http://srvmgdata1.tilak.cc/DataLogger", help="url of DataLogger Webapplication")
+    parser.add_argument('--url', default="https://datalogger-api.tirol-kliniken.cc/DataLogger", help="url of DataLogger Webapplication")
     parser.add_argument('--logdir', default="/data1/haproxy_daily/", help="directory where to find day sorted haproxylogs")
     parser.add_argument("-b", '--back', help="how many days back from now")
     parser.add_argument("-s", '--startdate', help="start date in isoformat YYY-MM-DD")
