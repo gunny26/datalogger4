@@ -9,6 +9,7 @@ import urllib3
 import time
 import datetime
 import requests
+import re
 import logging
 logging.basicConfig(level=logging.ERROR, format='%(asctime)-15s %(levelname)s %(filename)s:%(funcName)s:%(lineno)s %(message)s')
 logging.getLogger("requests").setLevel(logging.WARNING)
@@ -29,6 +30,21 @@ def decode_ip(encoded):
     ip_str = "%d.%d.%d.%d" % (int(encoded[0:2], 16) - 5, int(encoded[2:4], 16) - 5, int(encoded[4:6], 16) - 5, int(encoded[6:8], 16) - 5)
     return ip_str
 
+
+def generate_filter_vhost():
+    whitelist = ("pki1.tilak.at", "pki2.tilak.at")
+    blacklist = (
+        re.compile("(.*)\.tilak.ibk"),
+        re.compile("(.*)\.tilak.at"),
+        re.compile("(.*)\.uki.at"),
+        re.compile("(.*)\.uklibk.ac.at"),
+    )
+    def inner(vhost):
+        if vhost in whitelist:
+            return False
+        return any((rex.match(vhost) for rex in blacklist))
+    return inner
+
 def main():
     project = "haproxy"
     tablename = "http_host"
@@ -41,7 +57,11 @@ def main():
     index = 1
     out_data = []
     out_data.append(("index", "vhost", "domain", "fqdn", "ip", "ip_reverse_hostname", "status_code", "x_backend_server", "duration"))
+    filter_vhost = generate_filter_vhost()
     for vhost in vhosts:
+        if filter_vhost(vhost) is True:
+            logging.info("vhost %s filtered out", vhost)
+            continue
         ip = "unknown"
         hostname = "unknown"
         duration = -1.0
