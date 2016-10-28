@@ -49,7 +49,7 @@ def main():
     project = "haproxy"
     tablename = "http_host"
     datalogger = DataLoggerWeb("https://datalogger-api.tirol-kliniken.cc/DataLogger")
-    datestring = datalogger.get_last_business_day_datestring()
+    # datestring = datalogger.get_last_business_day_datestring()
     # two days back for haproxy logs
     datestring = (datetime.date.today() - datetime.timedelta(int(2))).isoformat()
     caches = datalogger.get_caches(project, tablename, datestring)
@@ -67,7 +67,7 @@ def main():
         duration = -1.0
         status_code = 0
         x_backend_server = None
-        domain = vhost.split(".")[1:]
+        domain = ".".join(vhost.split(".")[1:])
         try:
             fqdn = socket.getfqdn(vhost)
             ip = socket.gethostbyname(vhost)
@@ -77,6 +77,7 @@ def main():
         if (ip == "unknown") or (not ip.startswith("10.")):
             logging.info("could not resolv hostname %s , probably fake", vhost)
             continue
+        # could be obsolete
         elif (not ip.startswith("10.")):
             logging.info("%s is external, skipping", vhost)
             continue
