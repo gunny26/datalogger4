@@ -9,6 +9,7 @@ import urllib3
 import time
 import datetime
 import requests
+import re
 import logging
 logging.basicConfig(level=logging.ERROR, format='%(asctime)-15s %(levelname)s %(filename)s:%(funcName)s:%(lineno)s %(message)s')
 logging.getLogger("requests").setLevel(logging.WARNING)
@@ -29,11 +30,26 @@ def decode_ip(encoded):
     ip_str = "%d.%d.%d.%d" % (int(encoded[0:2], 16) - 5, int(encoded[2:4], 16) - 5, int(encoded[4:6], 16) - 5, int(encoded[6:8], 16) - 5)
     return ip_str
 
+
+def generate_filter_vhost():
+    whitelist = ("pki1.tilak.at", "pki2.tilak.at")
+    blacklist = (
+        re.compile("(.*)\.tilak.ibk"),
+        re.compile("(.*)\.tilak.at"),
+        re.compile("(.*)\.uki.at"),
+        re.compile("(.*)\.uklibk.ac.at"),
+    )
+    def inner(vhost):
+        if vhost in whitelist:
+            return False
+        return any((rex.match(vhost) for rex in blacklist))
+    return inner
+
 def main():
     project = "haproxy"
     tablename = "http_host"
     datalogger = DataLoggerWeb("https://datalogger-api.tirol-kliniken.cc/DataLogger")
-    datestring = datalogger.get_last_business_day_datestring()
+    # datestring = datalogger.get_last_business_day_datestring()
     # two days back for haproxy logs
     datestring = (datetime.date.today() - datetime.timedelta(int(2))).isoformat()
     caches = datalogger.get_caches(project, tablename, datestring)
@@ -41,13 +57,17 @@ def main():
     index = 1
     out_data = []
     out_data.append(("index", "vhost", "domain", "fqdn", "ip", "ip_reverse_hostname", "status_code", "x_backend_server", "duration"))
+    filter_vhost = generate_filter_vhost()
     for vhost in vhosts:
+        if filter_vhost(vhost) is True:
+            logging.info("vhost %s filtered out", vhost)
+            continue
         ip = "unknown"
         hostname = "unknown"
         duration = -1.0
         status_code = 0
         x_backend_server = None
-        domain = vhost.split(".")[1:]
+        domain = ".".join(vhost.split(".")[1:])
         try:
             fqdn = socket.getfqdn(vhost)
             ip = socket.gethostbyname(vhost)
@@ -57,6 +77,7 @@ def main():
         if (ip == "unknown") or (not ip.startswith("10.")):
             logging.info("could not resolv hostname %s , probably fake", vhost)
             continue
+        # could be obsolete
         elif (not ip.startswith("10.")):
             logging.info("%s is external, skipping", vhost)
             continue
