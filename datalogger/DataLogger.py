@@ -919,6 +919,41 @@ class DataLogger(object):
                 break
         return ret_data
 
+#    def get_tsastats_longtime(self, start, stop, index_key, value_key, stat_func_name):
+#        """
+#        walk from datestring start to datestring stop and return for every
+#        tsastat data of this particular day, the value for matching dataset
+#        index_key : value_keyname : stat_func_name
+#
+#        start <str> datestring of start
+#        stop <str> datestring of stop
+#        index_key <tuple> index key to use
+#        value_key <str> which value key to return
+#        stat_func_name <str> which statistical function to include in returned data
+#
+#        return:
+#        {
+#            datestring : value of statistical function
+#        }
+#        """
+#        # datalogger = DataLogger(BASEDIR, project, tablename)
+#        filterkeys = dict(zip(self.__index_keynames, index_key))
+#        logging.debug("build filterkeys %s", filterkeys)
+#        ret_data = {}
+#        for datestring in DataLogger.datewalker(start, stop):
+#            logging.debug("getting tsatstats for %s", monthstring)
+#            try:
+#                tsastats = self.load_tsastats(datestring, filterkeys=filterkeys)
+#                ret_data[datestring] = tsastats[key][value_key][stat_func_name]
+#            except DataLoggerRawFileMissing as exc:
+#                logging.exception(exc)
+#                logging.error("No Input File for datestring %s found, skipping this date", datestring)
+#            except DataLoggerLiveDataError as exc:
+#                logging.exception(exc)
+#                logging.error("Reading from live data is not allowed, skipping this data, and ending loop")
+#                break
+#        return ret_data
+
     @staticmethod
     def get_ts_for_datestring(datestring):
         """

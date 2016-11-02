@@ -12,6 +12,8 @@ import time
 import base64
 import gzip
 # own modules
+from datalogger import DataLoggerRawFileMissing as DataLoggerRawFileMissing
+from datalogger import DataLoggerLiveDataError as DataLoggerLiveDataError
 from datalogger import DataLogger as DataLogger
 from datalogger import TimeseriesStats as TimeseriesStats
 
@@ -64,7 +66,10 @@ def memcache(func):
         for key in MEMCACHE.keys():
             if (MEMCACHE[key]["ts"] + MAXAGE) < starttime:
                 logging.info("deleting aged cache entry for key %s", key)
-                del MEMCACHE[key]
+                try:
+                    del MEMCACHE[key]
+                except KeyError:
+                    pass # ignore race conditioned KeyError
         # is there an entry for this key
         if thiskey in MEMCACHE:
             if (MEMCACHE[thiskey]["ts"] + MAXAGE) > starttime:
@@ -125,33 +130,84 @@ class DataLoggerWeb(object):
         parameters = args.split("/")
         if len(parameters) > 0:
             logging.info("received parameters %s", parameters)
-            project = parameters[0]
-            if len(parameters) == 1:
-                return self.get_tablenames(project)
-            elif len(parameters) == 2:
-                tablename = parameters[1]
-                return self.get_meta([project, tablename])
-            elif len(parameters) == 3:
-                tablename = parameters[1]
-                datestring = parameters[2]
-                return self.get_caches([project, tablename, datestring])
-            elif len(parameters) >= 4:
-                tablename = parameters[1]
-                datestring = parameters[2]
-                function = parameters[3]
-                args = []
-                if len(parameters) > 4:
-                    args = parameters[4:]
-                if function == "tsa":
-                    return self.get_tsa(project, tablename, datestring, args)
-                elif function == "ts":
-                    return self.get_ts(project, tablename, datestring, args)
-                elif (function == "tsastats") or (function == "tsastat"):
-                    return self.get_tsastats(project, tablename, datestring, args)
-                elif function == "quantile":
-                    return self.get_quantile(project, tablename, datestring, args)
+            if parameters[0] == "sr":
+                # hook to implement Special Reports
+                # htey usually dont need any parameters other than a
+                # datestring
+                # sr/<datestring>/<report-name>
+                report_name = parameters[1]
+                if report_name == "vicenter_unused_cpu_cores":
+                    return self.sr_vicenter_unused_cpu_cores(parameters[2:])
+                elif report_name == "vicenter_unused_mem":
+                    return self.sr_vicenter_unused_mem(parameters[2:])
+                elif report_name == "hrstorageram_unused":
+                    return self.sr_hrstorageram_unused(parameters[2:])
+                elif report_name == "hrstorage_unused":
+                    return self.sr_hrstorage_unused(parameters[2:])
+                else:
+                    web.notfound()
+                    return
+            else:
+                # ok this lookes like /<project-name>/...
+                project = parameters[0]
+                if len(parameters) == 1:
+                    # ok this is /<project-name>
+                    return self.get_tablenames(project)
+                elif len(parameters) == 2:
+                    # ok this is /<project-name>/<tablename>
+                    tablename = parameters[1]
+                    return self.get_meta([project, tablename])
+                elif len(parameters) == 3:
+                    # ok this is
+                    # /<project-name>/<tablename>/<datestring>
+                    tablename = parameters[1]
+                    datestring = parameters[2]
+                    return self.get_caches([project, tablename, datestring])
+                elif len(parameters) >= 4:
+                    # ok this looks like
+                    # /<project-name>/<tablename>/<datestring>/...
+                    tablename = parameters[1]
+                    datestring = parameters[2]
+                    function = parameters[3]
+                    if len(datestring) == 7:
+                        # datestring is a monthstring, only 7 charecters
+                        # long
+                        args = []
+                        if len(parameters) > 4:
+                            args = parameters[4:]
+                        if function == "ts":
+                           return self.get_monthly_ts(project, tablename, datestring, args)
+                        else:
+                            web.notfound()
+                    elif len(datestring) == 10:
+                        # valid datestring, 10 characters long
+                        args = []
+                        if len(parameters) > 4:
+                            # cut the remaining arguments
+                            args = parameters[4:]
+                        if function == "tsa":
+                            return self.get_tsa(project, tablename, datestring, args)
+                        elif function == "ts":
+                            return self.get_ts(project, tablename, datestring, args)
+                        elif function == "tsstat":
+                            return self.get_tsstat(project, tablename, datestring, args)
+                        elif (function == "tsastats") or (function == "tsastat"):
+                            return self.get_tsastats(project, tablename, datestring, args)
+                        elif function == "quantile":
+                            return self.get_quantile(project, tablename, datestring, args)
+                        elif function == "scatter":
+                            return self.get_scatter(project, tablename, datestring, args)
+                        web.notfound()
+                    elif datestring == "lt":
+                        # longtime data
+                        # TODO seems to be much overloaded
+                        return self.get_lt_ts(project, tablename, parameters[3:])
+                    else:
+                        # crap, this should not happen
+                        web.internalerror()
         else:
-            logging.debug("unknown method called %s", method)
+            logging.debug("unknown call %s", parameters)
+            web.notfound()
             return "unknown call %s" % parameters
 
     def POST(self, args):
@@ -301,11 +357,10 @@ class DataLoggerWeb(object):
             logging.error(caches)
         return json.dumps(caches)
 
-    def get_tsa(self, args):
+    def get_tsa(self, project, tablename, datestring, args):
         """
         return exported TimeseriesArray json formatted
         """
-        project, tablename, datestring = args
         datalogger = DataLogger(basedir, project, tablename)
         tsa = datalogger[datestring]
         web.header('Content-type', 'text/html')
@@ -386,6 +441,31 @@ class DataLoggerWeb(object):
         #outbuffer = json.dumps(tuple(tsa.export()))
         #return outbuffer
 
+    def get_tsstat(self, project, tablename, datestring, args):
+        """
+        return exported TimeseriesStats data
+
+        [
+            list of index_keys,
+            list of value_keys,
+            list of [
+                index_key : tsstat_dictionary
+                ]
+        ]
+
+        if optional args is given, only one specific statistical function is returned
+
+        returns:
+        json(tsastats_dict)
+        """
+        logging.info("optional arguments received: %s", args)
+        if len(args) > 0:
+            key_str = args[0]
+            key = tuple([unicode(key_value) for key_value in eval(base64.b64decode(key_str))])
+            datalogger = DataLogger(basedir, project, tablename)
+            tsastats = datalogger.load_tsastats(datestring)
+            return json.dumps(tsastats[key].stats)
+
     def get_tsastats(self, project, tablename, datestring, args):
         """
         return exported TimeseriesArrayStats json formatted
@@ -440,232 +520,62 @@ class DataLoggerWeb(object):
             return json.dumps(ret_data)
         return quantile.to_json()
 
-    def get_chart_data_ungrouped(self, args):
+    def get_monthly_ts(self, project, tablename, monthstring, args):
         """
-        get values from RAW Archive
+        get monthly statistical values
 
-        parameters:
-        /<str>project/<str>tablename/<str>datestring/<str>key/<str>value_keys/<str>datetype/<str>group_str
-
-        keyids=hostname:srvszp2orb.tilak.cc means
-        this is only useful if keyids are unique
-
-        return data like this:
-        [
-            {
-                name: "name of this series" usually this is the counter name
-                data : [[ts, value], ...]
-            },
-            ...
-        ]
+        TODO: should be combined with get_lt_ts
         """
-        assert len(args) == 7
-        project, tablename, datestring, keys_str, value_keys_str, datatype_str, group_str = args
-        # key_str should be a tuple string, convert to unicode tuple
-        keys = tuple([unicode(key_value) for key_value in eval(base64.b64decode(keys_str))])
-        value_keys = ()
-        if json.loads(value_keys_str) is not None:
-            value_keys = tuple(json.loads(value_keys_str))
-        datatype = json.loads(datatype_str)
-        group_by = ()
-        if json.loads(group_str) is not None:
-            group_by = (json.loads(group_str),)
-        logging.info("project : %s", project)
-        logging.info("tablename : %s", tablename)
-        logging.info("datestring : %s", datestring)
-        logging.info("keys : %s", keys)
-        logging.info("value_keys : %s", value_keys)
-        logging.info("datatype : %s", datatype)
-        logging.info("group_by : %s", group_by)
-        datalogger = DataLogger(basedir, project, tablename)
-        keys_dict = dict(zip(datalogger.index_keynames, keys))
-        # build filter if any group_by is given
-        filterkeys = keys_dict # default
-        if len(group_by) > 0:
-            filterkeys = {}
-            for key in group_by:
-                filterkeys[key] = keys_dict[key]
-        logging.info("useing filterkeys: %s", filterkeys)
-        tsa = datalogger.load_tsa(datestring, filterkeys=filterkeys)
-        logging.info("got tsa with %d keys", len(tsa))
-        # is there something to calculate, lets do it
-        if datatype != u"absolute":
-            new_value_keys = []
-            for value_key in value_keys:
-                new_value_key = None
-                if datatype == "derive":
-                    new_value_key = "%s_d" % value_key
-                    logging.info("deriving %s to %s", value_key, new_value_key)
-                    tsa.add_derive_col(value_key, new_value_key)
-                elif datatype == "per_s":
-                    new_value_key = "%s_s" % value_key
-                    logging.info("deriving %s to %s", value_key, new_value_key)
-                    tsa.add_per_s_col(value_key, new_value_key)
-                tsa.remove_col(value_key)
-                new_value_keys.append(new_value_key)
-            value_keys = new_value_keys
-        #logging.info(tsa.get_value_keys())
-        # grouping stuff if necessary
-        data = None # holds finally calculated data
-        stats = None
-        if len(group_by) > 0:
-            logging.info("generating new key for left possible keys in grouped tsa")
-            key_dict = dict(zip(datalogger.index_keynames, keys))
-            new_key = tuple((key_dict[key] for key in group_by))
-            logging.info("key after grouping would be %s", new_key)
-            logging.info("grouping tsa by %s", group_by)
-            new_tsa = datalogger.group_by(datestring, tsa, group_by, group_func=lambda a, b: a + b)
-            #new_tsa = tsa.get_group_by_tsa(group_by, group_func=lambda a: sum(a))
-            tsa = new_tsa
-            data = tsa[new_key].dump_dict()
-            stats = tsa[new_key].stats.htmltable()
+        index_key_enc = None
+        value_keyname = None
+        stat_func_name = "avg"
+        if len(args) == 2:
+            index_key_enc, value_keyname = args
         else:
-            data = tsa[keys].dump_dict()
-            stats = tsa[keys].stats.htmltable()
-        result = {
-                "stats" : stats,
-                "data" : [],
-                }
-        # holds return data
-        logging.info("data keys : %s", data[data.keys()[0]].keys())
-        for value_key in value_keys:
-            # ist important to sort by timestamp, to not confuse
-            # highcharts
-            result["data"].append(
-                {
-                    "name" : value_key,
-                    "data" : tuple(((ts * 1000, row_dict[value_key]) for ts, row_dict in sorted(data.items())))
-                }
-            )
-        return json.dumps(result)
-
-    def get_hc_daily_data(self, args):
-        """
-        get values(min 1) from TimeseriesArray to use for highcharts graphing
-
-        parameters:
-        /project/tablename/datestring/index_key/value_keynames/index_keyname
-
-        <b>poject</b> <str> defines which project to use
-        <b>tablename</b> <str> defines which tablename to use
-        <b>datestring</b> <str> in form of YYYY-MM-DD to define whih day to use
-        <b>index_key</b> base64 encoded tuple, defines which Timeseries to use, ex. (u'srvcl14db2.tilak.cc', u'DB2', u'ablagsys', u'data only')
-        <b>value_keynames</b> json encoded list of value_keynames to show in graph
-            each value_keyname will be a separate highchart line
-        <b>index_keynam</b> json encoded <str> or null
-            if given, the data will be grouped on this given index_keyname
-            if hostname is given the above example will be gruped by hostname=u'srvcl14db2.tilak.cc'
-            and all possible Timeseries will be summed up
-
-        return data json encoded like this
-        [
-            {   name : "timeseries value_name 1",
-                data : [[ts, value], ...]
-            },
-            {   name : "timeseries value name 2",
-                data : [[ts, value], ...]
-            }
-            ...
-        ]
-        this structure could already be used in highcharts.data
-        """
-        assert len(args) == 6
-        project, tablename, datestring, index_key_b64, value_keynames_str, index_keyname_str = args
-        # key_str should be a tuple string, convert to unicode tuple
-        index_key = tuple([unicode(key_value) for key_value in eval(base64.b64decode(index_key_b64))])
-        value_keynames = ()
-        if json.loads(value_keynames_str) is not None:
-            value_keynames = tuple(json.loads(value_keynames_str))
-        index_keyname = ()
-        if json.loads(index_keyname_str) is not None:
-            index_keyname = (json.loads(index_keyname_str),)
-        logging.info("project : %s", project)
-        logging.info("tablename : %s", tablename)
-        logging.info("datestring : %s", datestring)
-        logging.info("index_key : %s", index_key)
-        logging.info("value_keynames : %s", value_keynames)
-        logging.info("index_keyname : %s", index_keyname)
-        datalogger = DataLogger(basedir, project, tablename)
-        index_key_dict = dict(zip(datalogger.index_keynames, index_key))
-        # build filter if any group_by is given
-        filterkeys = index_key_dict # default
-        if len(index_keyname) > 0:
-            filterkeys = {}
-            for key in index_keyname:
-                filterkeys[key] = index_key_dict[key]
-        logging.info("using filterkeys: %s", filterkeys)
-        tsa = datalogger.load_tsa(datestring, filterkeys=filterkeys)
-        logging.info("got tsa with %d keys", len(tsa))
-        # grouping stuff if necessary
-        data = None # holds finally calculated data
-        stats = None # holds tsstats informations
-        if len(index_keyname) > 0:
-            # grouping by key named
-            logging.info("generating new key for left possible keys in grouped tsa")
-            new_key = tuple((index_key_dict[key] for key in index_keyname))
-            logging.info("key after grouping would be %s", new_key)
-            logging.info("grouping tsa by %s", index_keyname)
-            new_tsa = datalogger.group_by(datestring, tsa, index_keyname, group_func=lambda a, b: a + b)
-            tsa = new_tsa
-            data = tsa[new_key].dump_dict()
-            stats = tsa[new_key].stats.get_stats()
-        else:
-            # not grouping, simple
-            data = tsa[index_key].dump_dict()
-            stats = tsa[index_key].stats.get_stats()
-        # holds return data
-        logging.info("data keys : %s", data[data.keys()[0]].keys())
-        # get in highcharts shape
-        result = {
-            "stats" : stats,
-            "data" : [], # holds highchart data
-        }
-        for value_keyname in value_keynames:
-            # its important to sort by timestamp, to not confuse
-            # highcharts
-            result["data"].append(
-                {
-                    "name" : value_keyname,
-                    "data" : tuple(((ts * 1000, row_dict[value_keyname]) for ts, row_dict in sorted(data.items())))
-                }
-            )
-        return json.dumps(result)
-
-    def get_longtime_data(self, args):
-        """
-        get values from RAW Archive
-
-        parameters:
-        /<str>project/<str>tablename/<str>datestring/<str>key/<str>value_keys
-
-        keyids=hostname:srvszp2orb.tilak.cc means
-        this is only useful if keyids are unique
-
-        return data like this:
-        [
-            {
-                name: "name of this series" usually this is the counter name
-                data : [[ts, value], ...]
-            },
-            ...
-        ]
-        """
-        assert len(args) == 5
-        project, tablename, monthstring, keys_str, value_key = args
-        if len(monthstring) > 7:
+            index_key_enc, value_keyname, stat_func_name = args
+        if len(monthstring) != 7:
+            web.internalerror()
             return "monthstring, has to be in YYYY-MM format"
         # key_str should be a tuple string, convert to unicode tuple
-        keys = tuple([unicode(key_value) for key_value in eval(base64.b64decode(keys_str))])
-        logging.info("project : %s", project)
-        logging.info("tablename : %s", tablename)
-        logging.info("monthstring : %s", monthstring)
-        logging.info("keys : %s", keys)
-        logging.info("value_keys : %s", value_key)
+        index_key = tuple([unicode(key_value) for key_value in eval(base64.b64decode(index_key_enc))])
+        logging.info("index_key : %s", index_key)
+        logging.info("value_keyname : %s", value_keyname)
+        logging.info("stat_func_name: %s", stat_func_name)
         datalogger = DataLogger(basedir, project, tablename)
-        data = datalogger.get_tsastats_longtime_hc(monthstring, keys, value_key)
-        #logging.info("got data: %s", data)
-        hc_data = [{"name" : funcname, "data" : data[funcname]} for funcname in data.keys()]
-        return json.dumps(hc_data)
+        filterkeys = dict(zip(datalogger.index_keynames, index_key))
+        ret_data = []
+        for datestring in datalogger.monthwalker(monthstring):
+            logging.debug("getting tsatstats for %s", monthstring)
+            try:
+                tsastats = datalogger.load_tsastats(datestring, filterkeys=filterkeys)
+                ret_data.append([datestring, tsastats[index_key][value_keyname][stat_func_name]])
+            except DataLoggerRawFileMissing as exc:
+                logging.error("No Input File for datestring %s found, skipping this date", datestring)
+            except DataLoggerLiveDataError as exc:
+                logging.error("Reading from live data is not allowed, skipping this data, and ending loop")
+                break
+        return json.dumps(ret_data)
+
+    def get_lt_ts(self, project, tablename, args):
+        """
+        get longtime statistical values
+        """
+        # datestringStart + "/" + datestringStop + "/" + Base64.encode(indexKey) + "/" + valueKeyname + "/" + statFuncName
+        start, stop, index_key_enc, value_keyname, stat_func_name = args
+        index_key = tuple([unicode(key_value) for key_value in eval(base64.b64decode(index_key_enc))])
+        datalogger = DataLogger(basedir, project, tablename)
+        filterkeys = dict(zip(datalogger.index_keynames, index_key))
+        ret_data = []
+        for datestring in datalogger.datewalker(start, stop):
+            try:
+                tsastats = datalogger.load_tsastats(datestring, filterkeys=filterkeys)
+                ret_data.append([datestring, tsastats[index_key][value_keyname][stat_func_name]])
+            except DataLoggerRawFileMissing as exc:
+                logging.error("No Input File for datestring %s found, skipping this date", datestring)
+            except DataLoggerLiveDataError as exc:
+                logging.error("Reading from live data is not allowed, skipping this data, and ending loop")
+                break
+        return json.dumps(ret_data)
 
     def upload_raw_file(self, args):
         """
@@ -710,7 +620,7 @@ class DataLoggerWeb(object):
 
     @staticmethod
     @calllogger
-    def get_scatter_data(args):
+    def get_scatter(project, tablename, datestring, args):
         """
         gets scatter plot data of two value_keys of the same tablename
 
@@ -722,8 +632,7 @@ class DataLoggerWeb(object):
         returns:
         json(highgraph data)
         """
-        assert len(args) == 6
-        project, tablename, datestring, value_key1, value_key2, stat_func_name = args
+        value_key1, value_key2, stat_func_name = args
         logging.info("project : %s", project)
         logging.info("tablename : %s", tablename)
         logging.info("datestring : %s", datestring)
@@ -735,7 +644,7 @@ class DataLoggerWeb(object):
         for key, tsstat in tsastats.items():
             hc_scatter_data.append({
                 "name" : str(key),
-                "data" : ((tsstat[value_key1]["avg"], tsstat[value_key2]["avg"]), )
+                "data" : ((tsstat[value_key1][stat_func_name], tsstat[value_key2][stat_func_name]), )
             })
         return json.dumps(hc_scatter_data)
 
@@ -811,7 +720,8 @@ class DataLoggerWeb(object):
         special report to get a report of unused SNMP Host Storage
         works only with snmp/hrStorageTable
         """
-        datestring, storage_type = args[:2]
+        datestring = args[0]
+        storage_type = "hrStorageFixedDisk"
         datalogger = DataLogger(basedir, "snmp", "hrStorageTable")
         tsastat = datalogger.load_tsastats(datestring)
         data = []

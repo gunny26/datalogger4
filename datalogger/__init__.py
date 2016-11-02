@@ -36,7 +36,11 @@ from datalogger.Quantile import QuantileArray as QuantileArray
 from datalogger.Quantile import Quantile as Quantile
 from datalogger.CorrelationMatrix import CorrelationMatrixArray as CorrelationMatrixArray
 from datalogger.CorrelationMatrixTime import CorrelationMatrixTime as CorrelationMatrixTime
-from datalogger.CustomExceptions import *
+# custom exceptions
+from datalogger.CustomExceptions import TimeseriesEmptyError as TimeseriesEmptyError
+from datalogger.CustomExceptions import DataLoggerRawFileMissing as DataLoggerRawFileMissing
+from datalogger.CustomExceptions import DataLoggerLiveDataError as DataLoggerLiveDataError
+from datalogger.CustomExceptions import DataLoggerFilenameDecodeError as DataLoggerFilenameDecodeError
 # classes to use with webapplication API
 from datalogger.DataLoggerWeb import DataLoggerWeb as DataLoggerWeb
 from datalogger.DataLoggerRest import DataLoggerRest as DataLoggerRest
