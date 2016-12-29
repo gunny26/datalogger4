@@ -12,17 +12,28 @@ import time
 import base64
 import gzip
 # own modules
+import tk_web
 from datalogger import DataLoggerRawFileMissing as DataLoggerRawFileMissing
 from datalogger import DataLoggerLiveDataError as DataLoggerLiveDataError
 from datalogger import DataLogger as DataLogger
 from datalogger import TimeseriesStats as TimeseriesStats
 
 urls = (
+    "/oauth2/v1/", "tk_web.IdpConnector",
     "/(.*)", "DataLoggerWeb",
     )
 
 basedir = "/var/rrd"
 application = web.application(urls, globals()).wsgifunc()
+CONFIG = tk_web.TkWebConfig("~/DataLoggerWebApp.json")
+# prepare IDP Connector to use actual CONFIG
+tk_web.IdpConnector.CONFIG = CONFIG
+tk_web.IdpConnector.web = web
+# some decorators, use it as needed
+authenticator = tk_web.std_authenticator(web, CONFIG)
+calllogger = tk_web.std_calllogger(web, CONFIG)
+outformat = tk_web.std_jsonout(web, CONFIG)
+
 #handler = logging.handlers.RotatingFileHandler(
 #    os.path.join(basedir, "/var/log/apache2/datalogger.log"),
 #    maxBytes=10 * 1024 * 1024,
