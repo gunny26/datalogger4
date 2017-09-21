@@ -189,7 +189,7 @@ def datatype_gauge32(times, series):
     return new_series
 
 
-class DataFormatError(StandardError):
+class DataFormatError(Exception):
     """raised if format does not match"""
     pass
 

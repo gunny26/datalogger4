@@ -71,14 +71,14 @@ if __name__ == "__main__":
     basedir = "/var/rrd"
     yesterday_datestring = (datetime.date.today() - datetime.timedelta(1)).isoformat()
     parser = argparse.ArgumentParser(description='generate TimeseriesArrays on local backend')
-    parser.add_argument('--basedir', default="/var/rrd", help="basedirectory of datalogger data on local machine")
+    parser.add_argument('--basedir', default="/var/rrd", help="basedirectory of datalogger data on local machine (default: %(default)s)")
     parser.add_argument("-s", '--startdate', help="start date in isoformat YYYY-MM-DD")
     parser.add_argument("-e", '--enddate', default=yesterday_datestring, help="stop date in isoformat YYYY-MM-DD")
     parser.add_argument("-q", '--quiet', action='store_true', help="set to loglevel ERROR")
     parser.add_argument("-v", '--verbose', action='store_true', help="set to loglevel DEBUG")
     parser.add_argument("-p", '--project', help="process only this project name")
     parser.add_argument("-t", '--tablename', help="process only this tablename")
-    parser.add_argument("-a", '--archivedir', default="/var/rrd/global_cache/raw_archives", help="directory to archive old raw data to")
+    parser.add_argument("-a", '--archivedir', default="/var/datalogger-archiv", help="directory to archive old raw data to (default: %(default)s)")
     parser.add_argument("--profile", action="store_true", help="use cProfile to start main")
     args = parser.parse_args()
     if args.quiet is True:

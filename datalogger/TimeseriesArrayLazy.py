@@ -320,7 +320,7 @@ class TimeseriesArrayLazy(object):
                             logging.exception(exc)
                             logging.error("error at operation group_func(%s, %s)", ret_data[subkey][valuekey], stat_data[valuekey])
                     ret_data[subkey]["count"] += 1
-            except StandardError as exc:
+            except Exception as exc:
                 logging.exception(exc)
         return ret_data
 
@@ -604,7 +604,7 @@ class TimeseriesArrayLazy(object):
             filehandle = open(infile, "rb")
             data = json.load(filehandle)
             filehandle.close()
-        except StandardError as exc:
+        except Exception as exc:
             logging.exception(exc)
             logging.error("Something went wrong while loading json data from %s", tsa_filename)
             raise exc

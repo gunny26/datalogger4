@@ -326,7 +326,7 @@ class TimeseriesArrayStats(object):
         try:
             fh = open(infilename, "rb")
             indata = json.load(fh)
-        except StandardError as exc:
+        except Exception as exc:
             logging.exception(exc)
             logging.error("something went wrong while loading %s", infilename)
             raise exc

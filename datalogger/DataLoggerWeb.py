@@ -98,7 +98,7 @@ class DataLoggerWeb(object):
             raw = res.read()
         #logging.debug("Raw Output: %s", raw)
             return raw
-        except StandardError as exc:
+        except Exception as exc:
             logging.exception(exc)
             logging.error("Error occured calling %s", url)
             raise exc
@@ -128,7 +128,7 @@ class DataLoggerWeb(object):
                 except ValueError as exc:
                     logging.exception(exc)
             return json.loads(data)
-        except StandardError as exc:
+        except Exception as exc:
             logging.exception(exc)
             logging.error("Error occured calling %s", url)
             raise exc

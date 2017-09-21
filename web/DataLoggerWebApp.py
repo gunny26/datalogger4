@@ -20,12 +20,13 @@ from datalogger import TimeseriesStats as TimeseriesStats
 
 urls = (
     "/oauth2/v1/", "tk_web.IdpConnector",
-    "/(.*)", "DataLoggerWeb",
+    "/(.*)", "DataLoggerWebApp",
     )
 
-basedir = "/var/rrd"
 application = web.application(urls, globals()).wsgifunc()
+
 CONFIG = tk_web.TkWebConfig("~/DataLoggerWebApp.json")
+basedir = CONFIG["BASEDIR"]
 # prepare IDP Connector to use actual CONFIG
 tk_web.IdpConnector.CONFIG = CONFIG
 tk_web.IdpConnector.web = web
@@ -41,26 +42,26 @@ outformat = tk_web.std_jsonout(web, CONFIG)
 #logging.getLogger("").addHandler(handler)
 #logging.getLogger("").setLevel(level=logging.DEBUG)
 
-def calllogger(func):
-    """
-    decorator to log and measure call durations
-    """
-    def inner(*args, **kwds):
-        starttime = time.time()
-        call_str = "%s(%s, %s)" % (func.__name__, args, kwds)
-        logging.debug("calling %s", call_str)
-        try:
-            ret_val = func(*args, **kwds)
-            logging.debug("duration of call %s : %s", call_str, (time.time() - starttime))
-            return ret_val
-        except StandardError as exc:
-            logging.exception(exc)
-            logging.error("call to %s caused StandardError", call_str)
-            return "call to %s caused StandardError" % call_str
-    # set inner function __name__ and __doc__ to original ones
-    inner.__name__ = func.__name__
-    inner.__doc__ = func.__doc__
-    return inner
+#def calllogger(func):
+#    """
+#    decorator to log and measure call durations
+#    """
+#    def inner(*args, **kwds):
+#        starttime = time.time()
+#        call_str = "%s(%s, %s)" % (func.__name__, args, kwds)
+#        logging.debug("calling %s", call_str)
+#        try:
+#            ret_val = func(*args, **kwds)
+#            logging.debug("duration of call %s : %s", call_str, (time.time() - starttime))
+#            return ret_val
+#        except StandardError as exc:
+#            logging.exception(exc)
+#            logging.error("call to %s caused StandardError", call_str)
+#            return "call to %s caused StandardError" % call_str
+#    # set inner function __name__ and __doc__ to original ones
+#    inner.__name__ = func.__name__
+#    inner.__doc__ = func.__doc__
+#    return inner
 
 MEMCACHE = {}
 MAXAGE = 300
@@ -68,15 +69,16 @@ def memcache(func):
     """
     decorator to cache return values according to used function parameters
     """
+    logger = logging.getLogger("MemCache")
     def inner(*args, **kwds):
         starttime = time.time()
         thiskey = unicode((func.__name__, args, kwds))
-        logging.info("number of keys in cache %d", len(MEMCACHE.keys()))
-        logging.info("key to look for %s", thiskey)
+        logger.info("number of keys in cache %d", len(MEMCACHE.keys()))
+        logger.info("key to look for %s", thiskey)
         # get rid of old cache entries
         for key in MEMCACHE.keys():
             if (MEMCACHE[key]["ts"] + MAXAGE) < starttime:
-                logging.info("deleting aged cache entry for key %s", key)
+                logger.info("deleting aged cache entry for key %s", key)
                 try:
                     del MEMCACHE[key]
                 except KeyError:
@@ -84,7 +86,7 @@ def memcache(func):
         # is there an entry for this key
         if thiskey in MEMCACHE:
             if (MEMCACHE[thiskey]["ts"] + MAXAGE) > starttime:
-                logging.info("returning from cache for key %s", thiskey)
+                logger.info("returning from cache for key %s", thiskey)
                 return MEMCACHE[thiskey]["data"]
         #logging.info("createing new cache entry for %s", key)
         try:
@@ -96,7 +98,7 @@ def memcache(func):
             }
             return ret_val
         except StandardError as exc:
-            logging.exception(exc)
+            logger.exception(exc)
     # set inner function __name__ and __doc__ to original ones
     inner.__name__ = func.__name__
     inner.__doc__ = func.__doc__
@@ -104,12 +106,21 @@ def memcache(func):
 
 
 
-class DataLoggerWeb(object):
+class DataLoggerWebApp(object):
     """retrieve Data from RRD Archive"""
 
     def __init__(self):
         """__init__"""
+        self.logger = logging.getLogger("DataLoggerWebApp")
 
+    def OPTIONS(self, args):
+        self.logger.info("OPTIONS called")
+        web.header('Access-Control-Allow-Origin', '*')
+        web.header('Access-Control-Allow-Credentials', 'true')
+        web.header('Access-Control-Allow-Headers', 'x-authkey')
+        web.header('Access-Control-Allow-Headers', 'x-apikey')
+
+    @authenticator
     def GET(self, args):
         """
         GET Multiplexer function, according to first argument in URL
@@ -129,10 +140,8 @@ class DataLoggerWeb(object):
         /<projectname>/<tablename>/quantile/<datestring> -> get quantile of this datestring
         /<projectname>/<tablename>/tsastat/<datestring> -> get tsastat of this datestring
         """
-        web.header('Access-Control-Allow-Origin', '*')
-        web.header('Access-Control-Allow-Credentials', 'true')
         web.header("Content-Type", "application/json")
-        logging.info("received args %s", args)
+        self.logger.info("received args %s", args)
         if args == u"":
             return self.get_projects()
         # strip trailing slash
@@ -140,7 +149,7 @@ class DataLoggerWeb(object):
             args = args[:-1]
         parameters = args.split("/")
         if len(parameters) > 0:
-            logging.info("received parameters %s", parameters)
+            self.logger.info("received parameters %s", parameters)
             if parameters[0] == "sr":
                 # hook to implement Special Reports
                 # htey usually dont need any parameters other than a
@@ -217,7 +226,7 @@ class DataLoggerWeb(object):
                         # crap, this should not happen
                         web.internalerror()
         else:
-            logging.debug("unknown call %s", parameters)
+            self.logger.debug("unknown call %s", parameters)
             web.notfound()
             return "unknown call %s" % parameters
 
@@ -234,7 +243,7 @@ class DataLoggerWeb(object):
 
         """
         method = args.split("/")[0]
-        logging.info("method %s should be called", method)
+        self.logger.info("method %s should be called", method)
         #web.header('Access-Control-Allow-Origin', '*')
         #web.header('Access-Control-Allow-Credentials', 'true')
         method_args = args.split("/")[1:] # all without method name
@@ -265,14 +274,13 @@ class DataLoggerWeb(object):
                 outbuffer.append(doc.replace("\n", "<br>"))
             outbuffer.append("</div>")
         except AttributeError as exc:
-            logging.info(exc)
+            self.logger.info(exc)
             outbuffer.append(str(exc))
         outbuffer.append("</body></html>")
         return "\n".join(outbuffer)
 
-    @staticmethod
     @memcache
-    def get_projects():
+    def get_projects(self):
         """
         get available projects for this Datalogger Server
 
@@ -289,9 +297,8 @@ class DataLoggerWeb(object):
         }
         return json.dumps(ret_data)
 
-    @staticmethod
     @memcache
-    def get_tablenames(project):
+    def get_tablenames(self, project):
         """
         get available tablenames, for one particular project
         uses directory listing in raw subdirectory for this purpose
@@ -304,9 +311,8 @@ class DataLoggerWeb(object):
         """
         return json.dumps(DataLogger.get_tablenames(basedir, project))
 
-    @staticmethod
     @memcache
-    def get_meta(args):
+    def get_meta(self, args):
         """
         get available tablenames, for one particular project
         uses directory listing in raw subdirectory for this purpose
@@ -325,8 +331,7 @@ class DataLoggerWeb(object):
         ret_data["value_keynames"] = ret_data["value_keynames"].keys()
         return json.dumps(datalogger.meta)
 
-    @staticmethod
-    def get_caches(args):
+    def get_caches(self, args):
         """
         return dictionary of caches available for this project/tablename/datestring combination
 
@@ -364,8 +369,8 @@ class DataLoggerWeb(object):
         try:
             caches = datalogger.get_caches(datestring)
         except StandardError as exc:
-            logging.exception(exc)
-            logging.error(caches)
+            self.logger.exception(exc)
+            self.logger.error(caches)
         return json.dumps(caches)
 
     def get_tsa(self, project, tablename, datestring, args):
@@ -394,27 +399,27 @@ class DataLoggerWeb(object):
             "max" : max,
             "sum" : lambda a, b: a+b,
         }
-        logging.info(args)
+        self.logger.info(args)
         project, tablename, datestring, groupkeys_enc, group_func_name, index_pattern_enc = args
         groupkeys_dec = eval(base64.b64decode(groupkeys_enc)) # should be tuple
         logging.info("groupkeys_dec: %s", groupkeys_dec)
         index_pattern = base64.b64decode(index_pattern_enc)
         if index_pattern == "None":
             index_pattern = None
-        logging.info("index_pattern: %s", index_pattern)
+        self.logger.info("index_pattern: %s", index_pattern)
         assert group_func_name in group_funcs.keys()
         datalogger = DataLogger(basedir, project, tablename)
         tsa = None
         # gete data
         if groupkeys_dec is not None:
-            logging.info("groupkeys is %s", groupkeys_dec)
+            self.logger.info("groupkeys is %s", groupkeys_dec)
             groupkeys = tuple([unicode(key_value) for key_value in groupkeys_dec])
             tsa1 = datalogger.load_tsa(datestring, index_pattern=index_pattern)
             tsa = datalogger.group_by(datestring, tsa1, groupkeys, group_funcs[group_func_name])
         else:
-            logging.info("groupkeys is None, fallback to get ungrouped tsa")
+            self.logger.info("groupkeys is None, fallback to get ungrouped tsa")
             tsa = datalogger.load_tsa(datestring, index_pattern=index_pattern)
-        logging.info(tsa.keys()[0])
+        self.logger.info(tsa.keys()[0])
         web.header('Content-type', 'text/html')
         # you must not set this option, according to
         # http://stackoverflow.com/questions/11866333/ioerror-when-trying-to-serve-file
@@ -436,12 +441,12 @@ class DataLoggerWeb(object):
         tsa exported in JSON format
         """
         key_str = args[0]
-        logging.info("base64encoded index_key: %s", key_str)
+        self.logger.info("base64encoded index_key: %s", key_str)
         key = tuple([unicode(key_value) for key_value in eval(base64.b64decode(key_str))])
-        logging.info("project : %s", project)
-        logging.info("tablename : %s", tablename)
-        logging.info("datestring : %s", datestring)
-        logging.info("key : %s", key)
+        self.logger.info("project : %s", project)
+        self.logger.info("tablename : %s", tablename)
+        self.logger.info("datestring : %s", datestring)
+        self.logger.info("key : %s", key)
         datalogger = DataLogger(basedir, project, tablename)
         key_dict = dict(zip(datalogger.index_keynames, key))
         tsa = datalogger.load_tsa(datestring, filterkeys=key_dict)
@@ -469,7 +474,7 @@ class DataLoggerWeb(object):
         returns:
         json(tsastats_dict)
         """
-        logging.info("optional arguments received: %s", args)
+        self.logger.info("optional arguments received: %s", args)
         if len(args) > 0:
             key_str = args[0]
             key = tuple([unicode(key_value) for key_value in eval(base64.b64decode(key_str))])
@@ -494,7 +499,7 @@ class DataLoggerWeb(object):
         returns:
         json(tsastats_dict)
         """
-        logging.info("optional arguments received: %s", args)
+        self.logger.info("optional arguments received: %s", args)
         datalogger = DataLogger(basedir, project, tablename)
         tsastats = datalogger.load_tsastats(datestring)
         if len(args) > 0:
@@ -517,7 +522,7 @@ class DataLoggerWeb(object):
         returns:
         json(quantile_dict)
         """
-        logging.info("optional arguments received: %s", args)
+        self.logger.info("optional arguments received: %s", args)
         datalogger = DataLogger(basedir, project, tablename)
         quantile = datalogger.load_quantile(datestring)
         if len(args) > 0:
@@ -549,21 +554,21 @@ class DataLoggerWeb(object):
             return "monthstring, has to be in YYYY-MM format"
         # key_str should be a tuple string, convert to unicode tuple
         index_key = tuple([unicode(key_value) for key_value in eval(base64.b64decode(index_key_enc))])
-        logging.info("index_key : %s", index_key)
-        logging.info("value_keyname : %s", value_keyname)
-        logging.info("stat_func_name: %s", stat_func_name)
+        self.logger.info("index_key : %s", index_key)
+        self.logger.info("value_keyname : %s", value_keyname)
+        self.logger.info("stat_func_name: %s", stat_func_name)
         datalogger = DataLogger(basedir, project, tablename)
         filterkeys = dict(zip(datalogger.index_keynames, index_key))
         ret_data = []
         for datestring in datalogger.monthwalker(monthstring):
-            logging.debug("getting tsatstats for %s", monthstring)
+            self.logger.debug("getting tsatstats for %s", monthstring)
             try:
                 tsastats = datalogger.load_tsastats(datestring, filterkeys=filterkeys)
                 ret_data.append([datestring, tsastats[index_key][value_keyname][stat_func_name]])
             except DataLoggerRawFileMissing as exc:
-                logging.error("No Input File for datestring %s found, skipping this date", datestring)
+                self.logger.error("No Input File for datestring %s found, skipping this date", datestring)
             except DataLoggerLiveDataError as exc:
-                logging.error("Reading from live data is not allowed, skipping this data, and ending loop")
+                self.logger.error("Reading from live data is not allowed, skipping this data, and ending loop")
                 break
         return json.dumps(ret_data)
 
@@ -582,9 +587,9 @@ class DataLoggerWeb(object):
                 tsastats = datalogger.load_tsastats(datestring, filterkeys=filterkeys)
                 ret_data.append([datestring, tsastats[index_key][value_keyname][stat_func_name]])
             except DataLoggerRawFileMissing as exc:
-                logging.error("No Input File for datestring %s found, skipping this date", datestring)
+                self.logger.error("No Input File for datestring %s found, skipping this date", datestring)
             except DataLoggerLiveDataError as exc:
-                logging.error("Reading from live data is not allowed, skipping this data, and ending loop")
+                self.logger.error("Reading from live data is not allowed, skipping this data, and ending loop")
                 break
         return json.dumps(ret_data)
 
@@ -596,42 +601,41 @@ class DataLoggerWeb(object):
         """
         assert len(args) == 3
         project, tablename, datestring = args
-        logging.info("basedir:   %s", basedir)
-        logging.info("tablename: %s", tablename)
-        logging.info("datestring:%s", datestring)
+        self.logger.info("basedir:   %s", basedir)
+        self.logger.info("tablename: %s", tablename)
+        self.logger.info("datestring:%s", datestring)
         datalogger = DataLogger(basedir, project, tablename)
         filename = os.path.join(datalogger.raw_basedir, "%s_%s.csv.gz" % (tablename, datestring))
         if os.path.isfile(filename):
-            logging.info("File already exists")
+            self.logger.info("File already exists")
             return "File already exists"
         try:
             filehandle = gzip.open(filename, "wb")
             x = web.input(myfile={})
-            logging.info(x.keys())
-            logging.info("Storing data to %s", filename)
+            self.logger.info(x.keys())
+            self.logger.info("Storing data to %s", filename)
             if "filedata" in x: # curl type
                 filehandle.write(x["filedata"])
             else: # requests or urllib3 type
                 filehandle.write(x["myfile"].file.read())
             filehandle.close()
         except StandardError as exc:
-            logging.exception(exc)
+            self.logger.exception(exc)
             os.unlink(filename)
-            logging.info("Error while saving received data to")
+            self.logger.info("Error while saving received data to")
             return "Error while saving received data to"
         try:
             tsa = datalogger[str(datestring)] # read received data
         except StandardError as exc:
-            logging.exception(exc)
+            self.logger.exception(exc)
             os.unlink(filename)
-            logging.info("Invalid data in uploaded file, see apache error log for details, uploaded file not stored")
+            self.logger.info("Invalid data in uploaded file, see apache error log for details, uploaded file not stored")
             return "Invalid data in uploaded file, see apache error log for details, uploaded file not stored"
-        logging.info("File stored")
+        self.logger.info("File stored")
         return "File stored"
 
-    @staticmethod
     @calllogger
-    def get_scatter(project, tablename, datestring, args):
+    def get_scatter(self, project, tablename, datestring, args):
         """
         gets scatter plot data of two value_keys of the same tablename
 
@@ -644,11 +648,11 @@ class DataLoggerWeb(object):
         json(highgraph data)
         """
         value_key1, value_key2, stat_func_name = args
-        logging.info("project : %s", project)
-        logging.info("tablename : %s", tablename)
-        logging.info("datestring : %s", datestring)
-        logging.info("value_key1 : %s", value_key1)
-        logging.info("value_key2 : %s", value_key2)
+        self.logger.info("project : %s", project)
+        self.logger.info("tablename : %s", tablename)
+        self.logger.info("datestring : %s", datestring)
+        self.logger.info("value_key1 : %s", value_key1)
+        self.logger.info("value_key2 : %s", value_key2)
         datalogger = DataLogger(basedir, project, tablename)
         tsastats = datalogger.load_tsastats(datestring)
         hc_scatter_data = []
@@ -659,8 +663,7 @@ class DataLoggerWeb(object):
             })
         return json.dumps(hc_scatter_data)
 
-    @staticmethod
-    def sr_vicenter_unused_cpu_cores(args):
+    def sr_vicenter_unused_cpu_cores(self, args):
         """
         special report to find virtual machine which re not used their virtual core entirely
         on this machine there is a possibility to save some virtual cores
@@ -680,8 +683,7 @@ class DataLoggerWeb(object):
             data.append((key[0], "%0.2f" % tsastat_g[key]["cpu.idle.summation"]["min"], "%0.2f" % tsastat_g[key]["cpu.used.summation"]["avg"], "%0.2f" % tsastat_g[key]["cpu.used.summation"]["max"]))
         return json.dumps(data)
 
-    @staticmethod
-    def sr_vicenter_unused_mem(args):
+    def sr_vicenter_unused_mem(self, args):
         """
         special resport to find virtual machine which are not used their ram entirely
         on this machines there is a possibility to save some virtual memory
@@ -699,8 +701,7 @@ class DataLoggerWeb(object):
             data.append((key[0], "%0.2f" % tsastat_g[key]["mem.active.average"]["max"], "%0.3f" % tsastat_g[key]["mem.granted.average"]["min"], "%0.2f" % not_used))
         return json.dumps(data)
 
-    @staticmethod
-    def sr_hrstorageram_unused(args):
+    def sr_hrstorageram_unused(self, args):
         """
         special report to find servers which are not using their ram entirely
         specially on virtual machines are is a huge saving potential
@@ -725,8 +726,7 @@ class DataLoggerWeb(object):
             data.append((key[0], "%0.2f" % sizekb, "%0.2f" % usedkb, "%0.2f" % notused, "%0.2f" % notused_pct))
         return json.dumps(data)
 
-    @staticmethod
-    def sr_hrstorage_unused(args):
+    def sr_hrstorage_unused(self, args):
         """
         special report to get a report of unused SNMP Host Storage
         works only with snmp/hrStorageTable

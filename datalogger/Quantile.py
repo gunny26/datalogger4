@@ -164,7 +164,7 @@ class Quantile(object):
                     self.__quantile[key] = self.__calculate(tsa[key][value_key])
                 except KeyError as exc:
                     logging.debug("no timeseriesstats available for index_key = %s and value_key = %s, skipping", key, value_key)
-        except StandardError as exc:
+        except Exception as exc:
             logging.exception(exc)
             logging.error("an error occured with value_key %s", value_key)
             raise exc

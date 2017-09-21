@@ -29,7 +29,7 @@ DEBUG = False
 def datestring_to_date(datestring):
     """convert datestring 2015-01-31 into date object"""
     if len(datestring) != 10:
-        raise StandardError("datestring must be in form of datetime.isodate()")
+        raise Exception("datestring must be in form of datetime.isodate()")
     year, month, day = (int(part) for part in datestring.split("-"))
     return datetime.date(year, month, day)
 
@@ -99,7 +99,7 @@ class DataLogger(object):
         metafile = os.path.join(meta_basedir, "%s.json" % self.__tablename)
         try:
             self.__meta = self.__load_metainfo(metafile)
-        except StandardError as exc:
+        except Exception as exc:
             logging.exception(exc)
             logging.error("error while loading meta informations from file %s", metafile)
             raise exc
@@ -236,7 +236,7 @@ class DataLogger(object):
             logging.debug("loaded %s", meta)
         else:
             logging.error("You have to define meta data for this tablename in %s", metafile)
-            raise StandardError("You have to define meta data for this tablename in %s" % metafile)
+            raise Exception("You have to define meta data for this tablename in %s" % metafile)
         return meta
 
     def __parse_line(self, row, timedelta=0.0):
@@ -410,7 +410,7 @@ class DataLogger(object):
             caches["tsa"]["raw"] = self.__get_raw_filename(datestring) # raises exception if no file was found
         except DataLoggerRawFileMissing:
             caches["tsa"]["raw"] = None
-        except StandardError as exc:
+        except Exception as exc:
             logging.exception(exc)
             raise
         for cachetype in ("tsa", "ts", "tsastat", "tsstat"):
@@ -497,7 +497,7 @@ class DataLogger(object):
             q_cachefilename = os.path.join(cachedir, "quantile.json")
             qantile.dump(open(q_cachefilename, "wb"))
         else:
-            raise StandardError("TSA Archive %s exists already in cache" % cachefilename)
+            raise Exception("TSA Archive %s exists already in cache" % cachefilename)
 
     def load_tsa(self, datestring, filterkeys=None, index_pattern=None, timedelta=0, cleancache=False, validate=False):
         """
@@ -708,10 +708,10 @@ class DataLogger(object):
                     key = eval(base64.b64decode(key_encoded))
                 assert type(key) == tuple
                 return key
-            except StandardError as exc:
+            except Exception as exc:
                 logging.exception(exc)
                 raise DataLoggerFilenameDecodeError("filename %s could not be decoded to tuple, result: %s" % (filename, key))
-        except StandardError as exc:
+        except Exception as exc:
             logging.exception(exc)
             raise DataLoggerFilenameDecodeError("Something went wrong while decoding filensme %s" % filename)
 
