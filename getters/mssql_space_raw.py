@@ -34,8 +34,7 @@ import time
 import logging
 logging.basicConfig(level=logging.ERROR)
 # own modules
-import tilak_cmdb
-import tilak_centreon
+import tk_webapis
 
 
 def get_connection(username, password, hostname, connection_string, database="master"):
@@ -58,7 +57,8 @@ def get_connection(username, password, hostname, connection_string, database="ma
                 password=password,
                 database=database)
         return con
-    except Exception, exc:
+    except Exception as exc:
+        logging.error("Connection Failure to %s", hostname)
         logging.exception(exc)
         raise exc
 
@@ -107,21 +107,18 @@ def get_credentials(cmdb_con, server):
 
 def get_data():
     """ simply main """
-    cmdb = tilak_cmdb.Cmdb()
-    centreon = tilak_centreon.Centreon()
-    cmdb_con = cmdb.getConnection_ro()
-    servers = centreon.getCentreonHostGroupMembers("CMDB_MSSQL")
+    credentialstore = tk_webapis.CredentialStoreWebClient()
+    centreonweb = tk_webapis.CentreonWebClient()
+    servers = centreonweb.get_hostgroups("CMDB_MSSQL")["hosts"]
     logging.debug(servers)
     outdata = {}
     for server in servers:
         logging.info("working on server %s ", server)
-        # Den SA Login holen
-        try:
-            username, password, connection_string = get_credentials(cmdb_con, server)
-        except StandardError:
-            continue
-        # check specific instance/server
-        check_con = get_connection(username, password, server, connection_string)
+        # get login to this server
+        credentials = credentialstore.search({"authority": server, "user":"sa", "schema":"mssql"})
+        # take only first entry
+        cred = credentials[0]
+        check_con = get_connection(cred["user"], cred["password"], server, cred["path"])
         check_cur = check_con.cursor()
         # get instance name
         check_cur.execute("select SERVERPROPERTY('InstanceName')")

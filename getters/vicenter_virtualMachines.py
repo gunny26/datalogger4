@@ -156,6 +156,12 @@ def main():
             "cpu.used.summation",
             "cpu.wait.summation",
             ),
+        "virtualMachineCpuStats6" : ( # adaption for ESX 6 VMs
+            "cpu.idle.summation", # lacks system.summation for every core
+            "cpu.ready.summation",
+            "cpu.used.summation",
+            "cpu.wait.summation",
+            ),
         "virtualMachineMemoryStats": (
             "mem.consumed.average",
             "mem.overhead.average",

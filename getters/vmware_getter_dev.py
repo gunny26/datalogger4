@@ -97,8 +97,8 @@ def get_data(managed_object, interval, counters):
         properties = tvsp.get_properties([managed_object], ['name', 'runtime.powerState'], managed_object)
         #Find VM supplied as arg and use Managed Object Reference (moref) for the PrintVmInfo
         for mor in properties:
-            #if mor["moref"].name != "WS00008220":
-            #    continue
+            if not mor["name"].startswith("broadleaf"):
+                continue
             if mor['runtime.powerState'] == "poweredOn":
                 try:
                     get_perf_values(mor['moref'], vchtime, interval, perf_dict, data, counters)
@@ -143,6 +143,30 @@ def save_data(basedir_raw, tablename, data):
     logging.info("timerange from %s to %s", first, last)
     outfile.close()
 
+def print_data(data, counters):
+    """
+    save data in data to raw file with isoformat extention in basedir_raw
+    """
+    # output full dataset
+    headers = True
+    lines = 0
+    for keyid in sorted(data.keys()):
+        timestamp, name, instance = keyid
+        if headers is True:
+            logging.error("datetime\tts\thostname\tinstance\t%s" % "\t".join(sorted(data[keyid].keys())))
+            headers = False
+        try:
+            assert len(data[keyid]) == len(counters)
+            logging.error("%s\t%s\t%s\t%s\t%s" % (datetime.datetime.fromtimestamp(timestamp).isoformat(), timestamp, name, instance, "\t".join((str(data[keyid][counter]) for counter in sorted(data[keyid].keys())))))
+            lines += 1
+        except AssertionError:
+            logging.error("WRONG Key Length, skipping %s", data[keyid])
+    logging.error("got %d datasets", lines)
+    logging.error("got %d unique keys", len(data.keys()))
+    first = datetime.datetime.fromtimestamp(sorted(data.keys())[0][0])
+    last = datetime.datetime.fromtimestamp(sorted(data.keys())[-1][0])
+    logging.info("timerange from %s to %s", first, last)
+
 # Start program
 def main():
     """main what else"""
@@ -152,9 +176,11 @@ def main():
         "virtualMachineCpuStats" : ( # datalogger tablename
             "cpu.idle.summation", # vicenter counter names in this table
             "cpu.ready.summation",
-            #"cpu.system.summation", not usable at vmware 6
+            #"cpu.system.summation", #not usable at ESX 6, this is an aggregated value in ESX 6
             "cpu.used.summation",
             "cpu.wait.summation",
+            "cpu.run.summation",
+            "cpu.costop.summation",
             ),
 #        "virtualMachineMemoryStats": (
 #            "mem.consumed.average",
@@ -185,13 +211,13 @@ def main():
 #            "power.power.average",
 #            ),
 # known issue as of vicenter 5.5, these counters are not available
-        "virtualMachineNetworkStats" : (
-            "net.usage.average",
-            "net.received.average",
-            "net.transmitted.average",
-            "net.droppedRx.summation",
-            "net.droppedTx.summation",
-            ),
+#        "virtualMachineNetworkStats" : (
+#            "net.usage.average",
+#            "net.received.average",
+#            "net.transmitted.average",
+#            "net.droppedRx.summation",
+#            "net.droppedTx.summation",
+#            ),
     }
     #basedir = "/var/rrd"
     #project = "vdi"
@@ -212,11 +238,11 @@ def main():
         if len(data) > 0:
             logging.info("saving data")
             # save data
-            print(data)
+            print_data(data, counters)
             #save_data(basedir_raw, tablename, data)
         else:
             logging.info("no data receiveed")
 
 if __name__ == "__main__":
-    tvsp = tilak_vimomi.TilakVdi6()
+    tvsp = tilak_vimomi.TilakVsphere()
     main()
