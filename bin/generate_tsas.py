@@ -10,6 +10,8 @@ logging.basicConfig(level=logging.INFO)
 import argparse
 # own modules
 from datalogger import DataLogger as DataLogger
+from datalogger import TimeseriesArrayStats as TimeseriesArrayStats
+from datalogger import DataLoggerRawFileMissing as DataLoggerRawFileMissing
 
 def gen_caches(project, tablename, datestring):
     datalogger = DataLogger(basedir, project, tablename)
@@ -18,7 +20,7 @@ def gen_caches(project, tablename, datestring):
     data = None
     if caches["tsa"]["raw"] is None:
         if len(caches["tsa"]["keys"]) == 0:
-            logging.info("%s RAW Data not availabale maybe archived, tsa exists already", suffix)
+            logging.info("%s RAW Data not available maybe archived, tsa exists already", suffix)
         else:
             logging.debug("%s RAW Data is missing, no tsa archive exists", suffix)
     else:
@@ -59,20 +61,30 @@ def main():
                         logging.debug("skipping tablename %s", tablename)
                         continue
                     logging.debug("working on tablename %s", tablename)
-                gen_caches(project, tablename, datestring)
+                if args.object is not None:
+                    if args.object == "tsastats":
+                        datalogger = DataLogger(basedir, project, tablename)
+                        try:
+                            tsa = datalogger.load_tsastats(datestring, cleancache=True)
+                        except DataLoggerRawFileMissing:
+                            pass
+                else:
+                    # normal cache check, not trying to recreate
+                    gen_caches(project, tablename, datestring)
 
 if __name__ == "__main__":
     basedir = "/var/rrd"
     yesterday_datestring = (datetime.date.today() - datetime.timedelta(1)).isoformat()
     parser = argparse.ArgumentParser(description='generate TimeseriesArrays on local backend')
-    parser.add_argument('--basedir', default="/var/rrd", help="basedirectory of datalogger data on local machine")
+    parser.add_argument('--basedir', default="/var/rrd", help="basedirectory of datalogger data on local machine, default : %(default)s")
     parser.add_argument("-b", '--back', help="how many days back from now")
     parser.add_argument("-s", '--startdate', help="start date in isoformat YYYY-MM-DD")
-    parser.add_argument("-e", '--enddate', default=yesterday_datestring, help="stop date in isoformat YYYY-MM-DD")
+    parser.add_argument("-e", '--enddate', default=yesterday_datestring, help="stop date in isoformat YYYY-MM-DD, default : %(default)s")
     parser.add_argument("-q", '--quiet', action='store_true', help="set to loglevel ERROR")
     parser.add_argument("-v", '--verbose', action='store_true', help="set to loglevel DEBUG")
     parser.add_argument("-p", '--project', help="process only this project name")
     parser.add_argument("-t", '--tablename', help="process only this tablename")
+    parser.add_argument("-o", '--object', help="object to recreate")
     parser.add_argument("--profile", action="store_true", help="use cProfile to start main")
     args = parser.parse_args()
     if args.quiet is True:

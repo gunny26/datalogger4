@@ -27,7 +27,6 @@ __date__ = "$Date: 2013/04/16 06:50:15 $"
 # $Id: __init__.py,v 1.2 2013/04/16 06:50:15 mesznera Exp $
 
 from datalogger.DataLogger import DataLogger as DataLogger
-from datalogger.DataLogger import DataLoggerRawFileMissing as DataLoggerRawFileMissing
 from datalogger.Timeseries import Timeseries as Timeseries
 from datalogger.TimeseriesArrayLazy import TimeseriesArrayLazy as TimeseriesArray
 from datalogger.TimeseriesStats import TimeseriesStats as TimeseriesStats

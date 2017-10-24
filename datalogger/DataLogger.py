@@ -532,8 +532,10 @@ class DataLogger(object):
             tsa = self.load_tsa_raw(datestring, timedelta)
             tsa.dump_split(cachedir) # save full data
             # read the data afterwards to make sure there is no problem,
-            if validate is True:
-                tsa = TimeseriesArrayLazy.load_split(cachedir, self.__index_keynames, filterkeys=filterkeys, index_pattern=index_pattern, datatypes=self.__datatypes)
+            # TODO: is this the fastest way?
+            # corrected 2017-09-21 reread stored data to convert data to correct type
+            # if validate is True:
+            tsa = TimeseriesArrayLazy.load_split(cachedir, self.__index_keynames, filterkeys=filterkeys, index_pattern=index_pattern, datatypes=self.__datatypes)
             # also generate TSASTATS and dump to cache directory
             tsastats = TimeseriesArrayStats(tsa) # generate full Stats
             tsastats.dump(cachedir) # save
