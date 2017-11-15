@@ -347,7 +347,7 @@ class TimeseriesArrayStats(object):
         outdata = []
         outdata.append(self.__index_keynames)
         outdata.append(self.__value_keynames)
-        outdata.append([(key, tsstat.to_json()) for key, tsstat in self.__stats.items()])
+        outdata.append([(key, tsstat.stats) for key, tsstat in self.__stats.items()])
         try:
             return json.dumps(outdata)
         except TypeError as exc:
