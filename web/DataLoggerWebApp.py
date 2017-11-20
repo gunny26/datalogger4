@@ -501,10 +501,14 @@ class DataLoggerWebApp(object):
         """
         self.logger.info("optional arguments received: %s", args)
         datalogger = DataLogger(basedir, project, tablename)
-        tsastats = datalogger.load_tsastats(datestring)
-        if len(args) > 0:
-            return json.dumps(tsastats.to_csv(args[0]))
-        return tsastats.to_json()
+        try:
+            tsastats = datalogger.load_tsastats(datestring)
+            if len(args) > 0:
+                return json.dumps(tsastats.to_csv(args[0]))
+            return tsastats.to_json()
+        except DataLoggerRawFileMissing as exc:
+            logging.error(exc)
+            raise web.notfound() 
 
 
     def get_quantile(self, project, tablename, datestring, args):
