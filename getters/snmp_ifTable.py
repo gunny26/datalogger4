@@ -65,7 +65,7 @@ def get_snmp_table(hostname, table_oid, community, index=False):
 def get_hrStorageTable(hostname, community):
     data = get_snmp_table(hostname, "IF-MIB::ifTable", community, index=False)
     # return only if ifConnectorPresent = "true"
-    data2 = [entry for entry in data if (entry["ifAdminStatus"] == "up") and (entry["ifOperStatus"] == "up")]
+    data2 = [entry for entry in data if (entry["ifAdminStatus"] == "up") and (entry["ifOperStatus"] == "up") and (entry["ifType"] == "ethernetCsmacd")]
     return data2
 
 def save_data(filename, data):
