@@ -28,9 +28,9 @@ def get_snmp_table(hostname, table_oid, community, index=False):
     # field should be extra separated, not the default space
     cmd = ""
     if index is False:
-        cmd = "snmptable -v2c -c %s -Cf \; %s %s" % (community, hostname, table_oid)
+        cmd = "snmptable -r2 -t15 -v2c -c %s -Cf \; %s %s" % (community, hostname, table_oid)
     else:
-        cmd = "snmptable -v2c -c %s -Ci -Cf \; %s %s" % (community, hostname, table_oid)
+        cmd = "snmptable -r2 -t15 -v2c -c %s -Ci -Cf \; %s %s" % (community, hostname, table_oid)
     logging.info(cmd)
     output = subprocess.check_output((cmd, ), shell=True)
     lines_to_ignore = 1 # ignore first two line

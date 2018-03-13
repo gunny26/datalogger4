@@ -135,6 +135,7 @@ if __name__ == "__main__":
     project = "snmp"
     tablename = "hrStorageTable"
     nagios_group = "CMDB_SERVER"
+    MAX_THREADS = 5
     basedir = os.path.join("/var/rrd", project)
     if not os.path.exists(basedir):
         os.mkdir(basedir)
@@ -153,7 +154,7 @@ if __name__ == "__main__":
         worklist.put((hostname, community))
     q_size = worklist.qsize()
     starttime = time.time()
-    for i in range(10):
+    for i in range(MAX_THREADS):
         t = threading.Thread(target=worker)
         t.daemon = True
         t.start()

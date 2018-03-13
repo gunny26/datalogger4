@@ -125,7 +125,7 @@ if __name__ == "__main__":
     project = "snmp"
     tablename = "ifTable"
     nagios_group = "CMDB_SERVER"
-    MAX_THREADS = 10
+    MAX_THREADS = 5
     basedir = os.path.join("/var/rrd", project)
     if not os.path.exists(basedir):
         os.mkdir(basedir)
