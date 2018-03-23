@@ -15,7 +15,7 @@ class Test(unittest.TestCase):
     def setUp(self):
         self.basedir = "/var/rrd"
         self.datestring = "2015-11-30"
-        self.testfile = "/opt/datalogger/datalogger/testdata/ts_KHUnc3J2d2Vic3FsMi50aWxhay5jYycsKQ==.csv.gz"
+        self.testfile = "testdata/ts_KHUnc3J2d2Vic3FsMi50aWxhay5jYycsKQ==.csv.gz"
         with gzip.open(self.testfile, "rt") as infile:
             self.app = Timeseries.load(infile)
 
@@ -24,8 +24,8 @@ class Test(unittest.TestCase):
 
     def test_headers(self):
         assert self.app.headers == [
-            'com_select', 'uptime', 'com_insert', 'slow_queries', 'bytes_sent', 
-            'com_update', 'connections', 'com_delete', 'qcache_hits', 'questions', 
+            'com_select', 'uptime', 'com_insert', 'slow_queries', 'bytes_sent',
+            'com_update', 'connections', 'com_delete', 'qcache_hits', 'questions',
             'opened_tables', 'aborted_connects', 'bytes_received', 'created_tmp_tables',
             'created_tmp_disk_tables', 'aborted_clients'
         ]
@@ -84,7 +84,7 @@ class Test(unittest.TestCase):
         ts1 = ts.slice(("bytes_received",))
         ts1.append("bytes_received_org", self.app.get_serie("bytes_received"))
         assert ts1[0][1] == ts1[0][2] + ts1[0][2]
-        print(ts1) 
+        print(ts1)
 
     def test_resample(self):
         print("testing slice, resample")
@@ -101,9 +101,9 @@ class Test(unittest.TestCase):
 
     def test_dump(self):
         print("testing dump, load")
-        with gzip.open("/opt/datalogger/datalogger/testdata/ts_test.csv.gz", "wt") as outfile:
+        with gzip.open("testdata/ts_test.csv.gz", "wt") as outfile:
             self.app.dump(outfile)
-        with gzip.open("/opt/datalogger/datalogger/testdata/ts_test.csv.gz", "rt") as infile:
+        with gzip.open("testdata/ts_test.csv.gz", "rt") as infile:
             ts = Timeseries.load(infile)
         assert ts[0][0] == self.app[0][0]
         assert ts[-1][-1] == self.app[-1][-1]

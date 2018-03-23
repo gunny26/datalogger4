@@ -6,7 +6,7 @@ import datetime
 import gzip
 import os
 # own modules
-from TimeseriesArrayLazy import TimeseriesArray as TimeseriesArray
+from TimeseriesArray import TimeseriesArray as TimeseriesArray
 
 
 class Test(unittest.TestCase):
@@ -15,10 +15,10 @@ class Test(unittest.TestCase):
     def setUp(self):
         self.basedir = "/var/rrd"
         self.datestring = "2015-11-30"
-        self.testfile = "/opt/datalogger/datalogger/testdata/"
-        index_keys = ("hostname")
-        self.app = TimeseriesArray.load(self.testfile, index_keys)
-    
+        self.testfile = "testdata/"
+        index_keys = ("hostname",)
+        self.app = TimeseriesArray.load("testdata/", index_keys)
+
     def test_str(self):
         print(self.app)
 

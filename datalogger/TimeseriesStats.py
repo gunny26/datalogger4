@@ -6,7 +6,7 @@ Modules deals with timeseries statistics
 import json
 import logging
 # own modules
-from datalogger.CustomExceptions import TimeseriesEmptyError as TimeseriesEmptyError
+from CustomExceptions import TimeseriesEmptyError as TimeseriesEmptyError
 
 
 def mean(data):

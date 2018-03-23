@@ -11,8 +11,8 @@ import json
 import os
 import gzip
 # own modules
-from datalogger.Timeseries import Timeseries as Timeseries
-from datalogger.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
+from Timeseries import Timeseries as Timeseries
+from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 
 
 #################### hack begin ##########################
@@ -20,16 +20,19 @@ from datalogger.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesAr
 hack to mimic some python 2.x behaviour is string
 representation of tuples
 """
-def _b64encode(index_keys):
-    if len(index_keys) == 1:
-        start ="(u'" + index_keys[0] + "',)"
+def _b64encode(list_obj):
+    if len(list_obj) == 1:
+        start ="(u'" + list_obj[0] + "',)"
     else:
-        start ="(u'" + "', u'".join((str(key) for key in index_keys)) + "')"
-    return base64.b64encode(start.encode("utf-8")).decode("utf-8")
+        start ="(u'" + "', u'".join((str(key) for key in list_obj)) + "')"
+    encoded = base64.urlsafe_b64encode(start.encode("utf-8")).decode("utf-8")
+    print("%s -> %s" % (list_obj, encoded))
+    return encoded
 
 def _b64decode(encoded):
-    decoded = base64.b64decode(enc).decode("utf-8")
-    return eval(decoded)
+    decoded = base64.b64decode(encoded).decode("utf-8")
+    print("%s -> %s" % (encoded, decoded))
+    return decoded
 
 if sys.version_info < (3,0):
     print("using original function")
@@ -49,7 +52,7 @@ def is_near(value, target_value, pct=0.05):
     return minimum < float(value) < maximum
 
 
-class TimeseriesArrayLazy(object):
+class TimeseriesArray(object):
     """
     holds dictionary of Timeseries objects
     """
@@ -69,9 +72,9 @@ class TimeseriesArrayLazy(object):
         datatypes <list> list of used datatypes
         cache <bool> should already loaded timeseries be cached, useful to calculate quantiles
         """
-        self.__index_keynames = tuple([unicode(value) for value in index_keys])
-        self.__value_keynames = list([unicode(value) for value in value_keys])
-        self.__ts_key = unicode(ts_key)
+        self.__index_keynames = tuple([value for value in index_keys])
+        self.__value_keynames = list([value for value in value_keys])
+        self.__ts_key = ts_key
         self.__cache = cache
         # define instance data
         self.__debug = False
@@ -87,7 +90,10 @@ class TimeseriesArrayLazy(object):
 
     def __str__(self):
         ret = ""
-        ret += "index_keynames: %s" % self.__index_keynames
+        ret += "index_keynames: %s\n" % self.__index_keynames
+        ret += "value_keynames: %s\n" % self.__value_keynames
+        ret += "ts_key: %s\n" % self.__ts_key
+        ret += "data: %s\n" % self.__data
         return ret
 
     def __getitem__(self, key):
@@ -126,8 +132,8 @@ class TimeseriesArrayLazy(object):
     def __eq__(self, other):
         """test equality in depth"""
         try:
-            assert self.__index_keynames == other.index_keys
-            assert self.__value_keynames == other.value_keys
+            assert self.__index_keynames == other.index_keynames
+            assert self.__value_keynames == other.value_keynames
             assert self.__ts_key == other.ts_key
             assert len(self.__data.keys()) == len(other.keys())
             for key in self.__data.keys():
@@ -149,7 +155,6 @@ class TimeseriesArrayLazy(object):
 
     def keys(self):
         """
-        return keys of internal data object
         mimic dict behaviour
         """
         return self.__data.keys()
@@ -162,25 +167,10 @@ class TimeseriesArrayLazy(object):
         """
         return dict(zip(self.__index_keynames, index_values))
 
-#    @property
-#    def data(self):
-#        """dictionary to hold Timeseries objects"""
-#        return self.__data
-
-    @property
-    def index_keys(self):
-        """DEPRECATED use index_keynames instead"""
-        return self.__index_keynames
-
     @property
     def index_keynames(self):
         """keynames which build key for self.data"""
         return self.__index_keynames
-
-    @property
-    def value_keys(self):
-        """DEPRECATED use value_keynames instead"""
-        return self.__value_keynames
 
     @property
     def value_keynames(self):
@@ -462,7 +452,7 @@ class TimeseriesArrayLazy(object):
         returns:
         TimeseriesArray
         """
-        ret_data = TimeseriesArrayLazy(index_keys=self.__index_keynames, value_keys=colnames, ts_key=self.__ts_key)
+        ret_data = TimeseriesArray(index_keys=self.__index_keynames, value_keys=colnames, ts_key=self.__ts_key)
         for key in self.keys():
             ret_data[key] = self[key].slice(colnames)
         return ret_data
@@ -515,14 +505,12 @@ class TimeseriesArrayLazy(object):
             # skip dump, if file exists, and overwrite=False
             if not os.path.isfile(os.path.join(outpath, ts_filename)) or overwrite:
                 logging.debug("dumping key %s to filename %s", key, ts_filename)
-                ts_filehandle = gzip.open(os.path.join(outpath, ts_filename), "wb")
-                timeseries.dump_to_csv(ts_filehandle)
-                ts_filehandle.close() # close to not get too many open files
+                with gzip.open(os.path.join(outpath, ts_filename), "wt") as outfile:
+                    timeseries.dump_to_csv(outfile)
             outbuffer["ts_filenames"].append(ts_filename)
-        filehandle = open(outfile, "wb")
-        json.dump(outbuffer, filehandle)
-        # flush explicit to make sure the data can be read immediately
-        filehandle.flush()
+        with open(outfile, "wt") as outfile:
+            json.dump(outbuffer, outfile)
+            outfile.flush()
     dump_split = dump
 
     @staticmethod
@@ -536,7 +524,7 @@ class TimeseriesArrayLazy(object):
         returns:
         <str>
         """
-        return "ts_%s.csv.gz" % base64.urlsafe_b64encode(unicode(key))
+        return "ts_%s.csv.gz" % b64encode(key)
 
     @staticmethod
     def get_dumpfilename(index_keys):
@@ -549,7 +537,7 @@ class TimeseriesArrayLazy(object):
         returns:
         <str>
         """
-        return "tsa_%s.json" % base64.urlsafe_b64encode(unicode(index_keys))
+        return "tsa_%s.json" % b64encode(index_keys)
 
     @staticmethod
     def filtermatch(key_dict, filterkeys, matchtype):
@@ -586,7 +574,7 @@ class TimeseriesArrayLazy(object):
         filterkeys could be a part of existing index_keys
         all matching keys will be used
         """
-        tsa_filename = TimeseriesArrayLazy.get_dumpfilename(index_keys)
+        tsa_filename = TimeseriesArray.get_dumpfilename(index_keys)
         logging.debug("tsa_filename: %s", tsa_filename)
         infile = os.path.join(path, tsa_filename)
         filehandle = open(infile, "rb")
@@ -601,10 +589,10 @@ class TimeseriesArrayLazy(object):
         for filename in data["ts_filenames"]:
             logging.debug("reading ts from file %s", filename)
             enc_key = filename.split(".")[0][3:] # only this pattern ts_(.*).csv.gz
-            key = eval(base64.urlsafe_b64decode(str(enc_key))) # must be str not unicode
+            key = eval(b64decode(enc_key)) # must be str not unicode
             key_dict = dict(zip(index_keys, key))
             if filterkeys is not None:
-                if TimeseriesArrayLazy.filtermatch(key_dict, filterkeys, matchtype):
+                if TimeseriesArray.filtermatch(key_dict, filterkeys, matchtype):
                     logging.debug("adding tsa key : %s", key)
                     filenames[key] = os.path.join(path, filename)
             else:
@@ -628,7 +616,7 @@ class TimeseriesArrayLazy(object):
         <TimeseriesArray>
         """
         # get filename and load json structure
-        tsa_filename = TimeseriesArrayLazy.get_dumpfilename(index_keys)
+        tsa_filename = TimeseriesArray.get_dumpfilename(index_keys)
         infile = os.path.join(path, tsa_filename)
         try:
             filehandle = open(infile, "rb")
@@ -669,13 +657,15 @@ class TimeseriesArrayLazy(object):
         """
         try to load TimeSeries given by key
         key has to be already in TimeseriesArray structure
+
+        parameters:
+        key : <tuple>
         """
         if key in self.ts_autoload:
             filename = self.ts_autoload[key]
             logging.debug("auto-loading Timeseries from file %s", filename)
-            filehandle = gzip.open(filename, "rb")
-            timeseries = Timeseries.load_from_csv(filehandle)
-            filehandle.close() # close to not get too many open files
+            with gzip.open(filename, "rt") as infile:
+                timeseries = Timeseries.load_from_csv(infile)
             # convert raw timeseries to datatype
             for colname, datatype in self.datatypes.items():
                 if datatype == "asis":
@@ -685,4 +675,4 @@ class TimeseriesArrayLazy(object):
         else:
             raise KeyError("key %s not in TimeseriesArray", key)
 
-TimeseriesArray = TimeseriesArrayLazy
+TimeseriesArrayLazy = TimeseriesArray

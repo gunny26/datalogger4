@@ -11,8 +11,8 @@ import base64
 import os
 import logging
 # own modules
-from datalogger.TimeseriesStats import TimeseriesStats as TimeseriesStats
-from datalogger.CustomExceptions import TimeseriesEmptyError as TimeseriesEmptyError
+from TimeseriesStats import TimeseriesStats as TimeseriesStats
+from CustomExceptions import TimeseriesEmptyError as TimeseriesEmptyError
 
 class TimeseriesArrayStats(object):
     """
