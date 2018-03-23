@@ -20,9 +20,9 @@ def gen_caches(project, tablename, datestring):
     data = None
     if caches["tsa"]["raw"] is None:
         if len(caches["tsa"]["keys"]) == 0:
-            logging.info("%s RAW Data not available maybe archived, tsa exists already", suffix)
+            logging.info("%s RAW Data is missing", suffix)
         else:
-            logging.debug("%s RAW Data is missing, no tsa archive exists", suffix)
+            logging.debug("%s RAW Data is archived, tsa archive exists already", suffix)
     else:
         if len(caches["tsa"]["keys"]) == 0:
             logging.info("%s TSA Archive missing, calling get_tsa and load_tsastats", suffix)
@@ -34,12 +34,12 @@ def gen_caches(project, tablename, datestring):
             else:
                 if len(caches["ts"]["keys"]) == 0:
                     logging.info("%s there are no ts archives, something went wrong, or tsa is completely empty, calling load_tsastats", suffix)
-                    data = datalogger.load_tsastats(datestring)
+                    data = datalogger.load_tsastats(datestring, cleancache=True)
                 else:
                     logging.debug("%s All fine", suffix)
             if caches["quantile"]["exists"] is not True:
                 logging.info("%s Quantile archive is missing, calling load_quantile", suffix)
-                data = datalogger.load_quantile(datestring)
+                #data = datalogger.load_quantile(datestring)
     del data
     del caches
     del datalogger

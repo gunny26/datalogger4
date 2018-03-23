@@ -3,7 +3,7 @@
 """Module for class Timeseries"""
 import logging
 # own modules
-from datalogger.TimeseriesStats import TimeseriesStats as TimeseriesStats
+from TimeseriesStats import TimeseriesStats as TimeseriesStats
 
 
 def datatype_percent(times, series):
@@ -46,6 +46,11 @@ def __datatype_counter(times, series, max_value):
     generic counter datatype with parameterized max_value,
     could be either 2^32, 2^64 or something completely different
     do not use directly, use counter32, counter64 instead
+    first value will always be 0.0
+
+    valid range of values : 
+        min: 0.0
+        max: max_value
 
     parameters:
     series <tuple> of <float>
@@ -54,6 +59,7 @@ def __datatype_counter(times, series, max_value):
     <tuple> of <float>
     """
     new_series = [0.0, ]
+    # first value has to be in range
     if not 0.0 <= series[0] <= max_value:
         msg = "counter %f out of range at time %f, max_value: %f " % (series[0], times[0], max_value)
         logging.error(msg)
@@ -81,7 +87,8 @@ def datatype_counter32(times, series):
     """
     returns series converted to datatype counter32
     counter32 will steadily increase until overflow at 2^32 occurs
-    stores only differences between to subsequent values
+    stores only differences between to subsequent values,
+    first value wil always be 0.0
 
     parameters:
     series <tuple> of <float>
@@ -135,6 +142,9 @@ def datatype_counterreset(times, series):
     eg. haproxy statistics counter which increases until restart, then begin by 0
     There is naturally some data missing, from last value to next value after reset
 
+    in difference to counter32 or counter64 this reset can occur way below 2^32 or 2^64
+    there is no upper value defined to overflow
+
     parameters:
     series <tuple> of <tuple>(ts:<float>, value:<float>)
 
@@ -158,6 +168,9 @@ def datatype_gauge32(times, series):
     this counter is not supposed to overflow, so lower next level in time,
     means there was a reset
 
+    in difference to counterreset, gauge32 will calculate 
+    difference / duration  to get some e.g. byte/s values
+
     parameters:
     series <tuple> of <tuple>(ts:<float>, value:<float>)
 
@@ -165,12 +178,12 @@ def datatype_gauge32(times, series):
     <tuple> of <float>
     """
     new_series = [0.0, ]
-    if not 0.0 <= series[0]:
+    if not series[0] >= 0.0:
         msg = "counter %f out of range at time %f" % (series[0], times[0])
         logging.error(msg)
         raise AssertionError(msg)
     for index in range(1, len(series)):
-        if not 0.0 <= series[index]: # requirement for counter type
+        if not series[index] >= 0.0: # requirement for counter type
             msg = "counter %f out of range at time %f" % (series[index], times[index])
             logging.error(msg)
             raise AssertionError(msg)
@@ -206,6 +219,17 @@ class Timeseries(object):
     all column values have to be numerical
     ts value has to be integer
     """
+
+    datatype_mapper = {
+        "derive" : datatype_derive,
+        "counter32" : datatype_counter32,
+        "gauge32" : datatype_gauge32,
+        "counter64" : datatype_counter64,
+        "counterreset" : datatype_counterreset,
+        "percent" : datatype_percent,
+        "persecond" : datatype_persecond,
+    }
+
     def __init__(self, headers, ts_keyname="ts"):
         """
         headers <list> column names of values
@@ -213,8 +237,9 @@ class Timeseries(object):
 
         all header columns have to be strictly numeric
         """
-        self.__ts_keyname = unicode(ts_keyname)
-        self.__headers = list([unicode(value) for value in headers]) # also the number of columns
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.__ts_keyname = ts_keyname
+        self.__headers = list([value for value in headers]) # also the number of columns
         self.__index = 0
         self.__ts_index = {}
         # define new data
@@ -268,6 +293,10 @@ class Timeseries(object):
         t_zero = self.data[0][0]
         return sum(((row[0] - t_zero) / (index + 1) for index, row in enumerate(self.data))) / len(self.data)
 
+    @property
+    def datatypes(self):
+        return list(self.datatype_mapper.keys())
+
     def __eq__(self, other):
         if self.__headers != other.headers:
             raise AssertionError("headers are different")
@@ -308,8 +337,10 @@ class Timeseries(object):
         self[<int>row, <int>col] -> returns self.data[row][colnum] -> <float>
         self[<int>row, colname] -> returns self.data[row][index of colname in self.colnames] -> <float>
         """
+        # if key is int treat it as row of data
         if isinstance(key, int):
             return self.data[key]
+        # if key is double-item tuple treat it position in matrix
         elif isinstance(key, tuple):
             row, col = key
             rownum = None
@@ -331,14 +362,14 @@ class Timeseries(object):
             else:
                 colnum = col
             return self.data[rownum][colnum]
-        # if key is float
+        # if key is float treat it as timestamp
         elif isinstance(key, float):
             try:
                 return self.data[self.__ts_index[key]]
             except KeyError:
                 raise KeyError("Timstamp %f not found in dataset" % key)
-        # if key is text
-        elif isinstance(key, basestring):
+        # if key is text treat it as column name
+        elif isinstance(key, str):
             colnum = self.colnames.index(key)
             return tuple((row[colnum] for row in self.data))
         else:
@@ -350,21 +381,57 @@ class Timeseries(object):
         colnames += self.__headers
         return delimiter.join(colnames)
 
-    def head(self, delimiter="\t", ncols=5, headers=True):
+    def __get_col(self, colnum):
+        """
+        get data series from timeseries object with column number given
+        """
+        for row in self.data:
+            yield row[colnum]
+
+    def __add(self, timestamp, values):
+        """
+        private method to add data to internal data storage
+        timstamp should be float
+        values should be array of float
+
+        while adding the timstamp index will be updated
+        if the timestamp is already in the internal array,
+        this data will be skipped
+
+        parameters:
+        timestamp <float>
+        values <iterable> of float
+
+        raises:
+        DataformatError if TypeError occurs
+        """
+        # finally add to datastore
+        if timestamp not in self.__ts_index:
+            try:
+                row = [timestamp,  ] + values
+                self.data.append(row)
+                self.__ts_index[timestamp] = self.__index
+                self.__index += 1
+            except TypeError as exc:
+                logging.exception(exc)
+                logging.error("ts : %s, values: %s", timestamp, values)
+                raise DataFormatError("TypeError: some values are not of type <float>")
+
+    def head(self, delimiter="\t", nrows=5, headers=True):
         """return printable string for first ncols rows"""
         lbuffer = []
         if headers:
-            lbuffer.append(self.__str__headers())
-        for row in self.data[:ncols]:
+            lbuffer.append(self.__str__headers(delimiter))
+        for row in self.data[:nrows]:
             lbuffer.append(delimiter.join((str(value) for value in row)))
         return "\n".join(lbuffer)
 
-    def tail(self, delimiter="\t", ncols=5, headers=True):
+    def tail(self, delimiter="\t", nrows=5, headers=True):
         """return printable string for last ncols rows"""
         lbuffer = []
         if headers:
-            lbuffer.append(self.__str__headers())
-        for row in self.data[-ncols:]:
+            lbuffer.append(self.__str__headers(delimiter))
+        for row in self.data[-nrows:]:
             lbuffer.append(delimiter.join((str(value) for value in row)))
         return "\n".join(lbuffer)
 
@@ -420,35 +487,6 @@ class Timeseries(object):
         """
         self.__add(timestamp, values)
 
-    def __add(self, timestamp, values):
-        """
-        private method to add data to internal data storage
-        timstamp should be float
-        values should be array of float
-
-        while adding the timstamp index will be updated
-        if the timestamp is already in the internal array,
-        this data will be skipped
-
-        parameters:
-        timestamp <float>
-        values <iterable> of float
-
-        raises:
-        DataformatError if TypeError occurs
-        """
-        # finally add to datastore
-        if timestamp not in self.__ts_index:
-            try:
-                row = [timestamp,  ] + values
-                self.data.append(row)
-                self.__ts_index[timestamp] = self.__index
-                self.__index += 1
-            except TypeError as exc:
-                logging.exception(exc)
-                logging.error("ts : %s, values: %s", timestamp, values)
-                raise DataFormatError("TypeError: some values are not of type <float>")
-
     def group_add(self, timestamp, values, group_func):
         """
         function to add new data, and if data exists, aggregate existing data with new ones
@@ -485,7 +523,16 @@ class Timeseries(object):
     def resample(self, time_interval, func):
         """
         resample data to time interval given
-        using func as aggregation function
+        using func as aggregation function for values in between
+        aggregation function is caled for every series on its own, 
+        so you get a tuple with numerical values and hsa to resturn one single value
+
+        parameters:
+        time_interval <int> something above actual interval
+        func - something like lambda values : sum(values)
+
+        returns:
+        <Timeseries>
         """
         ret_data = Timeseries(self.__headers) # holds return data
         first_ts = self.data[0][0]
@@ -507,103 +554,96 @@ class Timeseries(object):
             last_ts = timestamp
         return ret_data
 
-    def __get_col(self, colnum):
-        """
-        get data series from timeseries object with column number given
-        """
-        for row in self.data:
-            yield row[colnum]
+#    def dump_list(self, value_keys=None, start_ts=None, stop_ts=None):
+#        """
+#        return internal Data as list of tuples
+#
+#        [
+#            [ ts1, value1, value2, ... ],
+#            [ ts2, value1, value2, ... ],
+#        ]
+#        """
+#        if value_keys is None:
+#            value_keys = self.__headers
+#        try:
+#            assert type(start_ts) == type(stop_ts)
+#            if start_ts is not None:
+#                assert type(start_ts) == int
+#        except AssertionError as exc:
+#            logging.exception("start_ts and stop_ts has to be the same type and int")
+#            logging.error("start_ts=%s, stop_ts=%s", start_ts, stop_ts)
+#            raise exc
+#        colnums = tuple((self.__get_colnum(key) for key in value_keys))
+#        ret_data = []
+#        for row in self.data:
+#            if (start_ts is None) or (start_ts <= row[0] <= stop_ts):
+#                row_data = [row[0], ]
+#                row_data.extend((row[index] for index in colnums))
+#                ret_data.append(row_data)
+#        return ret_data
 
-    def dump_list(self, value_keys=None, start_ts=None, stop_ts=None):
-        """
-        return internal Data as list of tuples
+#    def dump_ts_dict(self, value_keys=None, start_ts=None, stop_ts=None):
+#        """
+#        return iternal data as dict key = ts, with tuple values
+#
+#        {
+#            ts1: [value1, value2, value3 ...]
+#            ts2: [value1, value2, value3 ...]
+#        }
+#        """
+#        if value_keys is None:
+#            value_keys = self.__headers
+#        try:
+#            assert type(start_ts) == type(stop_ts)
+#            if start_ts is not None:
+#                assert type(start_ts) == int
+#        except AssertionError as exc:
+#            logging.exception("start_ts and stop_ts has to be the same type and int")
+#            logging.error("start_ts=%s, stop_ts=%s", start_ts, stop_ts)
+#            raise exc
+#        colnums = tuple((self.__get_colnum(key) for key in value_keys))
+#        ret_data = {}
+#        for row in self.data:
+#            if (start_ts is None) or (start_ts <= row[0] <= stop_ts):
+#                ret_data[row[0]] = tuple((row[index] for index in colnums))
+#        return ret_data
 
-        [
-            [ ts1, value1, value2, ... ],
-            [ ts2, value1, value2, ... ],
-        ]
-        """
-        if value_keys is None:
-            value_keys = self.__headers
-        try:
-            assert type(start_ts) == type(stop_ts)
-            if start_ts is not None:
-                assert type(start_ts) == int
-        except AssertionError as exc:
-            logging.exception("start_ts and stop_ts has to be the same type and int")
-            logging.error("start_ts=%s, stop_ts=%s", start_ts, stop_ts)
-            raise exc
-        colnums = tuple((self.__get_colnum(key) for key in value_keys))
-        ret_data = []
-        for row in self.data:
-            if (start_ts is None) or (start_ts <= row[0] <= stop_ts):
-                row_data = [row[0], ]
-                row_data.extend((row[index] for index in colnums))
-                ret_data.append(row_data)
-        return ret_data
+#    def dump_dict(self, value_keys=None, start_ts=None, stop_ts=None):
+#        """
+#        return internal data as dict key = ts, of dicts value_key = value
+#
+#        {
+#            ts1: {
+#                key1 : value1,
+#                key2 : value2,
+#                ...
+#            }
+#             ts2: {
+#                key1 : value1,
+#                key2 : value2,
+#                ...
+#            }
+#            ...
+#        }
+#        """
+#        if value_keys is None:
+#            value_keys = self.__headers # use all columns if None
+#        try:
+#            assert type(start_ts) == type(stop_ts)
+#            if start_ts is not None:
+#                assert type(start_ts) == int
+#        except AssertionError as exc:
+#            logging.exception("start_ts and stop_ts has to be the same type and int")
+#            logging.error("start_ts=%s, stop_ts=%s", start_ts, stop_ts)
+#            raise exc
+#        colnums = tuple((self.__get_colnum(key) for key in value_keys))
+#        ret_data = {}
+#        for row in self.data:
+#            if (start_ts is None) or (start_ts <= row[0] <= stop_ts):
+#                ret_data[row[0]] = dict(((value_keys[index], row[colnums[index]]) for index in range(len(value_keys))))
+#        return ret_data
 
-    def dump_ts_dict(self, value_keys=None, start_ts=None, stop_ts=None):
-        """
-        return iternal data as dict key = ts, with tuple values
-
-        {
-            ts1: [value1, value2, value3 ...]
-            ts2: [value1, value2, value3 ...]
-        }
-        """
-        if value_keys is None:
-            value_keys = self.__headers
-        try:
-            assert type(start_ts) == type(stop_ts)
-            if start_ts is not None:
-                assert type(start_ts) == int
-        except AssertionError as exc:
-            logging.exception("start_ts and stop_ts has to be the same type and int")
-            logging.error("start_ts=%s, stop_ts=%s", start_ts, stop_ts)
-            raise exc
-        colnums = tuple((self.__get_colnum(key) for key in value_keys))
-        ret_data = {}
-        for row in self.data:
-            if (start_ts is None) or (start_ts <= row[0] <= stop_ts):
-                ret_data[row[0]] = tuple((row[index] for index in colnums))
-        return ret_data
-
-    def dump_dict(self, value_keys=None, start_ts=None, stop_ts=None):
-        """
-        return internal data as dict key = ts, of dicts value_key = value
-
-        {
-            ts1: {
-                key1 : value1,
-                key2 : value2,
-                ...
-            }
-             ts2: {
-                key1 : value1,
-                key2 : value2,
-                ...
-            }
-            ...
-        }
-        """
-        if value_keys is None:
-            value_keys = self.__headers # use all columns if None
-        try:
-            assert type(start_ts) == type(stop_ts)
-            if start_ts is not None:
-                assert type(start_ts) == int
-        except AssertionError as exc:
-            logging.exception("start_ts and stop_ts has to be the same type and int")
-            logging.error("start_ts=%s, stop_ts=%s", start_ts, stop_ts)
-            raise exc
-        colnums = tuple((self.__get_colnum(key) for key in value_keys))
-        ret_data = {}
-        for row in self.data:
-            if (start_ts is None) or (start_ts <= row[0] <= stop_ts):
-                ret_data[row[0]] = dict(((value_keys[index], row[colnums[index]]) for index in range(len(value_keys))))
-        return ret_data
-
-    def dump_csv(self, value_keynames=None, headers=True, delimiter=",", start_ts=None, stop_ts=None):
+    def to_csv(self, value_keynames=None, headers=True, delimiter=",", start_ts=None, stop_ts=None):
         """
         return internal data csv formatted
 
@@ -626,22 +666,24 @@ class Timeseries(object):
             logging.exception("start_ts and stop_ts has to be the same type and int")
             logging.error("start_ts=%s, stop_ts=%s", start_ts, stop_ts)
             raise exc
-        colnums = tuple((self.__get_colnum(key) for key in value_keynames))
-        ret_data = ""
+        colnums = [self.__get_colnum(key) for key in value_keynames]
         headline = [self.ts_keyname, ]
         headline.extend(value_keynames)
         for row in self.data:
             if (start_ts is None) or (start_ts <= row[0] <= stop_ts):
                 if headers is True:
-                    ret_data += "%s\n" % delimiter.join(headline)
+                    yield "%s" % delimiter.join(headline)
                     headers = False
-                ret_data += "%s%s%s\n" % (row[0], delimiter, delimiter.join((str(row[index]) for index in colnums)))
-        return ret_data
+                yield "%s%s%s" % (row[0], delimiter, delimiter.join((str(row[index]) for index in colnums)))
 
     def get_serie(self, colname):
         """
-        colname <str> the name of one value key
-        return timeseries of one givel value_key
+        returning all values for given colname
+
+        parameters:
+        colname <str> - must be in self.colnames
+
+        returns:
         return <tuple> of <float>
         """
         colnum = self.__get_colnum(colname)
@@ -650,7 +692,14 @@ class Timeseries(object):
     def slice(self, colnames):
         """
         return new Timeseries object with only in colnames given columns
+
+        parameters:
+        colnames <tuple>
+
+        returns:
+        <Timeseries>
         """
+        assert not isinstance(colnames, str)
         ret_data = Timeseries(colnames, ts_keyname=self.ts_keyname)
         for row in self.data:
             ret_data.add(row[0], tuple((row[self.__get_colnum(colname)] for colname in colnames)))
@@ -658,35 +707,23 @@ class Timeseries(object):
 
     def convert(self, colname, datatype, newcolname=None):
         """
-        add derived column to colname
-        ts colname
-        t1 value1
-        t2 value2
-        ...
+        convert some existing columns to given datatype and add this column to Timeseries
+        
+        parameters:
+        colname <str> - must be in colnames
+        datatype <str> - must be in datatypes
+        newcolname <str> - must not be in colnames
 
-        add these
-
-        ts colname colname_d
-        t1 value1  0
-        t2 value2  value2-value1
-        t3 value3  value3-value2
+        returns:
+        <None>
         """
         if len(self.data) == 0:
             logging.error("Empty Timeseries, nothing to convert")
             return
-        datatype_mapper = {
-            "derive" : datatype_derive,
-            "counter32" : datatype_counter32,
-            "gauge32" : datatype_gauge32,
-            "counter64" : datatype_counter64,
-            "counterreset" : datatype_counterreset,
-            "percent" : datatype_percent,
-            "persecond" : datatype_persecond,
-        }
         colnum = self.__get_colnum(colname)
         times = [row[0] for row in self.data]
         series = [row[colnum] for row in self.data]
-        newseries = datatype_mapper[datatype](times, series)
+        newseries = self.datatype_mapper[datatype](times, series)
         if newcolname is None: # ovrewrite existing column
             self.remove_col(colname)
             self.append(colname, newseries)
@@ -694,59 +731,63 @@ class Timeseries(object):
             self.append(newcolname, newseries)
 
     def add_derive_col(self, colname, colname_d):
-        """
-        add derived column to colname
-        ts colname
-        t1 value1
-        t2 value2
-        ...
-
-        add these
-
-        ts colname colname_d
-        t1 value1  0
-        t2 value2  value2-value1
-        t3 value3  value3-value2
-        """
-        colnum = self.__get_colnum(colname)
-        last_value = None
-        for row in self.data:
-            if last_value is None:
-                row.append(float(0))
-            else:
-                row.append(row[colnum] - last_value)
-            last_value = row[colnum]
-        self.__headers.append(colname_d)
+        self.logger.info("DEPRECATED function add_derive_col use convert")
+        return self.convert(colname, "derive", colname_d)
+#        """
+#        add derived column to colname
+#        ts colname
+#        t1 value1
+#        t2 value2
+#        ...
+#
+#        add these
+#
+#        ts colname colname_d
+#        t1 value1  0
+#        t2 value2  value2-value1
+#        t3 value3  value3-value2
+#        """
+#        colnum = self.__get_colnum(colname)
+#        last_value = None
+#        for row in self.data:
+#            if last_value is None:
+#                row.append(float(0))
+#            else:
+#                row.append(row[colnum] - last_value)
+#            last_value = row[colnum]
+#        self.__headers.append(colname_d)
 
     def add_per_s_col(self, colname, colname_d):
-        """
-        add new per second columns from existing column
-
-        ts colname colname_d
-        t1 value1  0.0 (always)
-        t2 value2  (value2-value1)/(t2-t1)
-        t3 value3  (value3-value2)/(t3-t2)
-        ...
-        """
-        colnum = self.__get_colnum(colname)
-        last_ts = None
-        last_value = None
-        for row in self.data:
-            if last_ts is None:
-                row.append(0.0)
-            else:
-                try:
-                    assert row[colnum] >= last_value
-                    assert row[0] > last_ts
-                except AssertionError:
-                    logging.error("detected overflow ts: %s to %s, value: %s to %s", last_ts, row[0], last_value, row[colnum])
-                try:
-                    row.append((row[colnum] - last_value) / (row[0] - last_ts))
-                except ZeroDivisionError:
-                    row.append(0.0)
-            last_ts = row[0]
-            last_value = row[colnum]
-        self.__headers.append(colname_d)
+        self.logger.info("DEPRECATED function add_per_s_col use convert")
+        return self.convert(colname, "persecond", colname_d)
+#        """
+#        add new per second columns from existing column
+#
+#        ts colname colname_d
+#        t1 value1  0.0 (always)
+#        t2 value2  (value2-value1)/(t2-t1)
+#        t3 value3  (value3-value2)/(t3-t2)
+#        ...
+#        """
+#        colnum = self.__get_colnum(colname)
+#        last_ts = None
+#        last_value = None
+#        for row in self.data:
+#            if last_ts is None:
+#                row.append(0.0)
+#            else:
+#                try:
+#                    assert row[colnum] >= last_value
+#                    assert row[0] > last_ts
+#                except AssertionError:
+#                    logging.error("detected overflow ts: %s to %s, value: %s to %s", last_ts, row[0], last_value, row[colnum])
+#                try:
+#                    row.append((row[colnum] - last_value) / (row[0] - last_ts))
+#                except ZeroDivisionError:
+#                    row.append(0.0)
+#            last_ts = row[0]
+#            last_value = row[colnum]
+#        self.__headers.append(colname_d)
 
     def add_calc_col_single(self, colname, newcolname, func):
         """
@@ -798,16 +839,16 @@ class Timeseries(object):
             del row[colnum]
         self.__headers.remove(colname)
 
-    def pop(self, colnum):
-        """
-        remove colnum from data
-
-        add 1 to colnum, because the first col ts is added automatically
-        """
-        colnum += 1
-        assert colnum <= len(self.data[0])
-        for row in self.data:
-            row.pop(colnum)
+#    def pop(self, colnum):
+#        """
+#        remove colnum from data
+#
+#        add 1 to colnum, because the first col ts is added automatically
+#        """
+#        colnum += 1
+#        assert colnum <= len(self.data[0])
+#        for row in self.data:
+#            row.pop(colnum)
 
     def append(self, colname, series):
         """
@@ -831,32 +872,39 @@ class Timeseries(object):
 
     def dump(self, filehandle):
         """
+        write internal data to filehandle in CSV format
+
+        parameters:
         filename <str>
-        writer internal data to csv filename given
         """
         header_line = [self.__ts_keyname, ]
         header_line.extend(self.__headers)
-        lbuffer = []
-        lbuffer.append(";".join(header_line))
+        filehandle.write(";".join(header_line) + "\n")
         for row in self.data:
-            lbuffer.append(";".join((str(item) for item in row)))
-        filehandle.write("\n".join(lbuffer))
-    dump_to_csv = dump
+            filehandle.write(";".join((str(item) for item in row)) + "\n")
 
     @staticmethod
     def load(filehandle):
         """
-        recreate Timeseries Object from CSV File
+        recreate Timeseries Object from CSV Filehandle
         """
         try:
-            data = filehandle.read().split("\n")
-            header_line = data[0].split(";")
-            timeseries = Timeseries(header_line[1:], header_line[0])
-            for row in data[1:]:
-                values = row.split(";")
-                # use faster add_from_csv to avoid time consuming
-                # type checking
-                timeseries.add_from_csv(float(values[0]), [float(value) for value in values[1:]])
+            header = True # first line is header
+            timeseries = None
+            for row in filehandle:
+                if header is True:
+                    header_line = row.strip().split(";")
+                    timeseries = Timeseries(header_line[1:], header_line[0])
+                    header = False
+                else:
+                    values = row.strip().split(";")
+                    # use faster add_from_csv to avoid time consuming
+                    # type checking
+                    try:
+                        timeseries.add_from_csv(float(values[0]), [float(value) for value in values[1:]])
+                    except ValueError as exc:
+                        logging.error("Error parsing row %s", row)
+                        raise exc
             return timeseries
         except IOError as exc:
             logging.exception(exc)

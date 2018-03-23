@@ -5,7 +5,7 @@ import os
 #import gc
 #gc.set_debug(gc.DEBUG_STATS)
 import logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.ERROR)
 #import logging.handlers
 import json
 import time
@@ -34,34 +34,6 @@ tk_web.IdpConnector.web = web
 authenticator = tk_web.std_authenticator(web, CONFIG)
 calllogger = tk_web.std_calllogger(web, CONFIG)
 outformat = tk_web.std_jsonout(web, CONFIG)
-
-#handler = logging.handlers.RotatingFileHandler(
-#    os.path.join(basedir, "/var/log/apache2/datalogger.log"),
-#    maxBytes=10 * 1024 * 1024,
-#    backupCount=5)
-#logging.getLogger("").addHandler(handler)
-#logging.getLogger("").setLevel(level=logging.DEBUG)
-
-#def calllogger(func):
-#    """
-#    decorator to log and measure call durations
-#    """
-#    def inner(*args, **kwds):
-#        starttime = time.time()
-#        call_str = "%s(%s, %s)" % (func.__name__, args, kwds)
-#        logging.debug("calling %s", call_str)
-#        try:
-#            ret_val = func(*args, **kwds)
-#            logging.debug("duration of call %s : %s", call_str, (time.time() - starttime))
-#            return ret_val
-#        except StandardError as exc:
-#            logging.exception(exc)
-#            logging.error("call to %s caused StandardError", call_str)
-#            return "call to %s caused StandardError" % call_str
-#    # set inner function __name__ and __doc__ to original ones
-#    inner.__name__ = func.__name__
-#    inner.__doc__ = func.__doc__
-#    return inner
 
 MEMCACHE = {}
 MAXAGE = 300
@@ -103,7 +75,6 @@ def memcache(func):
     inner.__name__ = func.__name__
     inner.__doc__ = func.__doc__
     return inner
-
 
 
 class DataLoggerWebApp(object):
@@ -213,6 +184,8 @@ class DataLoggerWebApp(object):
                             return self.get_tsstat(project, tablename, datestring, args)
                         elif (function == "tsastats") or (function == "tsastat"):
                             return self.get_tsastats(project, tablename, datestring, args)
+                        elif (function == "total_stats") or (function == "total_stats"):
+                            return self.get_total_stats(project, tablename, datestring, args)
                         elif function == "quantile":
                             return self.get_quantile(project, tablename, datestring, args)
                         elif function == "scatter":
@@ -510,6 +483,18 @@ class DataLoggerWebApp(object):
             logging.error(exc)
             raise web.notfound() 
 
+    def get_total_stats(self, project, tablename, datestring, args):
+        """
+        return exported total Statistics for one table, if available
+
+        """
+        self.logger.info("optional arguments received: %s", args)
+        datalogger = DataLogger(basedir, project, tablename)
+        filename = os.path.join(datalogger.global_cachedir, datestring, project, tablename, "total_stats.json")
+        if not os.path.isfile(filename):
+            raise web.notfound()
+        else:
+            return open(filename, "rt").read()
 
     def get_quantile(self, project, tablename, datestring, args):
         """

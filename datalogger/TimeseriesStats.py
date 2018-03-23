@@ -165,7 +165,7 @@ class TimeseriesStats(object):
     def __str__(self):
         """printable string representation"""
         outbuffer = []
-        headers = [u"key", ] + self.stat_funcs.keys()
+        headers = [u"key", ] + list(self.stat_funcs.keys())
         outbuffer.append("\t".join(headers))
         for key in self.__stats.keys():
             row = (key, ) + tuple(("%02f" % self.stats[key][funcname] for funcname in self.stat_funcs.keys()))

@@ -60,6 +60,11 @@ class TimeseriesArrayLazy(object):
         """mimic dict"""
         return len(self.__data.keys())
 
+    def __str__(self):
+        ret = ""
+        ret += "index_keynames: %s" % self.__index_keynames
+        return ret
+
     def __getitem__(self, key):
         """mimic dict, honor lazy reloading of Timeseries if value is None"""
         if self.__data[key] is None:
@@ -654,3 +659,5 @@ class TimeseriesArrayLazy(object):
             return timeseries
         else:
             raise KeyError("key %s not in TimeseriesArray", key)
+
+TimeseriesArray = TimeseriesArrayLazy

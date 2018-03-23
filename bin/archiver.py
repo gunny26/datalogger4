@@ -78,7 +78,7 @@ if __name__ == "__main__":
     parser.add_argument("-v", '--verbose', action='store_true', help="set to loglevel DEBUG")
     parser.add_argument("-p", '--project', help="process only this project name")
     parser.add_argument("-t", '--tablename', help="process only this tablename")
-    parser.add_argument("-a", '--archivedir', default="/var/datalogger-archiv", help="directory to archive old raw data to (default: %(default)s)")
+    parser.add_argument("-a", '--archivedir', default="/srv/raw-archiv/datalogger_raw_archiv/", help="directory to archive old raw data to (default: %(default)s)")
     parser.add_argument("--profile", action="store_true", help="use cProfile to start main")
     args = parser.parse_args()
     if args.quiet is True:
