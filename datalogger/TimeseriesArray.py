@@ -20,25 +20,32 @@ from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 hack to mimic some python 2.x behaviour is string
 representation of tuples
 """
-def _b64encode(list_obj):
+def _b64encode_p3(list_obj):
     if len(list_obj) == 1:
         start ="(u'" + list_obj[0] + "',)"
     else:
         start ="(u'" + "', u'".join((str(key) for key in list_obj)) + "')"
     encoded = base64.urlsafe_b64encode(start.encode("utf-8")).decode("utf-8")
-    print("%s -> %s" % (list_obj, encoded))
+    #print("%s -> %s -> %s" % (list_obj, encoded, b64decode(encoded)))
+    return encoded
+
+def _b64encode_p2(list_obj):
+    encoded = base64.urlsafe_b64encode(unicode(tuple(list_obj))).decode("utf-8")
+    #print("%s -> %s -> %s" % (list_obj, encoded, b64decode(encoded)))
     return encoded
 
 def _b64decode(encoded):
     decoded = base64.b64decode(encoded).decode("utf-8")
-    print("%s -> %s" % (encoded, decoded))
+    #print("%s -> %s" % (encoded, decoded))
     return decoded
 
+
 if sys.version_info < (3,0):
-    print("using original function")
-    from base64 import b64encode, b64decode
+    print("using python 2 coding funtions")
+    b64encode = _b64encode_p3
+    b64decode = _b64decode
 else:
-    b64encode = _b64encode
+    b64encode = _b64encode_p3
     b64decode = _b64decode
 ##################### hack end ###########################
 
@@ -89,22 +96,32 @@ class TimeseriesArray(object):
         return len(self.__data.keys())
 
     def __str__(self):
-        ret = ""
-        ret += "index_keynames: %s\n" % self.__index_keynames
-        ret += "value_keynames: %s\n" % self.__value_keynames
-        ret += "ts_key: %s\n" % self.__ts_key
-        ret += "data: %s\n" % self.__data
-        return ret
+        """
+        return string represenation for tsa,
+        mainly the same as in stored version
+        """
+        outbuffer = {
+            "index_keys" : self.__index_keynames,
+            "value_keys" : self.__value_keynames,
+            "ts_key" : self.__ts_key,
+            "ts_filenames" : [self.get_ts_dumpfilename(key) for key in self.keys()],
+            "tsa_filename" : self.get_dumpfilename(self.__index_keynames),
+            "datatypes" : self.datatypes
+        }
+        return json.dumps(outbuffer, indent=4, sort_keys=True)
 
     def __getitem__(self, key):
         """mimic dict, honor lazy reloading of Timeseries if value is None"""
         if self.__data[key] is None:
+            # auto load data if None
             timeseries = self.__autoload_ts(key)
-            if self.__cache is True:
-                self.__data[key] = timeseries
-            return timeseries
-        else:
-            return self.__data[key]
+            if self.__cache is False:
+                # if cache is set to None, return only loaded data,
+                # but do not save reference, so every later call will
+                # result in re-read of timeseries
+                return timeseries
+            self.__data[key] = timeseries
+        return self.__data[key]
 
     def getitem_grouped__(self, key):
         """
@@ -137,7 +154,7 @@ class TimeseriesArray(object):
             assert self.__ts_key == other.ts_key
             assert len(self.__data.keys()) == len(other.keys())
             for key in self.__data.keys():
-                if len(self.__data[key]) != len(other.data[key]):
+                if len(self[key]) != len(other[key]):
                     raise AssertionError("timeseries %s data differences in length" % key)
             return True
         except AssertionError as exc:
@@ -145,11 +162,12 @@ class TimeseriesArray(object):
             return False
 
     def items(self):
-        """mimic dict"""
-        return ((key, self[key]) for key in self.keys())
+        """mimic dict, but honor autoload feature"""
+        for key in self.keys():
+            yield (key, self[key])
 
     def values(self):
-        """mimic dict"""
+        """mimic dict, but honor autoload feature"""
         for key in self.__data.keys():
             yield self[key]
 
@@ -225,7 +243,7 @@ class TimeseriesArray(object):
     @staticmethod
     def to_float(value_str):
         """
-        try to convert strint to float, honor "," als decimal point if possible
+        try to convert string to float, honor "," als decimal point if possible
         otherwise raise ValueError
         """
         try:
@@ -248,7 +266,7 @@ class TimeseriesArray(object):
         #assert all((value_key in data for value_key in self.__value_keynames)) # test if all keys are available
         # create key from data
         try:
-            index_key = tuple([unicode(data[key]) for key in self.__index_keynames])
+            index_key = tuple([data[key] for key in self.__index_keynames])
         except KeyError:
             #logging.exception(exc)
             logging.error("there are index_keys missing in this dataset %s, skipping this dataset", data.keys())
@@ -348,40 +366,54 @@ class TimeseriesArray(object):
         """
         call convert method of every stored Timeseries, with given parameter
         """
+        if self.__cache is False:
+            raise AttributeError("operation only applicable in cache mode, set <TimeseriesArray>.cache=True")
+        if colname not in self.__value_keynames:
+            raise KeyError("colname %s not in defined columns" % colname)
+        if newcolname in self.__value_keynames:
+            raise KeyError("newcolname %s already in defined columns" % newcolname)
         for key in self.keys():
-            timeseries = self[key]
-            timeseries.convert(colname, datatype, newcolname)
+            self[key].convert(colname, datatype, newcolname)
+        self.__value_keynames.append(newcolname)
 
     def add_derive_col(self, colname, newcolname):
-        """
-        add one to key to every Timeseries, for this specific colname
-        which represents the difference between two values in time
-        TODO: describe this better
-        """
-        assert colname in self.__value_keynames
-        assert newcolname not in self.__value_keynames
-        for key, timeseries in self.keys():
-            timeseries = self[key]
-            try:
-                assert newcolname not in timeseries.headers
-            except AssertionError as exc:
-                logging.error("%s does exist in current dataset at key %s", newcolname, key)
-                raise exc
-            timeseries.add_derive_col(colname, newcolname)
-        self.__value_keynames.append(newcolname)
+        logging.info("DEPRECATED function add_derive_col use convert(%s, 'derive', %s)", colname, newcolname)
+        return self.convert(colname, "derive", newcolname)
+#        """
+#        add one to key to every Timeseries, for this specific colname
+#        which represents the difference between two values in time
+#        TODO: describe this better
+#        """
+#        if self.__cache is False:
+#            raise AttributeError("operation only applicable in cache mode, set <TimeseriesArray>.cache=True")
+#        assert colname in self.__value_keynames
+#        assert newcolname not in self.__value_keynames
+#        for key, timeseries in self.keys():
+#            timeseries = self[key]
+#            try:
+#                assert newcolname not in timeseries.headers
+#            except AssertionError as exc:
+#                logging.error("%s does exist in current dataset at key %s", newcolname, key)
+#                raise exc
+#            timeseries.add_derive_col(colname, newcolname)
+#        self.__value_keynames.append(newcolname)
 
     def add_per_s_col(self, colname, newcolname):
-        """
-        add one to key to every Timeseries, for this specific colname
-        which represents the difference between two values in time
-        TODO: describe this better
-        """
-        assert colname in self.__value_keynames
-        assert newcolname not in self.__value_keynames
-        for timeseries in self.values():
-            assert newcolname not in timeseries.headers
-            timeseries.add_per_s_col(colname, newcolname)
-        self.__value_keynames.append(newcolname)
+        logging.info("DEPRECATED function add_derive_col use convert(%s, 'persecond', %s)", colname, newcolname)
+        return self.convert(colname, "persecond", newcolname)
+#       """
+#        add one to key to every Timeseries, for this specific colname
+#        which represents the difference between two values in time
+#        TODO: describe this better
+#        """
+#        if self.__cache is False:
+#            raise AttributeError("operation only applicable in cache mode, set <TimeseriesArray>.cache=True")
+#        assert colname in self.__value_keynames
+#        assert newcolname not in self.__value_keynames
+#        for timeseries in self.values():
+#            assert newcolname not in timeseries.headers
+#            timeseries.add_per_s_col(colname, newcolname)
+#        self.__value_keynames.append(newcolname)
 
     def add_calc_col_single(self, colname, newcolname, func=lambda a: a):
         """
@@ -396,11 +428,14 @@ class TimeseriesArray(object):
         return:
         None
         """
-        assert colname in self.__value_keynames
-        assert newcolname not in self.__value_keynames
-        for timeseries in self.values():
-            assert newcolname not in timeseries.headers
-            timeseries.add_calc_col_single(colname, newcolname, func)
+        if self.__cache is False:
+            raise AttributeError("operation only applicable in cache mode, set <TimeseriesArray>.cache=True")
+        if colname not in self.__value_keynames:
+            raise KeyError("colname %s not in defined columns" % colname)
+        if newcolname in self.__value_keynames:
+            raise KeyError("newcolname %s already in defined columns" % newcolname)
+        for key in self.keys():
+            self[key].add_calc_col_single(colname, newcolname, func)
         self.__value_keynames.append(newcolname)
 
     def add_calc_col_full(self, newcolname, func):
@@ -415,10 +450,12 @@ class TimeseriesArray(object):
         returns:
         None
         """
-        assert newcolname not in self.__value_keynames
-        for timeseries in self.values():
-            assert newcolname not in timeseries.headers
-            timeseries.add_calc_col_full(newcolname, func)
+        if self.__cache is False:
+            raise AttributeError("operation only applicable in cache mode, set <TimeseriesArray>.cache=True")
+        if newcolname in self.__value_keynames:
+            raise KeyError("newcolname %s already in defined columns" % newcolname)
+        for key in self.keys():
+            self[key].add_calc_col_full(newcolname, func)
         self.__value_keynames.append(newcolname)
 
     def remove_col(self, colname):
@@ -431,15 +468,12 @@ class TimeseriesArray(object):
         returns:
         None
         """
-        assert colname in self.__value_keynames
+        if self.__cache is False:
+            raise AttributeError("operation only applicable in cache mode, set <TimeseriesArray>.cache=True")
+        if colname not in self.__value_keynames:
+            raise KeyError("colname %s not in defined columns" % colname)
         for key in self.keys():
-            timeseries = self[key]
-            try:
-                assert colname in timeseries.headers
-            except AssertionError as exc:
-                logging.error("Timeseries with key %s, has no header %s, actually only %s", key, colname, timeseries.headers)
-                raise exc
-            timeseries.remove_col(colname)
+            self[key].remove_col(colname)
         self.__value_keynames.remove(colname)
 
     def slice(self, colnames):
@@ -472,27 +506,23 @@ class TimeseriesArray(object):
             # convert key tuple to dict
             key_dict = self.get_index_dict(key)
             # dump timeseries as dictionary and spice dict up with
-            # key_dict and timestamp
-            ts_dump_dict = timeseries.dump_dict()
-            for timestamp in sorted(ts_dump_dict.keys()):
-                row = ts_dump_dict[timestamp]
+            # key_dict
+            for row in self[key].to_dict():
                 row.update(key_dict)
-                row[self.ts_key] = timestamp
                 yield row
 
     def dump(self, outpath, overwrite=False):
         """
-        dump all data to filehandle in csv format
-        filehandle can also be gzip.open or other types
+        dump all data to directory in csv format, filename will be auto generated
 
         parameters:
-        filehandle <file>
+        outpath <str> must be existing directory
         overwrite <bool> overwrite existing Timeseries files, or not
-            the json file is witten nonetheless if this options is set or not
+            the TimeseriesArray file is witten nonetheless if this options is set or not
         """
         tsa_filename = self.get_dumpfilename(self.__index_keynames)
         logging.debug("tsa_filename: %s", tsa_filename)
-        outfile = os.path.join(outpath, tsa_filename)
+        tsa_outfilename = os.path.join(outpath, tsa_filename)
         outbuffer = {
             "index_keys" : self.__index_keynames,
             "value_keys" : self.__value_keynames,
@@ -503,12 +533,13 @@ class TimeseriesArray(object):
             timeseries = self[key]
             ts_filename = self.get_ts_dumpfilename(key)
             # skip dump, if file exists, and overwrite=False
-            if not os.path.isfile(os.path.join(outpath, ts_filename)) or overwrite:
+            ts_outfilename = os.path.join(outpath, ts_filename)
+            if not os.path.isfile(ts_outfilename) or overwrite:
                 logging.debug("dumping key %s to filename %s", key, ts_filename)
-                with gzip.open(os.path.join(outpath, ts_filename), "wt") as outfile:
-                    timeseries.dump_to_csv(outfile)
+                with gzip.open(ts_outfilename, "wt") as outfile:
+                    timeseries.dump(outfile)
             outbuffer["ts_filenames"].append(ts_filename)
-        with open(outfile, "wt") as outfile:
+        with open(tsa_outfilename, "wt") as outfile:
             json.dump(outbuffer, outfile)
             outfile.flush()
     dump_split = dump
@@ -576,10 +607,8 @@ class TimeseriesArray(object):
         """
         tsa_filename = TimeseriesArray.get_dumpfilename(index_keys)
         logging.debug("tsa_filename: %s", tsa_filename)
-        infile = os.path.join(path, tsa_filename)
-        filehandle = open(infile, "rb")
-        data = json.load(filehandle)
-        filehandle.close()
+        with open(os.path.join(path, tsa_filename), "rt") as infile:
+            data = json.load(infile)
         logging.debug("loaded json data")
         logging.debug("index_keys: %s", data["index_keys"])
         logging.debug("value_keys: %s", data["value_keys"])
@@ -587,9 +616,9 @@ class TimeseriesArray(object):
         logging.debug("number of ts files: %s", len(data["ts_filenames"]))
         filenames = {}
         for filename in data["ts_filenames"]:
-            logging.debug("reading ts from file %s", filename)
+            logging.debug("parsing Timeseries filename %s", filename)
             enc_key = filename.split(".")[0][3:] # only this pattern ts_(.*).csv.gz
-            key = eval(b64decode(enc_key)) # must be str not unicode
+            key = eval(b64decode(enc_key))
             key_dict = dict(zip(index_keys, key))
             if filterkeys is not None:
                 if TimeseriesArray.filtermatch(key_dict, filterkeys, matchtype):
@@ -604,10 +633,12 @@ class TimeseriesArray(object):
     @staticmethod
     def load(path, index_keys, filterkeys=None, index_pattern=None, matchtype="and", datatypes=None):
         """
+        load stored tsa data from directory <path>
+
         filterkeys could be a part of existing index_keys
         all matching keys will be used
 
-        index_keys <tuple>
+        index_keys <tuple> * required
         filterkeys <tuple> default None
         matchtype <str> default "and"
         index_pattern <str> for use in re.compile(index_pattern)
@@ -617,39 +648,25 @@ class TimeseriesArray(object):
         """
         # get filename and load json structure
         tsa_filename = TimeseriesArray.get_dumpfilename(index_keys)
-        infile = os.path.join(path, tsa_filename)
-        try:
-            filehandle = open(infile, "rb")
-            data = json.load(filehandle)
-            filehandle.close()
-        except Exception as exc:
-            logging.exception(exc)
-            logging.error("Something went wrong while loading json data from %s", tsa_filename)
-            raise exc
+        with open(os.path.join(path, tsa_filename), "rt") as infile:
+            data = json.load(infile)
         # create object
-        tsa = TimeseriesArrayLazy(data["index_keys"], data["value_keys"], data["ts_key"], datatypes=datatypes)
+        tsa = TimeseriesArray(data["index_keys"], data["value_keys"], data["ts_key"], datatypes=datatypes)
+        # load full or filter some keys
         if index_pattern is None:
             for key, filename in tsa.get_ts_filenames(path, index_keys, filterkeys, matchtype).items():
                 tsa.ts_autoload[key] = filename
                 tsa[key] = None
-                #logging.debug("loading Timeseries from file %s", filename)
-                #filehandle = gzip.open(filename, "rb")
-                #tsa.data[key] = Timeseries.load_from_csv(filehandle)
-                #filehandle.close() # close to not get too many open files
         else:
-            logging.info("using index_pattern %s to filter loaded keys", index_pattern)
+            logging.info("using index_pattern %s to filter index_keys", index_pattern)
             rex = re.compile(index_pattern)
             for key, filename in tsa.get_ts_filenames(path, index_keys, filterkeys, matchtype).items():
-                m = rex.match(unicode(key))
+                m = rex.match(str(key))
                 if m is not None:
                     tsa.ts_autoload[key] = filename
                     tsa[key] = None
-                    #logging.debug("loading Timeseries from file %s", filename)
-                    #filehandle = gzip.open(filename, "rb")
-                    #tsa.data[key] = Timeseries.load_from_csv(filehandle)
-                    #filehandle.close() # close to not get too many open files
                 else:
-                    logging.info("index_key %s filtered", key)
+                    logging.debug("index_key %s skipped by filter", key)
         return tsa
     load_split = load
 

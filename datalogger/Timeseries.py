@@ -608,40 +608,42 @@ class Timeseries(object):
 #                ret_data[row[0]] = tuple((row[index] for index in colnums))
 #        return ret_data
 
-#    def dump_dict(self, value_keys=None, start_ts=None, stop_ts=None):
-#        """
-#        return internal data as dict key = ts, of dicts value_key = value
-#
-#        {
-#            ts1: {
-#                key1 : value1,
-#                key2 : value2,
-#                ...
-#            }
-#             ts2: {
-#                key1 : value1,
-#                key2 : value2,
-#                ...
-#            }
-#            ...
-#        }
-#        """
-#        if value_keys is None:
-#            value_keys = self.__headers # use all columns if None
-#        try:
-#            assert type(start_ts) == type(stop_ts)
-#            if start_ts is not None:
-#                assert type(start_ts) == int
-#        except AssertionError as exc:
-#            logging.exception("start_ts and stop_ts has to be the same type and int")
-#            logging.error("start_ts=%s, stop_ts=%s", start_ts, stop_ts)
-#            raise exc
-#        colnums = tuple((self.__get_colnum(key) for key in value_keys))
-#        ret_data = {}
-#        for row in self.data:
-#            if (start_ts is None) or (start_ts <= row[0] <= stop_ts):
-#                ret_data[row[0]] = dict(((value_keys[index], row[colnums[index]]) for index in range(len(value_keys))))
-#        return ret_data
+    def to_dict(self, value_keynames=None, start_ts=None, stop_ts=None):
+        """
+        return internal data as dict key = ts, of dicts value_key = value
+
+        {
+            ts1: {
+                key1 : value1,
+                key2 : value2,
+                ...
+            }
+             ts2: {
+                key1 : value1,
+                key2 : value2,
+                ...
+            }
+            ...
+        }
+        """
+        if value_keynames is None:
+            value_keynames = self.__headers # use all columns if None
+        try:
+            assert type(start_ts) == type(stop_ts)
+            if start_ts is not None:
+                assert type(start_ts) == int
+        except AssertionError as exc:
+            logging.exception("start_ts and stop_ts has to be the same type and int")
+            logging.error("start_ts=%s, stop_ts=%s", start_ts, stop_ts)
+            raise exc
+        colnums = [self.__get_colnum(key) for key in value_keynames]
+        # TODO: return sorted by timestamp as default
+        for row in self.data:
+            if (start_ts is None) or (start_ts <= row[0] <= stop_ts):
+                # mind the -1 at value_keynames!!
+                row_dict = dict(((value_keynames[index-1], row[index]) for index in colnums))
+                row_dict.update({self.ts_keyname : row[0]})
+                yield row_dict
 
     def to_csv(self, value_keynames=None, headers=True, delimiter=",", start_ts=None, stop_ts=None):
         """
@@ -708,7 +710,7 @@ class Timeseries(object):
     def convert(self, colname, datatype, newcolname=None):
         """
         convert some existing columns to given datatype and add this column to Timeseries
-        
+
         parameters:
         colname <str> - must be in colnames
         datatype <str> - must be in datatypes
@@ -731,7 +733,7 @@ class Timeseries(object):
             self.append(newcolname, newseries)
 
     def add_derive_col(self, colname, colname_d):
-        self.logger.info("DEPRECATED function add_derive_col use convert")
+        self.logger.info("DEPRECATED function add_derive_col use convert(%s, 'derive', %s)", colname, colname_d)
         return self.convert(colname, "derive", colname_d)
 #        """
 #        add derived column to colname
@@ -758,7 +760,7 @@ class Timeseries(object):
 #        self.__headers.append(colname_d)
 
     def add_per_s_col(self, colname, colname_d):
-        self.logger.info("DEPRECATED function add_per_s_col use convert")
+        self.logger.info("DEPRECATED function add_per_s_col use convert(%s, 'persecond', %s)", colname, colname_d)
         return self.convert(colname, "persecond", colname_d)
 #        """
 #        add new per second columns from existing column

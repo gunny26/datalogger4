@@ -69,7 +69,7 @@ class Test(unittest.TestCase):
         assert self.app["ts"][-1] == 1521586501.0
         assert self.app["ts"][0] == self.app.start_ts
         assert self.app[(10, "com_select")] == 89359228.0 == self.app[(10, 1)] == self.app[10][1]
-        assert self.app[(1521586501.0, 1)] == 99254355.0 == self.app[(-1, 1)] == self.app[-1][1] 
+        assert self.app[(1521586501.0, 1)] == 99254355.0 == self.app[(-1, 1)] == self.app[-1][1]
 
     def add(self, timestamp, values, suppress_non_steady_ts=True):
         # TODO: implement this

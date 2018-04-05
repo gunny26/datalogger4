@@ -75,19 +75,19 @@ class TimeseriesStats(object):
     separated to cache statistics in own files
     """
     stat_funcs = {
-        u"min" : min,
-        u"max" : max,
-        u"avg" : mean,
-        u"sum" : sum,
-        u"std" : pstdev,
-        u"median" : lambda series: median(list(series)),
-        u"count" : len,
-        u"first" : lambda series: series[0],
-        u"last" : lambda series: series[-1],
-        u"mean" : mean,
-        u"inc" : increments,
-        u"dec" : decrements,
-        u"diff" : lambda series: series[-1] - series[0],
+        "min" : min,
+        "max" : max,
+        "avg" : mean,
+        "sum" : sum,
+        "std" : pstdev,
+        "median" : lambda series: median(list(series)),
+        "count" : len,
+        "first" : lambda series: series[0],
+        "last" : lambda series: series[-1],
+        "mean" : mean,
+        "inc" : increments,
+        "dec" : decrements,
+        "diff" : lambda series: series[-1] - series[0],
     }
 
     def __init__(self, timeseries):
@@ -159,7 +159,7 @@ class TimeseriesStats(object):
         """either numerical index or tuple (value_keyname, statistical functio name)"""
         if isinstance(index, tuple):
             value_key, func_name = index
-            return self.__stats[value_key, func_name]
+            return self.__stats[value_key][func_name]
         return self.__stats[index]
 
     def __str__(self):
@@ -170,22 +170,6 @@ class TimeseriesStats(object):
         for key in self.__stats.keys():
             row = (key, ) + tuple(("%02f" % self.stats[key][funcname] for funcname in self.stat_funcs.keys()))
             outbuffer.append("\t".join(row))
-        return "\n".join(outbuffer)
-
-    def htmltable(self):
-        """DEPRECATED: should be done in Javascript not here"""
-        outbuffer = []
-        outbuffer.append("<table>")
-        outbuffer.append("<tr><th>")
-        headers = [u"key", ] + self.stat_funcs.keys()
-        outbuffer.append("</th><th>".join(headers))
-        outbuffer.append("</th></tr>")
-        for key in self.__stats.keys():
-            row = (key, ) + tuple(("%0.2f" % self.stats[key][funcname] for funcname in self.stat_funcs.keys()))
-            outbuffer.append("<tr><td>")
-            outbuffer.append("</td><td>".join(row))
-            outbuffer.append("</td></tr>")
-        outbuffer.append("</table>")
         return "\n".join(outbuffer)
 
     def keys(self):
@@ -213,7 +197,7 @@ class TimeseriesStats(object):
     @property
     def funcnames(self):
         """get statistical function names"""
-        return self.stat_funcs.keys()
+        return sorted(self.stat_funcs.keys())
 
     def get_stats(self):
         """

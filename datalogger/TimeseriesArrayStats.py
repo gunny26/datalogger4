@@ -6,6 +6,7 @@ module to work with TimeseriesArrayStatistics
 automatically calculates all TimeseriesStats for every Timeseries in TimeseriesArray
 at initialization
 """
+import sys
 import json
 import base64
 import os
@@ -13,6 +14,41 @@ import logging
 # own modules
 from TimeseriesStats import TimeseriesStats as TimeseriesStats
 from CustomExceptions import TimeseriesEmptyError as TimeseriesEmptyError
+
+#################### hack begin ##########################
+"""
+hack to mimic some python 2.x behaviour is string
+representation of tuples
+"""
+def _b64encode_p3(list_obj):
+    if len(list_obj) == 1:
+        start ="(u'" + list_obj[0] + "',)"
+    else:
+        start ="(u'" + "', u'".join((str(key) for key in list_obj)) + "')"
+    encoded = base64.urlsafe_b64encode(start.encode("utf-8")).decode("utf-8")
+    #print("%s -> %s -> %s" % (list_obj, encoded, b64decode(encoded)))
+    return encoded
+
+def _b64encode_p2(list_obj):
+    encoded = base64.urlsafe_b64encode(unicode(tuple(list_obj))).decode("utf-8")
+    #print("%s -> %s -> %s" % (list_obj, encoded, b64decode(encoded)))
+    return encoded
+
+def _b64decode(encoded):
+    decoded = base64.b64decode(encoded).decode("utf-8")
+    #print("%s -> %s" % (encoded, decoded))
+    return decoded
+
+
+if sys.version_info < (3,0):
+    print("using python 2 coding funtions")
+    b64encode = _b64encode_p3
+    b64decode = _b64decode
+else:
+    b64encode = _b64encode_p3
+    b64decode = _b64decode
+##################### hack end ###########################
+
 
 class TimeseriesArrayStats(object):
     """
@@ -29,13 +65,22 @@ class TimeseriesArrayStats(object):
         """
         # define instance data
         self.__stats = {}
-        self.__index_keynames = tuple([unicode(value) for value in tsa.index_keys])
-        self.__value_keynames = tuple([unicode(value) for value in tsa.value_keys])
+        self.__index_keynames = tuple(tsa.index_keynames)
+        self.__value_keynames = tuple(tsa.value_keynames)
         for index_key in tsa.keys():
             try:
                 self.__stats[index_key] = TimeseriesStats(tsa[index_key])
             except TimeseriesEmptyError as exc:
                 logging.info("Timeseries for key %s is length zero, skipping", index_key)
+
+    def __str__(self):
+        outbuffer = {
+            "index_keynames" : self.__index_keynames,
+            "value_keynames" : self.__value_keynames,
+            "tsstats" : [self.get_tsstat_dumpfilename(key) for key in self.__stats.keys()],
+            "tsastats" : self.get_dumpfilename(self.__index_keynames)
+            }
+        return json.dumps(outbuffer, indent=4, sort_keys=True)
 
     def __eq__(self, other):
         try:
@@ -212,7 +257,7 @@ class TimeseriesArrayStats(object):
         returns:
         <str>
         """
-        return "tsstat_%s.json" % base64.urlsafe_b64encode(unicode(key))
+        return "tsstat_%s.json" % b64encode(key)
 
     @staticmethod
     def get_dumpfilename(index_keys):
@@ -227,7 +272,7 @@ class TimeseriesArrayStats(object):
         returns:
         <str>
         """
-        return "tsastat_%s.json" % base64.urlsafe_b64encode(unicode(index_keys))
+        return "tsastat_%s.json" % b64encode(index_keys)
 
     def dump(self, outpath, overwrite=False):
         """
@@ -297,7 +342,7 @@ class TimeseriesArrayStats(object):
         for filename in data["tsstat_filenames"]:
             logging.debug("reading key for tsstat from file %s", filename)
             enc_key = filename.split(".")[0][7:] # only this pattern tsstat_(.*).json
-            key = eval(base64.urlsafe_b64decode(str(enc_key))) # must be str not unicode
+            key = eval(b64decode(str(enc_key))) # must be str not unicode
             key_dict = dict(zip(index_keys, key))
             if filterkeys is not None:
                 if TimeseriesArrayStats.filtermatch(key_dict, filterkeys, matchtype):
@@ -383,8 +428,7 @@ class TimeseriesArrayStats(object):
         first column is always the identifying key of this TimseriesStat as string
         mainly to use in websites to get easier to the key of this row
         """
-        outbuffer = []
-        outbuffer.append((u"#key", ) + self.__index_keynames + self.__value_keynames)
+        yield ("#key", ) + self.__index_keynames + self.__value_keynames
         data = None
         if sortkey is not None:
             data = sorted(self.__stats.items(), key=lambda item: item[1][sortkey][stat_func_name], reverse=True)
@@ -392,7 +436,4 @@ class TimeseriesArrayStats(object):
             data = self.__stats.items()
         for key, value in data:
             values = list(key) + [value[value_key][stat_func_name] for value_key in self.__value_keynames]
-            outbuffer.append([unicode(key), ] + values)
-        return outbuffer
-
-
+            yield (str(key), ) + tuple(values)
