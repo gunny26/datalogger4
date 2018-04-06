@@ -1,14 +1,16 @@
 #!/usr/bin/pypy
 # pylint: disable=line-too-long
 import json
+import os
 import logging
-from datalogger.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
+from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 
 
 class QuantileArray(object):
     """
     hold a number of Quantile Objects
     """
+    __filename = "quantile.json"
 
     def __init__(self, tsa, tsastats=None):
         """
@@ -19,7 +21,7 @@ class QuantileArray(object):
         """
         self.__data = {}
         self.__keys = tuple(tsa.keys())
-        self.__value_keys = tuple(tsa.value_keys)
+        self.__value_keys = tuple(tsa.value_keynames)
         for value_key in self.__value_keys:
             try:
                 self.__data[value_key] = Quantile(tsa, value_key, tsastats=tsastats)
@@ -69,13 +71,17 @@ class QuantileArray(object):
             logging.exception(exc)
             return False
 
-    def dump(self, filehandle):
+    @classmethod
+    def get_dumpfilename(cls, outdir):
+        return os.path.join(outdir, cls.__filename)
+
+    def dump(self, outdir):
         """
         dump internal data to filehandle
         """
         quantille_data = dict(((key, quantille.dumps()) for key, quantille in self.__data.items()))
-        json.dump((quantille_data, self.__keys, self.__value_keys), filehandle)
-        filehandle.flush()
+        with open(os.path.join(outdir, self.__filename), "wt") as outfile:
+            json.dump((quantille_data, self.__keys, self.__value_keys), outfile)
 
     def to_json(self):
         """
@@ -84,8 +90,8 @@ class QuantileArray(object):
         quantille_data = dict(((key, quantille.dumps()) for key, quantille in self.__data.items()))
         return json.dumps((quantille_data, self.__keys, self.__value_keys))
 
-    @staticmethod
-    def load(filehandle):
+    @classmethod
+    def load(cls, outdir):
         """
         load data from stores json file on disk
 
@@ -93,7 +99,8 @@ class QuantileArray(object):
         filehandle <file> to read from, json expected
         """
         qa = QuantileArray.__new__(QuantileArray)
-        quantille_data, qa.__keys, qa.__value_keys = json.load(filehandle)
+        with open(os.path.join(indir, cls.__filename), "rt") as infile:
+            quantille_data, qa.__keys, qa.__value_keys = json.load(infile)
         # convert to tuple, to be equal to normal initialization
         qa.__keys = tuple((tuple(key) for key in qa.__keys))
         qa.__value_keys = tuple(qa.__value_keys)

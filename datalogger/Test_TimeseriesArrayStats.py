@@ -5,9 +5,11 @@ import logging
 logging.basicConfig(level=logging.INFO)
 import datetime
 import gzip
+import json
 import os
 # own modules
 from Timeseries import Timeseries as Timeseries
+from TimeseriesStats import TimeseriesStats as TimeseriesStats
 from TimeseriesArray import TimeseriesArray as TimeseriesArray
 from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 
@@ -108,10 +110,6 @@ class Test(unittest.TestCase):
         tsa = TimeseriesArray.load("testdata/", meta["index_keynames"], datatypes=meta["value_keynames"])
         self.tsastats = TimeseriesArrayStats(tsa)
 
-    @calllogger
-    def __getattr__(self, *args, **kwds):
-        return
-
     def test__str__(self):
         print("testing __str__")
         print(self.tsastats)
@@ -124,54 +122,59 @@ class Test(unittest.TestCase):
         pass
     def __delitem__(self, key):
         pass
-    def keys(self):
-        pass
-    def values(self):
-        pass
-    def items(self):
-        pass
-    def stats(self):
-        pass
-    def stats(self, value):
-        pass
-    def index_keys(self):
-        pass
-    def index_keys(self, value):
-        pass
-    def index_keynames(self):
-        pass
-    def index_keynames(self, value):
-        pass
-    def value_keys(self):
-        pass
-    def value_keys(self, value):
-        pass
-    def value_keynames(self):
-        pass
-    def value_keynames(self, value):
-        pass
-    def slice(self, value_keys):
-        pass
-    def get_stats(self, value_key):
-        pass
-    def get_tsstat_dumpfilename(key):
-        pass
-    def get_dumpfilename(index_keys):
-        pass
-    def dump(self, outpath, overwrite=False):
-        pass
+
+    def test_keys(self):
+        print(list(self.tsastats.keys()))
+        assert list(self.tsastats.keys()) == [('srvwebsql2.tilak.cc',), ('srvdmzsql1.tilak.cc',), ('srvaporti1.tilak.cc',), ('nagios.tilak.cc',), ('srvazwsql1.tilak.cc',)]
+
+    def test_values(self):
+        assert all((isinstance(value, TimeseriesStats) for value in self.tsastats.values()))
+
+    def test_items(self):
+        for key, value in self.tsastats.items():
+            assert isinstance(key, tuple)
+            assert isinstance(value, TimeseriesStats)
+
+    def test_index_keynames(self):
+        assert self.tsastats.index_keynames == ('hostname',)
+
+    def test_value_keynames(self):
+        assert self.tsastats.value_keynames == ('com_select', 'uptime', 'com_insert', 'slow_queries', 'bytes_sent', 'com_update', 'connections', 'com_delete', 'qcache_hits', 'questions', 'opened_tables', 'aborted_connects', 'bytes_received', 'created_tmp_tables', 'created_tmp_disk_tables', 'aborted_clients')
+
+    def test_slice(self):
+        tsastats = self.tsastats.slice(("bytes_sent", "bytes_received"))
+        assert tsastats.value_keynames == ("bytes_sent", "bytes_received")
+        print(tsastats)
+
+    def test_get_stats(self):
+        stats = self.tsastats.get_stats("bytes_sent")
+        assert stats[('nagios.tilak.cc',)]['max'] == 42969066.8
+
+    def test_dump(self):
+        outdir = "testdata/tsastat_testdump"
+        if not os.path.isdir(outdir):
+            os.mkdir(outdir)
+        self.tsastats.dump(outdir, overwrite=True)
+        tsastats = TimeseriesArrayStats.load(outdir, meta["index_keynames"], filterkeys=None, matchtype="and")
+        assert tsastats == self.tsastats
+
     def filtermatch(key_dict, filterkeys, matchtype):
         pass
+
     def get_load_filenames(path, index_keys, filterkeys=None, matchtype="and"):
         pass
-    def load(path, index_keys, filterkeys=None, matchtype="and"):
-        pass
-    def to_json(self):
-        pass
-    def from_json(jsondata):
-        pass
+
+    def test_load(self):
+        tsastat = TimeseriesArrayStats.load("testdata/", meta["index_keynames"], filterkeys=None, matchtype="and")
+        assert self.tsastats == tsastat
+
+    def test_from_json(self):
+        tsastats = TimeseriesArrayStats.from_json(self.tsastats.to_json())
+        assert tsastats == self.tsastats
+
     def remove_by_value(self, value_key, stat_func_name, value):
         pass
+
     def test_to_csv(self):
         for row in self.tsastats.to_csv("avg", sortkey=None, reverse=True):
             print(row)
