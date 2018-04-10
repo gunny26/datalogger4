@@ -39,6 +39,13 @@ class QuantileArray(object):
         """all available value_keynames"""
         return self.__value_keys
 
+    def __str__(self):
+        ret = {
+            "keys" : self.__keys,
+            "value_keynames" : self.__value_keys
+        }
+        return json.dumps(ret, indent=4)
+
     def __getitem__(self, key):
         """
         overloaded __getitem__
@@ -99,7 +106,7 @@ class QuantileArray(object):
         filehandle <file> to read from, json expected
         """
         qa = QuantileArray.__new__(QuantileArray)
-        with open(os.path.join(indir, cls.__filename), "rt") as infile:
+        with open(os.path.join(outdir, cls.__filename), "rt") as infile:
             quantille_data, qa.__keys, qa.__value_keys = json.load(infile)
         # convert to tuple, to be equal to normal initialization
         qa.__keys = tuple((tuple(key) for key in qa.__keys))
@@ -122,6 +129,7 @@ class QuantileArray(object):
         qa.__value_keys = tuple(qa.__value_keys)
         qa.__data = dict(((key, Quantile.loads(data)) for key, data in quantille_data.items()))
         return qa
+
 
 class QuantileError(Exception):
     """raised if there is some problem calculating Quantile"""

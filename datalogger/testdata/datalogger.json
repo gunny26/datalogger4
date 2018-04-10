@@ -1,0 +1,13 @@
+{
+    "user" : "mesznera",
+    "group" : "mesznera",
+    "cachedir" : "cache",
+    "projects" : {
+        "sanportperf" : {
+            "fcIfC3AccountingTable" : "1"
+        },
+        "mysql" : {
+            "performance" : "1"
+        }
+    }
+}

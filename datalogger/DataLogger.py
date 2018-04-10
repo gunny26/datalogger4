@@ -19,7 +19,6 @@ from TimeseriesArray import TimeseriesArray as TimeseriesArray
 from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 from TimeseriesStats import TimeseriesStats as TimeseriesStats
 from Quantile import QuantileArray as QuantileArray
-from CorrelationMatrix import CorrelationMatrixArray as CorrelationMatrixArray
 from CustomExceptions import DataLoggerRawFileMissing
 from CustomExceptions import DataLoggerLiveDataError
 from CustomExceptions import DataLoggerFilenameDecodeError
@@ -31,10 +30,14 @@ def not_today(datestring):
 
 class DataLogger(object):
     """
-    class to handle same work around Datalogger RAW File
+    class to handle same work around Datalogger Files
+    either precalculate Timeseries, TimeseriesArray, TimeseriesStats and TimeseriesArrayStats
+    or simple return this precalculated data
+
+    most of the time the pre-calculation will be done with the first call for this kind of data
     """
 
-    def __init__(self, basedir):
+    def __init__(self, basedir, configfilename="datalogger.json"):
         """
         loads some meta information of this raw data table in this project
         to get name of headers, and index columns
@@ -49,7 +52,7 @@ class DataLogger(object):
         # checking and loading config
         if not os.path.isdir(self.__basedir):
             raise AttributeError("global Base Directory %s does not exist" % self.__basedir)
-        self.__config_filename = os.path.join(basedir, "datalogger.json") # hardcoded
+        self.__config_filename = os.path.join(basedir, configfilename)
         # loading global configuration
         with open(self.__config_filename, "rt") as infile:
             self.__config = json.load(infile)
@@ -187,56 +190,59 @@ class DataLogger(object):
         """definition of this particular project/tablename configuration"""
         return self.__meta
 
-    def get_projects(self):
+    @property
+    def projects(self):
         """return available project, defined in datalogger.json"""
         return list(self.__config["projects"].keys())
 
-    def get_tablenames(self, project):
+    @property
+    def tablenames(self, project):
         """return available tablenames for projects, defined in datalogger.json"""
         return list(self.__config["projects"][project].keys())
 
-    def get_user(self):
+    @property
+    def os_user(self):
         """return OS user to use for file permissions, defined in datalogger.json"""
         return self.__config["user"]
 
-    def get_group(self):
+    @property
+    def os_group(self):
         """return OS group to use for file permissions, defined in datalogger.json"""
         return self.__config["group"]
 
-    def __getitem__(self, *args, **kwds):
+    def __getitem__(self, *args):
         """
-        super overloaded __getitem__ function
-        could be either
+        super overloaded __getitem__ function could be either
+        use this method to get to plain stored data, without any sophisticated processing
+
+        ["caches"] -> <dict>
         ["tsa"] -> return TimeseriesArray
         ["tsa", <key>] -> return Timeseries
         ["tsastats"] -> return TimeseriesArrayStats
         ["tsastats", <key>] -> return TimeseriesStats
-        ["quantile"] -> return QuantileArray
-        ["quantile", <key>] -> return Quantile
+        ["qa"] -> return QuantileArray
+        ["qa", <key>] -> return <dict> Quantile
         """
-        print(args, kwds)
-        if isinstance(key, basestring): # only datestring given
-            return self.load_tsa(key)
-        if type(key) == tuple: # tsa key selection given
-            if len(key) == 2:
-                tsa_key = key[1]
-                tsa_key_dict = dict(zip(self.__index_keynames, tsa_key))
-                if None in tsa_key: # return multiple ts in tsa
-                    return self.load_tsa(key[0], filterkeys=tsa_key_dict)
-                else: # returns one single ts in tsa
-                    return self.load_tsa(key[0], filterkeys=tsa_key_dict)[tsa_key]
-            if len(key) > 2: # tsa and ts selection given
-                datestring = key[0]
-                tsa_key = key[1]
-                tsa_key_dict = dict(zip(self.__index_keynames, tsa_key))
-                ts_key = key[2:]
-                # convert into single value if only one exists
-                if len(ts_key) == 1:
-                    ts_key = ts_key[0]
-                tsa = self.load_tsa(datestring, filterkeys=tsa_key_dict)
-                return tsa[tsa_key].__getitem__(ts_key)
+        if isinstance(args[0], str):
+            kind = args[0]
+            if kind == "tsa":
+                return self.load_tsa()
+            if kind == "tsastats":
+                return self.load_tsastats()
+            if kind == "qa":
+                return self.load_quantile()
+            if kind == "caches":
+                return self.get_caches()
+        if isinstance(args[0], tuple):
+            kind, subkey = args[0]
+            if kind == "tsa":
+                return self.load_tsa()[subkey]
+            if kind == "tsastats":
+                return self.load_tsastats()[subkey]
+            if kind == "qa":
+                return self.load_quantile()[subkey]
         else:
-            raise KeyError("key must be supplied as tuple (datestring, TimeseriesArray key, Timeseries key) or single value (datestring)")
+            raise KeyError("unknown datatype")
 
     def __parse_line(self, row, timedelta=0.0):
         """
@@ -307,14 +313,13 @@ class DataLogger(object):
         logging.debug("reading raw data from file %s", filename)
         start_ts, stop_ts = self.get_ts_for_datestring(self.__datestring) # get first and last timestamp of this date
         logging.debug("appropriate timestamps for this date are between %s and %s", start_ts, stop_ts)
-        #data = self.__get_file_handle(filename, "rb").read().split("\n")
-        filehandle = self.__get_file_handle(filename, "rb")
+        filehandle = self.__get_file_handle(filename, "rt")
         next(filehandle) # skip header line
         for lineno, row in enumerate(filehandle):
             if len(row) == 0 or row[0] == "#":
                 continue
             try:
-                data = self.__parse_line(str(row, "utf-8"), timedelta)
+                data = self.__parse_line(row, timedelta)
                 if self.__ts_keyname not in data:
                     logging.info("Format Error in row: %s, got %s", row, data)
                     continue
@@ -355,7 +360,7 @@ class DataLogger(object):
         if not os.path.exists(subdir):
             os.makedirs(subdir)
         # try to set ownership of created directories
-        username = self.get_user()
+        username = self.os_user
         try:
             uid = pwd.getpwnam(username).pw_uid
             gid = pwd.getpwnam(username).pw_gid
