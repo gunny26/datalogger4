@@ -1,0 +1,29 @@
+{
+    "blacklist": [],
+    "delimiter": "\t",
+    "headers": [
+        "fcIfC3Discards",
+        "fcIfC3InFrames",
+        "fcIfC3InOctets",
+        "fcIfC3OutFrames",
+        "fcIfC3OutOctets",
+        "hostname",
+        "ifDescr",
+        "index",
+        "ts"
+    ],
+    "index_keynames": [
+        "hostname",
+        "ifDescr"
+    ],
+    "interval": 300,
+    "ts_keyname": "ts",
+    "value_keynames": {
+        "fcIfC3Discards": "counter64",
+        "fcIfC3InFrames": "counter64",
+        "fcIfC3InOctets": "counter64",
+        "fcIfC3OutFrames": "counter64",
+        "fcIfC3OutOctets": "counter64",
+        "index": "asis"
+    }
+}

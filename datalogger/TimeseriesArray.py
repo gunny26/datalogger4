@@ -71,7 +71,7 @@ class TimeseriesArray(object):
         "len" : len,
     }
 
-    def __init__(self, index_keys, value_keys, ts_key="ts", datatypes=None, cache=False):
+    def __init__(self, index_keynames, value_keynames, ts_key="ts", datatypes=None, cache=False):
         """
         index_keys <tuple> column names of index columns
         value_keys <tuple> column names of value columns
@@ -79,8 +79,8 @@ class TimeseriesArray(object):
         datatypes <list> list of used datatypes
         cache <bool> should already loaded timeseries be cached, useful to calculate quantiles
         """
-        self.__index_keynames = tuple([value for value in index_keys])
-        self.__value_keynames = list([value for value in value_keys])
+        self.__index_keynames = tuple([value for value in index_keynames])
+        self.__value_keynames = list([value for value in value_keynames])
         self.__ts_key = ts_key
         self.__cache = cache
         # define instance data
@@ -122,21 +122,6 @@ class TimeseriesArray(object):
                 return timeseries
             self.__data[key] = timeseries
         return self.__data[key]
-
-    def getitem_grouped__(self, key):
-        """
-        ALPHA code to implement grouping while reading lazy
-        DON NOT USE
-        """
-        assert self.__group_keyname is not None
-        assert self.__group_func is not None
-        logging.debug("searching for key %s", key)
-        if self.__group_keyname is not None:
-            get_key_dict = dict(zip(self.__index_keynames, key))
-            logging.debug("converted to key_dict: %s", get_key_dict)
-            dict_keys = [dict(zip(self.__index_keynames, my_key)) for my_key in self.keys()]
-            load_keys = [dict_key for dict_key in dict_keys if dict_key[self.__group_keyname] == get_key_dict[self.__group_keyname]]
-            logging.debug("keys to load : %s", load_keys)
 
     def __setitem__(self, key, value):
         """mimic dict"""
@@ -253,12 +238,18 @@ class TimeseriesArray(object):
 
     def add(self, data, group_func=None):
         """
-        data must have following keys
-        <ts_keyname> <index_keys> <value_keys>
+        provided data must be type <dict> having following keys
+            ts_keyname
+            all(index_keynames)
+            all(value_keynames)
         if there are additional keys, these will be ignored
 
-        All index_keys are converted to unicode
-        All value_keys are converted to float
+        if group_func is given, entries with the same index_key are grouped by group_func
+        group func should be type <func> something like
+            lambda existing_value, new_value : (existing_value + new_value) / 2
+
+        all index_keys are converted to str
+        all value_keys are converted to float
         ts_keyname is converted to float
         """
         #assert self.__ts_key in data # timestamp key has to be in dict
@@ -322,7 +313,7 @@ class TimeseriesArray(object):
             logging.debug("this is the first timeseries")
         self[key] = timeserie
 
-    def groupby(self, fieldnum, group_func, time_func="avg"):
+    def old_groupby(self, fieldnum, group_func, time_func="avg"):
         """
         fieldnum <int>
         group_func <function> to group a set of numeric values
@@ -379,41 +370,10 @@ class TimeseriesArray(object):
     def add_derive_col(self, colname, newcolname):
         logging.info("DEPRECATED function add_derive_col use convert(%s, 'derive', %s)", colname, newcolname)
         return self.convert(colname, "derive", newcolname)
-#        """
-#        add one to key to every Timeseries, for this specific colname
-#        which represents the difference between two values in time
-#        TODO: describe this better
-#        """
-#        if self.__cache is False:
-#            raise AttributeError("operation only applicable in cache mode, set <TimeseriesArray>.cache=True")
-#        assert colname in self.__value_keynames
-#        assert newcolname not in self.__value_keynames
-#        for key, timeseries in self.keys():
-#            timeseries = self[key]
-#            try:
-#                assert newcolname not in timeseries.headers
-#            except AssertionError as exc:
-#                logging.error("%s does exist in current dataset at key %s", newcolname, key)
-#                raise exc
-#            timeseries.add_derive_col(colname, newcolname)
-#        self.__value_keynames.append(newcolname)
 
     def add_per_s_col(self, colname, newcolname):
         logging.info("DEPRECATED function add_derive_col use convert(%s, 'persecond', %s)", colname, newcolname)
         return self.convert(colname, "persecond", newcolname)
-#       """
-#        add one to key to every Timeseries, for this specific colname
-#        which represents the difference between two values in time
-#        TODO: describe this better
-#        """
-#        if self.__cache is False:
-#            raise AttributeError("operation only applicable in cache mode, set <TimeseriesArray>.cache=True")
-#        assert colname in self.__value_keynames
-#        assert newcolname not in self.__value_keynames
-#        for timeseries in self.values():
-#            assert newcolname not in timeseries.headers
-#            timeseries.add_per_s_col(colname, newcolname)
-#        self.__value_keynames.append(newcolname)
 
     def add_calc_col_single(self, colname, newcolname, func=lambda a: a):
         """
@@ -486,7 +446,7 @@ class TimeseriesArray(object):
         returns:
         TimeseriesArray
         """
-        ret_data = TimeseriesArray(index_keys=self.__index_keynames, value_keys=colnames, ts_key=self.__ts_key)
+        ret_data = TimeseriesArray(index_keynames=self.__index_keynames, value_keynames=colnames, ts_key=self.__ts_key)
         for key in self.keys():
             ret_data[key] = self[key].slice(colnames)
         return ret_data

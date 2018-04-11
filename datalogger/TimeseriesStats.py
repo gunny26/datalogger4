@@ -164,6 +164,7 @@ class TimeseriesStats(object):
 
     def __str__(self):
         """printable string representation"""
+        return json.dumps(self.__stats, indent=4)
         outbuffer = []
         headers = [u"key", ] + list(self.stat_funcs.keys())
         outbuffer.append("\t".join(headers))

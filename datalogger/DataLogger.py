@@ -23,11 +23,6 @@ from CustomExceptions import DataLoggerRawFileMissing
 from CustomExceptions import DataLoggerLiveDataError
 from CustomExceptions import DataLoggerFilenameDecodeError
 
-def not_today(datestring):
-    """return True if datestring does not match today"""
-    return datetime.date.today().isoformat() != datestring
-
-
 class DataLogger(object):
     """
     class to handle same work around Datalogger Files
@@ -57,68 +52,80 @@ class DataLogger(object):
         with open(self.__config_filename, "rt") as infile:
             self.__config = json.load(infile)
         if "cachedir" not in self.__config:
-            self.logging.info("you should define 'cachedir' in main configuration file, fallback to global_cache subdir under basedir")
-            self.__cachedir = os.path.join(basedir, "global_cache") # TODO: should be defined in datalogger.json
+            logging.info("you should define 'cachedir' in main configuration file, fallback to global_cache subdir under basedir")
+            self.__config["cachedir"] = os.path.join(basedir, "global_cache") # TODO: remove fallback in future
         else:
-            self.__cachedir = os.path.join(basedir, self.__config["cachedir"])
-        if not os.path.isdir(self.__cachedir):
-            raise AttributeError("global Cache Directory %s does not exist" % self.__cachedir)
+            self.__config["cachedir"] = os.path.join(basedir, self.__config["cachedir"])
+        if not os.path.isdir(self.__config["cachedir"]):
+            raise AttributeError("global Cache Directory %s does not exist" % self.__config["cachedir"])
+        self.__datestring = None
+        self.__project = None
+        self.__tablename = None
+        self.__timedelta = None
+        self.__meta = None
 
-    def setup(self, project, tablename, datestring):
+    def setup(self, project, tablename, datestring, timedelta=0.0):
+        """
+        set datalogger to some specific project/tablename/datestring combination
+
+        project <str> has to be in defined projects
+        tablename <str> has to be in defined tablenames of project
+        datestring <str> some datestring like 2018-12-31 in the past
+        timedelta <int> defaults to 0
+        """
         try:
-            assert not_today(datestring)
+            assert datetime.date.today().isoformat() != datestring
         except AssertionError:
             raise DataLoggerLiveDataError("Reading from live data is not allowed")
         self.__datestring = datestring
         self.__project = project
         self.__tablename = tablename
+        self.__timedelta = timedelta
         if project not in self.__config["projects"]:
             raise AttributeError("called project %s is not defined in main configuration file" % project)
         if tablename not in self.__config["projects"][project]:
             raise AttributeError("called tablename %s is not defined in project" % tablename)
-        # loading specific configuration
+        # loading specific configuration, first look for project directory
         projectdir = os.path.join(self.__basedir, project)
         if not os.path.isdir(projectdir):
             raise AttributeError("project Directory %s does not exist" % projectdir)
-        self.__rawdir = os.path.join(projectdir, "raw")
-        if not os.path.isdir(self.__rawdir):
-            raise AttributeError("project raw input directory %s does not exist" % self.__rawdir)
+        # load table definition from meta subdir, dir and subdir must exist
         # define some working directories
         metadir = os.path.join(projectdir, "meta")
         if not os.path.isdir(metadir):
             raise AttributeError("project meta directory %s does not exist" % metadir)
-        # load table definition
         metafile = os.path.join(metadir, "%s.json" % self.__tablename)
         if not os.path.isfile(metafile):
             raise AttributeError("table definition file %s does not exist" % metafile)
         with open(metafile, "rt") as infile:
             self.__meta = json.load(infile)
-        # to local __dict__
-        self.__delimiter = self.__meta["delimiter"]
-        self.__ts_keyname = self.__meta["ts_keyname"]
-        self.__headers = tuple(self.__meta["headers"])
+        # where to find raw input files
+        self.__meta["raw_basedir"] = os.path.join(projectdir, "raw")
+        if not os.path.isdir(self.__meta["raw_basedir"]):
+            raise AttributeError("project raw input directory %s does not exist" % self.__meta["raw_basedir"])
+        # convert to tuple
+        self.__meta["headers"] = tuple(self.__meta["headers"])
         # transitional hook to implement datatypes without correcting
         # all meta files at once
         if isinstance(self.__meta["value_keynames"], dict):
-            self.__value_keynames = tuple(self.__meta["value_keynames"].keys())
-            self.__datatypes = self.__meta["value_keynames"]
+            self.__meta["datatypes"] = self.__meta["value_keynames"]
+            self.__meta["value_keynames"] = tuple(self.__meta["value_keynames"].keys())
         elif isinstance(self.__meta["value_keynames"], list):
             # if old stype, keep all datatype asis, and print warning
-            self.__value_keynames = tuple(self.__meta["value_keynames"])
-            self.__datatypes = dict(zip(self.__meta["value_keynames"], ("asis",) * len(self.__meta["value_keynames"])))
             logging.error("You should define value_keynames as dict with datatypes")
-        self.__index_keynames = tuple(self.__meta["index_keynames"])
-        self.__blacklist = tuple(self.__meta["blacklist"])
-        self.__interval = self.__meta["interval"]
+            self.__meta["datatypes"] = dict(zip(self.__meta["value_keynames"], ("asis",) * len(self.__meta["value_keynames"])))
+            self.__meta["value_keynames"] = tuple(self.__meta["value_keynames"])
+        self.__meta["index_keynames"] = tuple(self.__meta["index_keynames"])
+        self.__meta["blacklist"] = tuple(self.__meta["blacklist"])
         # add available Statistical function names to meta structure
         self.__meta["stat_func_names"] = list(TimeseriesStats.stat_funcs.keys())
         # make some assertions
         # every index_keyname has to be in headers
-        assert all((key in self.__headers for key in self.__index_keynames))
+        assert all((key in self.__meta["headers"] for key in self.__meta["index_keynames"]))
         # ever value_keyname has to be in headers
-        assert all((key in self.__headers for key in self.__value_keynames))
-        # ts_keyname has to be headers
-        assert self.__ts_keyname in self.__headers
+        assert all((key in self.__meta["headers"] for key in self.__meta["value_keynames"]))
+        # ts_keyname has to be in headers
+        assert self.__meta["ts_keyname"] in self.__meta["headers"]
 
     def __str__(self):
         ret = {
@@ -141,49 +148,57 @@ class DataLogger(object):
         return self.__tablename
 
     @property
+    def datestring(self):
+        return self.__datestring
+
+    @property
+    def timedelta(self):
+        return self.__timedelta
+
+    @property
     def delimiter(self):
         """delimiter to use to read raw input"""
-        return self.__delimiter
+        return self.__meta["delimiter"]
 
     @property
     def ts_keyname(self):
         """keyname of timestamp"""
-        return self.__ts_keyname
+        return self.__meta["ts_keyname"]
 
     @property
     def headers(self):
         """all headers, order matters"""
-        return self.__headers
+        return self.__meta["headers"]
 
     @property
     def value_keynames(self):
         """keynames of value fields, have to be float convertible"""
-        return self.__value_keynames
+        return self.__meta["value_keynames"]
 
     @property
     def datatypes(self):
         """dictionary of datatypes"""
-        return self.__datatypes
+        return self.__meta["datatypes"]
 
     @property
     def index_keynames(self):
         """keynames of value fields, are treated as strings"""
-        return self.__index_keynames
+        return self.__meta["index_keynames"]
 
     @property
     def blacklist(self):
         """keynames to ignore from raw input file"""
-        return self.__blacklist
+        return self.__meta["blacklist"]
 
     @property
     def raw_basedir(self):
         """subdirectory under wich to find raw inout files"""
-        return self.__rawdir
+        return self.__meta["raw_basedir"]
 
     @property
     def global_cachedir(self):
         """subdirectory where to put caches"""
-        return self.__cachedir
+        return self.__config["cachedir"]
 
     @property
     def meta(self):
@@ -209,6 +224,16 @@ class DataLogger(object):
     def os_group(self):
         """return OS group to use for file permissions, defined in datalogger.json"""
         return self.__config["group"]
+
+    @property
+    def cachedir(self):
+        """return OS group to use for file permissions, defined in datalogger.json"""
+        return self.__config["cachedir"]
+
+    @property
+    def interval(self):
+        """return defined interval of timestamps defined in configuration"""
+        return self.__meta["interval"]
 
     def __getitem__(self, *args):
         """
@@ -244,7 +269,7 @@ class DataLogger(object):
         else:
             raise KeyError("unknown datatype")
 
-    def __parse_line(self, row, timedelta=0.0):
+    def __parse_line(self, row):
         """
         specialized method to parse a single line read from raw CSV
 
@@ -255,9 +280,9 @@ class DataLogger(object):
         returns:
         <dict> keys from headers, all values are converted to float
         """
-        data = dict(zip(self.__headers, row.split(self.__delimiter)))
+        data = dict(zip(self.headers, row.split(self.delimiter)))
         try:
-            data[self.__ts_keyname] = int(float(data[self.__ts_keyname]) + timedelta)
+            data[self.ts_keyname] = int(float(data[self.ts_keyname]) + self.timedelta)
         except ValueError as exc:
             logging.exception(exc)
             logging.error("ValueError on row skipping this data: %s", str(data))
@@ -280,8 +305,7 @@ class DataLogger(object):
         """
         if filename.endswith(".gz"):
             return gzip.open(filename, mode)
-        else:
-            return open(filename, mode)
+        return open(filename, mode)
 
     def __get_raw_filename(self):
         """
@@ -291,20 +315,19 @@ class DataLogger(object):
         parameters:
         datestring <str>
         """
-        filename = os.path.join(self.__rawdir, "%s_%s.csv" % (self.__tablename, self.__datestring))
+        filename = os.path.join(self.raw_basedir, "%s_%s.csv" % (self.tablename, self.datestring))
         if not os.path.isfile(filename):
             filename += ".gz" # try gz version
             if not os.path.isfile(filename):
                 raise DataLoggerRawFileMissing("No Raw Input File named %s (or .gz) found", filename)
         return filename
 
-    def __read_raw_dict(self, timedelta):
+    def __read_raw_dict(self):
         """
         generator to return parsed lines from raw file of one specific datestring
 
         parameters:
         datestring <str> isodate string like 2014-12-31
-        timedelta <int> amount of seconds to correct every timestamp in raw data
 
         yields:
         <dict> of every row
@@ -316,15 +339,15 @@ class DataLogger(object):
         filehandle = self.__get_file_handle(filename, "rt")
         next(filehandle) # skip header line
         for lineno, row in enumerate(filehandle):
-            if len(row) == 0 or row[0] == "#":
+            if not row or row[0] == "#":
                 continue
             try:
-                data = self.__parse_line(row, timedelta)
-                if self.__ts_keyname not in data:
+                data = self.__parse_line(row)
+                if self.ts_keyname not in data:
                     logging.info("Format Error in row: %s, got %s", row, data)
                     continue
-                if not start_ts <= data[self.__ts_keyname] <= stop_ts:
-                    logging.debug("Skipping line, ts %s not between %s and %s", data[self.__ts_keyname], start_ts, stop_ts)
+                if not start_ts <= data[self.ts_keyname] <= stop_ts:
+                    logging.debug("Skipping line, ts %s not between %s and %s", data[self.ts_keyname], start_ts, stop_ts)
                     continue
                 yield data
             except KeyError as exc:
@@ -342,7 +365,7 @@ class DataLogger(object):
         kind of debugging method to read from raw file, like load_tsa does,
         but report every line as is, only converted into dict
         """
-        for row in self.__read_raw_dict(0):
+        for row in self.__read_raw_dict():
             yield row
 
     def __get_cachedir(self):
@@ -356,7 +379,7 @@ class DataLogger(object):
         returns:
         <str> directory path
         """
-        subdir = os.path.join(self.__cachedir, self.__datestring, self.__project, self.__tablename)
+        subdir = os.path.join(self.cachedir, self.datestring, self.project, self.tablename)
         if not os.path.exists(subdir):
             os.makedirs(subdir)
         # try to set ownership of created directories
@@ -364,15 +387,16 @@ class DataLogger(object):
         try:
             uid = pwd.getpwnam(username).pw_uid
             gid = pwd.getpwnam(username).pw_gid
-            os.chown(os.path.join(self.__cachedir, self.__datestring), uid, gid)
-            os.chown(os.path.join(self.__cachedir, self.__datestring, self.__project), uid, gid)
-            os.chown(os.path.join(self.__cachedir, self.__datestring, self.__project, self.__tablename), uid, gid)
+            os.chown(os.path.join(self.cachedir, self.datestring), uid, gid)
+            os.chown(os.path.join(self.cachedir, self.datestring, self.project), uid, gid)
+            os.chown(os.path.join(self.cachedir, self.datestring, self.project, self.tablename), uid, gid)
         except KeyError as exc:
             logging.exception(exc)
             logging.error("User %s does not exist on this systemi, default permission will be applied to created directories", username)
         return subdir
 
     def delete_caches(self):
+        """delete pre calculates caches"""
         cachedir = self.__get_cachedir()
         for entry in os.listdir(cachedir):
             absfile = os.path.join(cachedir, entry)
@@ -447,9 +471,9 @@ class DataLogger(object):
         parameters:
         tsa <TimeseriesArray> object
         """
-        if self.__index_keynames != tsa.index_keynames:
+        if self.index_keynames != tsa.index_keynames:
             raise AssertionError("provided index_keynames does not match defined index_keynames")
-        if self.__value_keynames != tuple(tsa.value_keynames):
+        if self.value_keynames != tuple(tsa.value_keynames):
             raise AssertionError("provided value_keynames does not match defined value_keynames")
         cachedir = self.__get_cachedir()
         cachefilename = os.path.join(cachedir, TimeseriesArray.get_dumpfilename(tsa.index_keynames))
@@ -462,57 +486,51 @@ class DataLogger(object):
         else:
             raise Exception("TSA Archive %s exists already in cache" % cachefilename)
 
-    def load_tsa(self, filterkeys=None, index_pattern=None, timedelta=0, cleancache=False, validate=False):
+    def load_tsa(self, filterkeys=None, index_pattern=None):
         """
         caching version to load_tsa_raw
         if never called, get ts from load_tsa_raw, and afterwards dump_tsa
         on every consecutive call read from cached version
-        use cleancache to remove caches
 
         parameters:
         datestring <str>
         filterkeys <tuple> or None default None
         index_pattern <str> or None default None
-        timedelta <int> default 0
-        cleancache <bool> default False
-        validate <bool> if data is read from raw, dump it after initail read,
-            and reread it afterwards to make sure the stored tsa is OK
-            thats an performance issue
+
+        HINT:
+        use delete_caches to delete all precalculated files
+        use setup to define some sort of timedelta to use
 
         returns
         <TimeseriesArray> object read from cachefile or from raw data
         """
         cachedir = self.__get_cachedir()
-        cachefilename = os.path.join(cachedir, TimeseriesArray.get_dumpfilename(self.__index_keynames))
+        cachefilename = os.path.join(cachedir, TimeseriesArray.get_dumpfilename(self.index_keynames))
         def fallback():
             """
             fallback method to use, if reading from cache data is not possible
             """
-            tsa = self.load_tsa_raw(timedelta)
+            tsa = self.load_tsa_raw()
             tsa.dump(cachedir) # save full data
             # read the data afterwards to make sure there is no problem,
             # TODO: is this the fastest way?
             # corrected 2017-09-21 reread stored data to convert data to correct type
             # if validate is True:
-            tsa = TimeseriesArray.load(cachedir, self.__index_keynames, filterkeys=filterkeys, index_pattern=index_pattern, datatypes=self.__datatypes)
+            tsa = TimeseriesArray.load(cachedir, self.index_keynames, filterkeys=filterkeys, index_pattern=index_pattern, datatypes=self.datatypes)
             # also generate TSASTATS and dump to cache directory
-            tsastats = TimeseriesArrayStats(tsa) # generate full Stats
-            tsastats.dump(cachedir) # save
+            #tsastats = TimeseriesArrayStats(tsa) # generate full Stats
+            #tsastats.dump(cachedir) # save
             # and at last but not least quantile
-            qantile = QuantileArray(tsa, tsastats)
-            qantile.dump(cachedir)
+            #qantile = QuantileArray(tsa, tsastats)
+            #qantile.dump(cachedir)
             # finally return tsa
             return tsa
         if not os.path.isfile(cachefilename):
             logging.info("cachefile %s does not exist, fallback read from raw data file", cachefilename)
             return fallback()
-        if (os.path.isfile(cachefilename)) and (cleancache == True):
-            logging.info("deleting cachefile %s and read from raw data file", cachefilename)
-            os.unlink(cachefilename)
-            return fallback()
         logging.debug("loading stored TimeseriesArray object file %s", cachefilename)
         try:
-            tsa = TimeseriesArray.load(cachedir, self.__index_keynames, filterkeys=filterkeys, index_pattern=index_pattern, datatypes=self.__datatypes)
+            tsa = TimeseriesArray.load(cachedir, self.index_keynames, filterkeys=filterkeys, index_pattern=index_pattern, datatypes=self.datatypes)
             return tsa
         except IOError:
             logging.error("IOError while reading from %s, using fallback", cachefilename)
@@ -523,7 +541,7 @@ class DataLogger(object):
             os.unlink(cachefilename)
             return fallback()
 
-    def load_tsastats(self, filterkeys=None, timedelta=0, cleancache=False):
+    def load_tsastats(self, filterkeys=None):
         """
         caching version to load_tsa_raw
         if never called, get ts from load_tsa_raw, and afterwards dump_tsa
@@ -539,26 +557,22 @@ class DataLogger(object):
         <TimeseriesArray> object read from cachefile or from raw data
         """
         cachedir = self.__get_cachedir()
-        cachefilename = os.path.join(cachedir, TimeseriesArrayStats.get_dumpfilename(self.__index_keynames))
+        cachefilename = os.path.join(cachedir, TimeseriesArrayStats.get_dumpfilename(self.index_keynames))
         def fallback():
             """
             fallback method to use, if reading from cache data is not possible
             """
-            tsa = self.load_tsa(filterkeys=None, timedelta=timedelta) # load full tsa, and generate statistics
+            tsa = self.load_tsa(filterkeys=None) # load full tsa, and generate statistics
             tsastats = TimeseriesArrayStats(tsa) # generate full Stats
-            tsastats.dump(cachedir) # save
-            tsastats = TimeseriesArrayStats.load(cachedir, self.__index_keynames, filterkeys=filterkeys) # read specific
+            tsastats.dump(cachedir) # save it for future usage
+            tsastats = TimeseriesArrayStats.load(cachedir, self.index_keynames, filterkeys=filterkeys) # read specific
             return tsastats
         if not os.path.isfile(cachefilename):
             logging.info("cachefile %s does not exist, fallback read from tsa archive", cachefilename)
             return fallback()
-        if (os.path.isfile(cachefilename)) and (cleancache == True):
-            logging.info("deleting cachefile %s and read from raw", cachefilename)
-            os.unlink(cachefilename)
-            return fallback()
         logging.debug("loading stored TimeseriesArray object file %s", cachefilename)
         try:
-            tsastats = TimeseriesArrayStats.load(cachedir, self.__index_keynames, filterkeys=filterkeys)
+            tsastats = TimeseriesArrayStats.load(cachedir, self.index_keynames, filterkeys=filterkeys)
             return tsastats
         except IOError:
             logging.error("IOError while reading from %s, using fallback", cachefilename)
@@ -587,10 +601,10 @@ class DataLogger(object):
             quantile_array = QuantileArray.load(cachedir)
         else:
             logging.info("cachefile %s does not exist, fallback read from tsa archive", cachefilename)
-            tsa = self.load_tsa()
+            tsa = self["tsa"]
             tsa.cache = True # to enable in memory caching of timeseries
             # huge performance improvement, from 500s to 70s
-            tsastats = self.load_tsastats()
+            tsastats = self["tsastats"]
             quantile_array = QuantileArray(tsa, tsastats)
             quantile_array.dump(cachedir)
         return quantile_array
@@ -624,7 +638,7 @@ class DataLogger(object):
                 except TypeError as exc:
                     logging.exception(exc)
                     key = eval(base64.b64decode(key_encoded))
-                assert type(key) == tuple
+                assert isinstance(key, tuple)
                 return key
             except Exception as exc:
                 logging.exception(exc)
@@ -633,7 +647,7 @@ class DataLogger(object):
             logging.exception(exc)
             raise DataLoggerFilenameDecodeError("Something went wrong while decoding filensme %s" % filename)
 
-    def load_tsa_raw(self, timedelta=0):
+    def load_tsa_raw(self):
         """
         read data from raw input files and return TimeseriesArray object
 
@@ -644,8 +658,8 @@ class DataLogger(object):
         returns:
         <TimeseriesArray> object wich holds all data of this day
         """
-        tsa = TimeseriesArray(self.__index_keynames, self.__value_keynames, datatypes=self.__datatypes)
-        for rowdict in self.__read_raw_dict(timedelta):
+        tsa = TimeseriesArray(self.index_keynames, self.value_keynames, datatypes=self.datatypes)
+        for rowdict in self.__read_raw_dict():
             try:
                 tsa.add(rowdict)
             except ValueError as exc:
@@ -659,117 +673,117 @@ class DataLogger(object):
         return tsa
     read_day = load_tsa_raw
 
-    def tsa_group_by(self, tsa, subkeys, group_func):
-        """
-        TODO: make this method static, inteval should be in tsa
-        group given tsa by subkeys, and use group_func to aggregate data
-        first all Timeseries will be aligned in time, to get proper points in timeline
+#    def old_tsa_group_by(self, tsa, subkeys, group_func):
+#        """
+#        TODO: make this method static, inteval should be in tsa
+#        group given tsa by subkeys, and use group_func to aggregate data
+#        first all Timeseries will be aligned in time, to get proper points in timeline
+#
+#        parameters:
+#        tsa <TimeseriesArray>
+#        subkey <tuple> could also be empty, to aggregate everything
+#        group_func <func> like lambda a,b : (a+b)/2 to get averages
+#        slotlength <int> interval in seconds to correct every timeseries to
+#
+#        returns:
+#        <TimeseriesArray>
+#        """
+#        # intermediated tsa
+#        tsa2 = TimeseriesArray(index_keys=subkeys, value_keys=tsa.value_keys, ts_key=tsa.ts_key, datatypes=tsa.datatypes)
+#        start_ts, _ = DataLogger.get_ts_for_datestring(self.__datestring)
+#        ts_keyname = tsa.ts_key
+#        for data in tsa.export():
+#            # align timestamp
+#            nearest_slot = round((data[ts_keyname] - start_ts) / self.__interval)
+#            data[ts_keyname] = int(start_ts + nearest_slot * self.__interval)
+#            #data[ts_keyname] = align_timestamp(data[ts_keyname])
+#            tsa2.group_add(data, group_func)
+#        return tsa2
+#    group_by = tsa_group_by
 
-        parameters:
-        tsa <TimeseriesArray>
-        subkey <tuple> could also be empty, to aggregate everything
-        group_func <func> like lambda a,b : (a+b)/2 to get averages
-        slotlength <int> interval in seconds to correct every timeseries to
+#    @staticmethod
+#    def old_tsastat_group_by(tsastat, subkey):
+#        """
+#        group given tsastat array by some subkey
+#
+#        parameters:
+#        tsastat <TimeseriesArrayStats>
+#        subkey <tuple> subkey to group by
+#
+#        returns:
+#        <dict>
+#        """
+#        # how to aggregate statistical values
+#        group_funcs = {
+#            u'count' : lambda a, b: a + b,
+#            u'std' : lambda a, b: (a + b)/2,
+#            u'avg': lambda a, b: (a + b)/2,
+#            u'last' : lambda a, b: -1.0, # theres no meaning
+#            u'min' : min,
+#            u'max' : max,
+#            u'sum' : lambda a, b: (a + b) / 2,
+#            u'median' : lambda a, b: (a + b)/2,
+#            u'mean' : lambda a, b: (a + b)/2,
+#            u'diff' : lambda a, b: (a + b)/2,
+#            u'dec' : lambda a, b: (a + b)/2,
+#            u'inc' : lambda a, b: (a + b)/2,
+#            u'first' : lambda a, b: -1.0, # theres no meaning
+#        }
+#        # create new empty TimeseriesArrayStats Object
+#        tsastats_new = TimeseriesArrayStats.__new__(TimeseriesArrayStats)
+#        tsastats_new.index_keys = subkey # only subkey
+#        tsastats_new.value_keys = tsastat.value_keys # same oas original
+#        newdata = {}
+#        for index_key, tsstat in tsastat.items():
+#            key_dict = dict(zip(tsastat.index_keynames, index_key))
+#            newkey = None
+#            if len(subkey) == 0: # no subkey means total aggregation
+#                newkey = ("__total__", )
+#            else:
+#                newkey = tuple([key_dict[key] for key in subkey])
+#            if newkey not in newdata:
+#                newdata[newkey] = {}
+#            for value_key in tsastat.value_keynames:
+#                if value_key not in newdata[newkey]:
+#                    newdata[newkey][value_key] = dict(tsstat[value_key])
+#                else:
+#                    for stat_funcname in tsstat[value_key].keys():
+#                        existing = float(newdata[newkey][value_key][stat_funcname])
+#                        to_group = float(tsstat[value_key][stat_funcname])
+#                        newdata[newkey][value_key][stat_funcname] = group_funcs[stat_funcname](existing, to_group)
+#        tsastats_new.stats = newdata
+#        return tsastats_new
 
-        returns:
-        <TimeseriesArray>
-        """
-        # intermediated tsa
-        tsa2 = TimeseriesArray(index_keys=subkeys, value_keys=tsa.value_keys, ts_key=tsa.ts_key, datatypes=tsa.datatypes)
-        start_ts, _ = DataLogger.get_ts_for_datestring(self.__datestring)
-        ts_keyname = tsa.ts_key
-        for data in tsa.export():
-            # align timestamp
-            nearest_slot = round((data[ts_keyname] - start_ts) / self.__interval)
-            data[ts_keyname] = int(start_ts + nearest_slot * self.__interval)
-            #data[ts_keyname] = align_timestamp(data[ts_keyname])
-            tsa2.group_add(data, group_func)
-        return tsa2
-    group_by = tsa_group_by
-
-    @staticmethod
-    def tsastat_group_by(tsastat, subkey):
-        """
-        group given tsastat array by some subkey
-
-        parameters:
-        tsastat <TimeseriesArrayStats>
-        subkey <tuple> subkey to group by
-
-        returns:
-        <dict>
-        """
-        # how to aggregate statistical values
-        group_funcs = {
-            u'count' : lambda a, b: a + b,
-            u'std' : lambda a, b: (a + b)/2,
-            u'avg': lambda a, b: (a + b)/2,
-            u'last' : lambda a, b: -1.0, # theres no meaning
-            u'min' : min,
-            u'max' : max,
-            u'sum' : lambda a, b: (a + b) / 2,
-            u'median' : lambda a, b: (a + b)/2,
-            u'mean' : lambda a, b: (a + b)/2,
-            u'diff' : lambda a, b: (a + b)/2,
-            u'dec' : lambda a, b: (a + b)/2,
-            u'inc' : lambda a, b: (a + b)/2,
-            u'first' : lambda a, b: -1.0, # theres no meaning
-        }
-        # create new empty TimeseriesArrayStats Object
-        tsastats_new = TimeseriesArrayStats.__new__(TimeseriesArrayStats)
-        tsastats_new.index_keys = subkey # only subkey
-        tsastats_new.value_keys = tsastat.value_keys # same oas original
-        newdata = {}
-        for index_key, tsstat in tsastat.items():
-            key_dict = dict(zip(tsastat.index_keynames, index_key))
-            newkey = None
-            if len(subkey) == 0: # no subkey means total aggregation
-                newkey = ("__total__", )
-            else:
-                newkey = tuple([key_dict[key] for key in subkey])
-            if newkey not in newdata:
-                newdata[newkey] = {}
-            for value_key in tsastat.value_keynames:
-                if value_key not in newdata[newkey]:
-                    newdata[newkey][value_key] = dict(tsstat[value_key])
-                else:
-                    for stat_funcname in tsstat[value_key].keys():
-                        existing = float(newdata[newkey][value_key][stat_funcname])
-                        to_group = float(tsstat[value_key][stat_funcname])
-                        newdata[newkey][value_key][stat_funcname] = group_funcs[stat_funcname](existing, to_group)
-        tsastats_new.stats = newdata
-        return tsastats_new
-
-    @staticmethod
-    def get_scatter_data(tsa, value_keys, stat_func):
-        """
-        get data structure to use for highgraph scatter plots,
-        [
-            {
-                name : str(<key>),
-                data : [stat_func(tsa[key][value_keys[0]]), stat_func(tsa[key][value_keys[1]], ]
-            },
-            ...
-        ]
-
-        parameters:
-        tsa <TimeseriesArray>
-        value_keys <tuple> with len 2, represents x- and y-axis
-        stat_fuc <str> statistical function to use to aggregate xcolumn and ycolumns
-            must exist in Timeseries object
-
-        returns:
-        <list> of <dict> data structure to use directly in highgraph scatter plots, when json encoded
-        """
-        assert len(value_keys) == 2
-        highchart_data = []
-        for key in tsa.keys():
-            stats = tsa[key].get_stat(stat_func)
-            highchart_data.append({
-                "name" : key[0],
-                "data" : [[stats[value_keys[0]], stats[value_keys[1]]],]
-            })
-        return highchart_data
+#    @staticmethod
+#    def old_get_scatter_data(tsa, value_keys, stat_func):
+#        """
+#        get data structure to use for highgraph scatter plots,
+#        [
+#            {
+#                name : str(<key>),
+#                data : [stat_func(tsa[key][value_keys[0]]), stat_func(tsa[key][value_keys[1]], ]
+#            },
+#            ...
+#        ]
+#
+#        parameters:
+#        tsa <TimeseriesArray>
+#        value_keys <tuple> with len 2, represents x- and y-axis
+#        stat_fuc <str> statistical function to use to aggregate xcolumn and ycolumns
+#            must exist in Timeseries object
+#
+#        returns:
+#        <list> of <dict> data structure to use directly in highgraph scatter plots, when json encoded
+#        """
+#        assert len(value_keys) == 2
+#        highchart_data = []
+#        for key in tsa.keys():
+#            stats = tsa[key].get_stat(stat_func)
+#            highchart_data.append({
+#                "name" : key[0],
+#                "data" : [[stats[value_keys[0]], stats[value_keys[1]]],]
+#            })
+#        return highchart_data
 
     @staticmethod
     def datestring_to_date(datestring):
@@ -807,13 +821,13 @@ class DataLogger(object):
         and return data usable as higcharts input
         """
         # datalogger = DataLogger(BASEDIR, project, tablename)
-        filterkeys = dict(zip(self.__index_keynames, key))
+        filterkeys = dict(zip(self.index_keynames, key))
         logging.debug("build filterkeys %s", filterkeys)
         ret_data = {}
         for datestring in self.monthwalker(monthstring):
             logging.debug("getting tsatstats for %s", monthstring)
             try:
-                tsastats = self.load_tsastats(datestring, filterkeys=filterkeys)
+                tsastats = self.load_tsastats(filterkeys)
                 for funcname in tsastats[key][value_key].keys():
                     if funcname in ret_data:
                         ret_data[funcname].append((datestring, tsastats[key][value_key][funcname]))

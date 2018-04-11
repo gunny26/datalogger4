@@ -21,13 +21,13 @@ class QuantileArray(object):
         """
         self.__data = {}
         self.__keys = tuple(tsa.keys())
-        self.__value_keys = tuple(tsa.value_keynames)
-        for value_key in self.__value_keys:
+        self.__value_keynames = tuple(tsa.value_keynames)
+        for value_keyname in self.__value_keynames:
             try:
-                self.__data[value_key] = Quantile(tsa, value_key, tsastats=tsastats)
+                self.__data[value_keyname] = Quantile(tsa, value_keyname, tsastats=tsastats)
             except QuantileError as exc:
                 logging.exception(exc)
-                logging.error("skipping value_key %s", value_key)
+                logging.error("skipping value_key %s", value_keyname)
 
     @property
     def keys(self):
@@ -35,14 +35,14 @@ class QuantileArray(object):
         return self.__keys
 
     @property
-    def value_keys(self):
+    def value_keynames(self):
         """all available value_keynames"""
-        return self.__value_keys
+        return self.__value_keynames
 
     def __str__(self):
         ret = {
             "keys" : self.__keys,
-            "value_keynames" : self.__value_keys
+            "value_keynames" : self.__value_keynames
         }
         return json.dumps(ret, indent=4)
 
@@ -57,7 +57,7 @@ class QuantileArray(object):
         returns: <Quantile>
         """
         if isinstance(key, tuple):
-            return dict(((value_key, self.__data[value_key][key]) for value_key in self.__value_keys))
+            return dict(((value_keyname, self.__data[value_keyname][key]) for value_keyname in self.__value_keynames))
         elif isinstance(key, basestring):
             return self.__data[key]
         else:
@@ -68,13 +68,13 @@ class QuantileArray(object):
         try:
             assert type(self) == type(other)
             assert self.__keys == other.keys
-            assert self.__value_keys == other.value_keys
+            assert self.__value_keynames == other.value_keynames
             for key in self.__data.keys():
                 assert self.__data[key] == other[key]
             return True
         except AssertionError as exc:
             logging.debug("%s, %s", self.__keys, other.keys)
-            logging.debug("%s, %s", self.__value_keys, other.value_keys)
+            logging.debug("%s, %s", self.__value_keynames, other.value_keynames)
             logging.exception(exc)
             return False
 
@@ -88,14 +88,14 @@ class QuantileArray(object):
         """
         quantille_data = dict(((key, quantille.dumps()) for key, quantille in self.__data.items()))
         with open(os.path.join(outdir, self.__filename), "wt") as outfile:
-            json.dump((quantille_data, self.__keys, self.__value_keys), outfile)
+            json.dump((quantille_data, self.__keys, self.__value_keynames), outfile)
 
     def to_json(self):
         """
         dump internal data to json
         """
         quantille_data = dict(((key, quantille.dumps()) for key, quantille in self.__data.items()))
-        return json.dumps((quantille_data, self.__keys, self.__value_keys))
+        return json.dumps((quantille_data, self.__keys, self.__value_keynames))
 
     @classmethod
     def load(cls, outdir):
@@ -107,10 +107,10 @@ class QuantileArray(object):
         """
         qa = QuantileArray.__new__(QuantileArray)
         with open(os.path.join(outdir, cls.__filename), "rt") as infile:
-            quantille_data, qa.__keys, qa.__value_keys = json.load(infile)
+            quantille_data, qa.__keys, qa.__value_keynames = json.load(infile)
         # convert to tuple, to be equal to normal initialization
         qa.__keys = tuple((tuple(key) for key in qa.__keys))
-        qa.__value_keys = tuple(qa.__value_keys)
+        qa.__value_keynames = tuple(qa.__value_keynames)
         qa.__data = dict(((key, Quantile.loads(data)) for key, data in quantille_data.items()))
         return qa
 
@@ -123,10 +123,10 @@ class QuantileArray(object):
         json_data <basestring> json encoded
         """
         qa = QuantileArray.__new__(QuantileArray)
-        quantille_data, qa.__keys, qa.__value_keys = json.loads(json_data)
+        quantille_data, qa.__keys, qa.__value_keynames = json.loads(json_data)
         # convert to tuple, to be equal to normal initialization
         qa.__keys = tuple((tuple(key) for key in qa.__keys))
-        qa.__value_keys = tuple(qa.__value_keys)
+        qa.__value_keynames = tuple(qa.__value_keynames)
         qa.__data = dict(((key, Quantile.loads(data)) for key, data in quantille_data.items()))
         return qa
 

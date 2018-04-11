@@ -1,0 +1,47 @@
+{
+    "blacklist": [],
+    "delimiter": "\t",
+    "headers": [
+        "ts",
+        "hostname",
+        "com_select",
+        "uptime",
+        "com_insert",
+        "slow_queries",
+        "bytes_sent",
+        "com_update",
+        "connections",
+        "com_delete",
+        "qcache_hits",
+        "questions",
+        "opened_tables",
+        "aborted_connects",
+        "bytes_received",
+        "created_tmp_tables",
+        "created_tmp_disk_tables",
+        "aborted_clients"
+    ],
+    "index_keynames": [
+        "hostname"
+    ],
+    "interval": 300,
+    "ts_keyname": "ts",
+    "value_keynames": {
+        "aborted_clients": "persecond",
+        "aborted_connects": "persecond",
+        "bytes_received": "persecond",
+        "bytes_sent": "persecond",
+        "com_delete": "persecond",
+        "com_insert": "persecond",
+        "com_select": "persecond",
+        "com_update": "persecond",
+        "connections": "persecond",
+        "created_tmp_disk_tables": "persecond",
+        "created_tmp_tables": "persecond",
+        "opened_tables": "asis",
+        "qcache_hits": "persecond",
+        "questions": "persecond",
+        "slow_queries": "asis",
+        "uptime": "asis"
+    }
+}
