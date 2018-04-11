@@ -19,9 +19,7 @@ from TimeseriesArray import TimeseriesArray as TimeseriesArray
 from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 from TimeseriesStats import TimeseriesStats as TimeseriesStats
 from Quantile import QuantileArray as QuantileArray
-from CustomExceptions import DataLoggerRawFileMissing
-from CustomExceptions import DataLoggerLiveDataError
-from CustomExceptions import DataLoggerFilenameDecodeError
+from CustomExceptions import *
 
 class DataLogger(object):
     """
@@ -206,16 +204,6 @@ class DataLogger(object):
         return self.__meta
 
     @property
-    def projects(self):
-        """return available project, defined in datalogger.json"""
-        return list(self.__config["projects"].keys())
-
-    @property
-    def tablenames(self, project):
-        """return available tablenames for projects, defined in datalogger.json"""
-        return list(self.__config["projects"][project].keys())
-
-    @property
     def os_user(self):
         """return OS user to use for file permissions, defined in datalogger.json"""
         return self.__config["user"]
@@ -227,13 +215,44 @@ class DataLogger(object):
 
     @property
     def cachedir(self):
-        """return OS group to use for file permissions, defined in datalogger.json"""
-        return self.__config["cachedir"]
+        """
+        return specific subdirectory to store cache files
+        if this directory does not exist, it will be created
+
+        parameters:
+        datestring <str> actual datestring
+
+        returns:
+        <str> directory path
+        """
+        subdir = os.path.join(self.__config["cachedir"], self.datestring, self.project, self.tablename)
+        if not os.path.exists(subdir):
+            os.makedirs(subdir)
+        # try to set ownership of created directories
+        username = self.os_user
+        try:
+            uid = pwd.getpwnam(username).pw_uid
+            gid = pwd.getpwnam(username).pw_gid
+            os.chown(os.path.join(self.__config["cachedir"], self.datestring), uid, gid)
+            os.chown(os.path.join(self.__config["cachedir"], self.datestring, self.project), uid, gid)
+            os.chown(os.path.join(self.__config["cachedir"], self.datestring, self.project, self.tablename), uid, gid)
+        except KeyError as exc:
+            logging.exception(exc)
+            logging.error("User %s does not exist on this systemi, default permission will be applied to created directories", username)
+        return subdir
 
     @property
     def interval(self):
         """return defined interval of timestamps defined in configuration"""
         return self.__meta["interval"]
+
+    def projects(self):
+        """return available project, defined in datalogger.json"""
+        return list(self.__config["projects"].keys())
+
+    def tablenames(self, project):
+        """return available tablenames for projects, defined in datalogger.json"""
+        return list(self.__config["projects"][project].keys())
 
     def __getitem__(self, *args):
         """
@@ -291,21 +310,21 @@ class DataLogger(object):
             logging.error("KeyError on row, skipping this data: %s", str(data))
         return data
 
-    @staticmethod
-    def __get_file_handle(filename, mode):
-        """
-        return filehandle either for gzip or normal uncompressed file
-
-        parameters:
-        filename <str> fileanme
-        mode <str> as used in open(<filename>, <mode>)
-
-        returns:
-        <file> handle to opened file, either gzip.open or normal open
-        """
-        if filename.endswith(".gz"):
-            return gzip.open(filename, mode)
-        return open(filename, mode)
+#    @staticmethod
+#    def __get_file_handle(filename, mode):
+#        """
+#        return filehandle either for gzip or normal uncompressed file
+#
+#        parameters:
+#        filename <str> fileanme
+#        mode <str> as used in open(<filename>, <mode>)
+#
+#        returns:
+#        <file> handle to opened file, either gzip.open or normal open
+#        """
+#        if filename.endswith(".gz"):
+#            return gzip.open(filename, mode)
+#        return open(filename, mode)
 
     def __get_raw_filename(self):
         """
@@ -336,29 +355,33 @@ class DataLogger(object):
         logging.debug("reading raw data from file %s", filename)
         start_ts, stop_ts = self.get_ts_for_datestring(self.__datestring) # get first and last timestamp of this date
         logging.debug("appropriate timestamps for this date are between %s and %s", start_ts, stop_ts)
-        filehandle = self.__get_file_handle(filename, "rt")
-        next(filehandle) # skip header line
-        for lineno, row in enumerate(filehandle):
-            if not row or row[0] == "#":
-                continue
-            try:
-                data = self.__parse_line(row)
-                if self.ts_keyname not in data:
-                    logging.info("Format Error in row: %s, got %s", row, data)
+        if filename.endswith(".gz"):
+            filehandle = gzip.open(filename, "rt")
+        else:
+            filehandle = open(filename, "rt")
+        with filehandle as infile:
+            next(infile) # skip header line
+            for lineno, row in enumerate(infile):
+                if not row or row[0] == "#":
                     continue
-                if not start_ts <= data[self.ts_keyname] <= stop_ts:
-                    logging.debug("Skipping line, ts %s not between %s and %s", data[self.ts_keyname], start_ts, stop_ts)
-                    continue
-                yield data
-            except KeyError as exc:
-                logging.exception(exc)
-                logging.error("KeyError in File %s, line %s, on row: %s, skipping", filename, lineno, row)
-            except IndexError as exc:
-                logging.exception(exc)
-                logging.error("IndexError in File %s, line %s, on row: %s, skipping", filename, lineno, row)
-            except UnicodeDecodeError as exc:
-                logging.exception(exc)
-                logging.error("UnicodeDecodeError in File %s, line %s, on row: %s, skipping", filename, lineno, row)
+                try:
+                    data = self.__parse_line(row)
+                    if self.ts_keyname not in data:
+                        logging.info("Format Error in row: %s, got %s", row, data)
+                        continue
+                    if not start_ts <= data[self.ts_keyname] <= stop_ts:
+                        logging.debug("Skipping line, ts %s not between %s and %s", data[self.ts_keyname], start_ts, stop_ts)
+                        continue
+                    yield data
+                except KeyError as exc:
+                    logging.exception(exc)
+                    logging.error("KeyError in File %s, line %s, on row: %s, skipping", filename, lineno, row)
+                except IndexError as exc:
+                    logging.exception(exc)
+                    logging.error("IndexError in File %s, line %s, on row: %s, skipping", filename, lineno, row)
+                except UnicodeDecodeError as exc:
+                    logging.exception(exc)
+                    logging.error("UnicodeDecodeError in File %s, line %s, on row: %s, skipping", filename, lineno, row)
 
     def raw_reader(self):
         """
@@ -368,39 +391,11 @@ class DataLogger(object):
         for row in self.__read_raw_dict():
             yield row
 
-    def __get_cachedir(self):
-        """
-        return specific subdirectory to store cache files
-        if this directory does not exist, ist will be created
-
-        parameters:
-        datestring <str> actual datestring
-
-        returns:
-        <str> directory path
-        """
-        subdir = os.path.join(self.cachedir, self.datestring, self.project, self.tablename)
-        if not os.path.exists(subdir):
-            os.makedirs(subdir)
-        # try to set ownership of created directories
-        username = self.os_user
-        try:
-            uid = pwd.getpwnam(username).pw_uid
-            gid = pwd.getpwnam(username).pw_gid
-            os.chown(os.path.join(self.cachedir, self.datestring), uid, gid)
-            os.chown(os.path.join(self.cachedir, self.datestring, self.project), uid, gid)
-            os.chown(os.path.join(self.cachedir, self.datestring, self.project, self.tablename), uid, gid)
-        except KeyError as exc:
-            logging.exception(exc)
-            logging.error("User %s does not exist on this systemi, default permission will be applied to created directories", username)
-        return subdir
-
     def delete_caches(self):
         """delete pre calculates caches"""
-        cachedir = self.__get_cachedir()
-        for entry in os.listdir(cachedir):
-            absfile = os.path.join(cachedir, entry)
-            if entry.startswith("tsa_") or entry.startswith("ts_") or entry.startswith("tsastat_") or entry.startswith("tsstat_") or entry.startswith("quantile"):
+        for entry in os.listdir(self.cachedir):
+            absfile = os.path.join(self.cachedir, entry)
+            if entry.startswith("tsa_") or entry.startswith("ts_") or entry.startswith("tsastat_") or entry.startswith("tsstat_") or entry.startswith("quantile") or entry.startswith("total_stats"):
                 logging.debug("deleting cached file %s", entry)
                 os.unlink(absfile)
 
@@ -437,6 +432,10 @@ class DataLogger(object):
             "quantile" : {
                 "pattern" : "quantile.json",
                 "exists" : False,
+            },
+            "total_stats" : {
+                "pattern" : "total_stats.json",
+                "exists" : False,
             }
         }
         # the original raw file could be deleted, and only the
@@ -450,13 +449,15 @@ class DataLogger(object):
             logging.exception(exc)
             raise
         for cachetype in ("tsa", "ts", "tsastat", "tsstat"):
-            file_pattern = os.path.join(self.__get_cachedir(), caches[cachetype]["pattern"])
+            file_pattern = os.path.join(self.cachedir, caches[cachetype]["pattern"])
             for abs_filename in glob.glob(file_pattern):
                 filename = os.path.basename(abs_filename)
                 key = self.__decode_filename(filename)
                 caches[cachetype]["keys"][str(key)] = filename
         # add quantile part
-        caches["quantile"]["exists"] = os.path.isfile(os.path.join(self.__get_cachedir(), "quantile.json"))
+        caches["quantile"]["exists"] = os.path.isfile(os.path.join(self.cachedir, "quantile.json"))
+        # add total_stats part
+        caches["total_stats"]["exists"] = os.path.isfile(os.path.join(self.cachedir, "total_stats.json"))
         return caches
 
     def import_tsa(self, tsa):
@@ -475,14 +476,13 @@ class DataLogger(object):
             raise AssertionError("provided index_keynames does not match defined index_keynames")
         if self.value_keynames != tuple(tsa.value_keynames):
             raise AssertionError("provided value_keynames does not match defined value_keynames")
-        cachedir = self.__get_cachedir()
-        cachefilename = os.path.join(cachedir, TimeseriesArray.get_dumpfilename(tsa.index_keynames))
+        cachefilename = os.path.join(self.cachedir, TimeseriesArray.get_dumpfilename(tsa.index_keynames))
         if not os.path.isfile(cachefilename):
-            tsa.dump(cachedir)
+            tsa.dump(self.cachedir)
             tsastats = TimeseriesArrayStats(tsa)
-            tsastats.dump(cachedir)
+            tsastats.dump(self.cachedir)
             qantile = QuantileArray(tsa, tsastats)
-            qantile.dump(cachedir)
+            qantile.dump(self.cachedir)
         else:
             raise Exception("TSA Archive %s exists already in cache" % cachefilename)
 
@@ -504,33 +504,25 @@ class DataLogger(object):
         returns
         <TimeseriesArray> object read from cachefile or from raw data
         """
-        cachedir = self.__get_cachedir()
-        cachefilename = os.path.join(cachedir, TimeseriesArray.get_dumpfilename(self.index_keynames))
+        cachefilename = os.path.join(self.cachedir, TimeseriesArray.get_dumpfilename(self.index_keynames))
         def fallback():
             """
             fallback method to use, if reading from cache data is not possible
             """
             tsa = self.load_tsa_raw()
-            tsa.dump(cachedir) # save full data
+            tsa.dump(self.cachedir) # save full data
             # read the data afterwards to make sure there is no problem,
             # TODO: is this the fastest way?
             # corrected 2017-09-21 reread stored data to convert data to correct type
             # if validate is True:
-            tsa = TimeseriesArray.load(cachedir, self.index_keynames, filterkeys=filterkeys, index_pattern=index_pattern, datatypes=self.datatypes)
-            # also generate TSASTATS and dump to cache directory
-            #tsastats = TimeseriesArrayStats(tsa) # generate full Stats
-            #tsastats.dump(cachedir) # save
-            # and at last but not least quantile
-            #qantile = QuantileArray(tsa, tsastats)
-            #qantile.dump(cachedir)
-            # finally return tsa
+            tsa = TimeseriesArray.load(self.cachedir, self.index_keynames, filterkeys=filterkeys, index_pattern=index_pattern, datatypes=self.datatypes)
             return tsa
         if not os.path.isfile(cachefilename):
             logging.info("cachefile %s does not exist, fallback read from raw data file", cachefilename)
             return fallback()
         logging.debug("loading stored TimeseriesArray object file %s", cachefilename)
         try:
-            tsa = TimeseriesArray.load(cachedir, self.index_keynames, filterkeys=filterkeys, index_pattern=index_pattern, datatypes=self.datatypes)
+            tsa = TimeseriesArray.load(self.cachedir, self.index_keynames, filterkeys=filterkeys, index_pattern=index_pattern, datatypes=self.datatypes)
             return tsa
         except IOError:
             logging.error("IOError while reading from %s, using fallback", cachefilename)
@@ -556,23 +548,22 @@ class DataLogger(object):
         returns
         <TimeseriesArray> object read from cachefile or from raw data
         """
-        cachedir = self.__get_cachedir()
-        cachefilename = os.path.join(cachedir, TimeseriesArrayStats.get_dumpfilename(self.index_keynames))
+        cachefilename = os.path.join(self.cachedir, TimeseriesArrayStats.get_dumpfilename(self.index_keynames))
         def fallback():
             """
             fallback method to use, if reading from cache data is not possible
             """
             tsa = self.load_tsa(filterkeys=None) # load full tsa, and generate statistics
             tsastats = TimeseriesArrayStats(tsa) # generate full Stats
-            tsastats.dump(cachedir) # save it for future usage
-            tsastats = TimeseriesArrayStats.load(cachedir, self.index_keynames, filterkeys=filterkeys) # read specific
+            tsastats.dump(self.cachedir) # save it for future usage
+            tsastats = TimeseriesArrayStats.load(self.cachedir, self.index_keynames, filterkeys=filterkeys) # read specific
             return tsastats
         if not os.path.isfile(cachefilename):
             logging.info("cachefile %s does not exist, fallback read from tsa archive", cachefilename)
             return fallback()
         logging.debug("loading stored TimeseriesArray object file %s", cachefilename)
         try:
-            tsastats = TimeseriesArrayStats.load(cachedir, self.index_keynames, filterkeys=filterkeys)
+            tsastats = TimeseriesArrayStats.load(self.cachedir, self.index_keynames, filterkeys=filterkeys)
             return tsastats
         except IOError:
             logging.error("IOError while reading from %s, using fallback", cachefilename)
@@ -594,11 +585,10 @@ class DataLogger(object):
         returns:
         <QuantileArray>
         """
-        cachedir = self.__get_cachedir()
-        cachefilename = QuantileArray.get_dumpfilename(cachedir)
+        cachefilename = QuantileArray.get_dumpfilename(self.cachedir)
         quantile_array = None
         if os.path.isfile(cachefilename):
-            quantile_array = QuantileArray.load(cachedir)
+            quantile_array = QuantileArray.load(self.cachedir)
         else:
             logging.info("cachefile %s does not exist, fallback read from tsa archive", cachefilename)
             tsa = self["tsa"]
@@ -606,8 +596,56 @@ class DataLogger(object):
             # huge performance improvement, from 500s to 70s
             tsastats = self["tsastats"]
             quantile_array = QuantileArray(tsa, tsastats)
-            quantile_array.dump(cachedir)
+            quantile_array.dump(self.cachedir)
         return quantile_array
+
+    def load_total_stats(self):
+        """
+        aggregates all TimeseriesStats available in TimeseriesArrayStats to total_stats dict
+
+        returns:
+        <dict> of statistical functions, and values
+        """
+        aggregator = {
+            'median': lambda a, b: 0.0, # median of medians
+            'avg': lambda a, b: a + b,
+            'last': lambda a, b: 0.0,
+            'diff': lambda a, b: 0.0,
+            'max': lambda a, b: max(a, b),
+            'first': lambda a, b: 0.0,
+            'min': lambda a, b: min(a, b),
+            'std': lambda a, b: 0.0,
+            'count': lambda a, b: a + b,
+            'mean': lambda a, b: 0.0,
+            'dec': lambda a, b: a + b,
+            'inc': lambda a, b: a + b,
+            'sum': lambda a, b: a + b,
+            'total_count' : lambda a, b: a # to be consistent
+        }
+        cachefilename = os.path.join(self.cachedir, "total_stats.json")
+        if not os.path.isfile(cachefilename):
+            tsastats = self["tsastats"]
+            stats_data = {}
+            for value_keyname in self.value_keynames:
+                stats_data[value_keyname] = dict((key, 0.0) for key in aggregator.keys()) # prefill with 0.0
+                for index_key in tsastats.keys():
+                    stats = tsastats[index_key]
+                    for stat_func in stats[value_keyname].keys():
+                        stats_data[value_keyname][stat_func] = aggregator[stat_func](stats_data[value_keyname][stat_func], stats[value_keyname][stat_func])
+                    stats_data[value_keyname]["total_count"] += 1
+                if stats_data[value_keyname]["total_count"] > 0:
+                    stats_data[value_keyname]["total_avg"] = stats_data[value_keyname]["sum"] / stats_data[value_keyname]["total_count"]
+                    stats_data[value_keyname]["avg"] /= stats_data[value_keyname]["total_count"]
+                else:
+                    stats_data[value_keyname]["total_avg"] = 0.0
+                    stats_data[value_keyname]["avg"] = 0.0
+            with open(cachefilename, "wt") as outfile:
+                json.dump(stats_data, outfile, indent=4)
+            return stats_data
+        else:
+            with open(cachefilename, "rt") as infile:
+                stats_data = json.load(infile)
+            return stats_data
 
     @staticmethod
     def __decode_filename(filename):

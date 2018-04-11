@@ -121,6 +121,13 @@ class Test(unittest.TestCase):
         tsa = dl.load_tsa()
         print(dl.get_caches())
 
+    def test_total_stats(self):
+        dl = DataLogger("testdata")
+        dl.setup("mysql", "performance", "2018-04-01")
+        dl.delete_caches()
+        total_stats = dl.load_total_stats()
+        print(json.dumps(total_stats, indent=4))
+
     def test_raw_reader(self):
         dl = DataLogger("testdata")
         dl.setup("mysql", "performance", "2018-04-01")

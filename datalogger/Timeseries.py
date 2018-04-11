@@ -3,6 +3,7 @@
 """Module for class Timeseries"""
 import logging
 # own modules
+from CustomExceptions import *
 from TimeseriesStats import TimeseriesStats as TimeseriesStats
 
 
@@ -201,10 +202,6 @@ def datatype_gauge32(times, series):
             new_series.append(0.0)
     return new_series
 
-
-class DataFormatError(Exception):
-    """raised if format does not match"""
-    pass
 
 
 class Timeseries(object):

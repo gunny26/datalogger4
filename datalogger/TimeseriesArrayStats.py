@@ -13,7 +13,7 @@ import os
 import logging
 # own modules
 from TimeseriesStats import TimeseriesStats as TimeseriesStats
-from CustomExceptions import TimeseriesEmptyError as TimeseriesEmptyError
+from CustomExceptions import *
 
 #################### hack begin ##########################
 """

@@ -3,6 +3,8 @@
 import json
 import os
 import logging
+# own modules
+from CustomExceptions import *
 from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 
 
@@ -131,8 +133,6 @@ class QuantileArray(object):
         return qa
 
 
-class QuantileError(Exception):
-    """raised if there is some problem calculating Quantile"""
 
 
 class Quantile(object):
