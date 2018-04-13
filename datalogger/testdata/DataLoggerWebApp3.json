@@ -1,0 +1,14 @@
+{   "MAXAGE" : 300,
+    "BASEDIR" : "testdata",
+    "IDP_VERIFY" : "",
+    "IDP_CLIENT_ID" : "",
+    "IDP_CLIENT_SECRET" : "",
+    "REMOTE_ADDRS" : [],
+    "APIKEYS" : {
+        "0ae2d4a6-570f-441f-acf5-c973b3d4f9ee" : {
+            "name" : "read only user",
+            "role" : "read"
+        }
+    },
+    "IDPAPIKEYS" : []
+}
