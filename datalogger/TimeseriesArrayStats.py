@@ -74,13 +74,9 @@ class TimeseriesArrayStats(object):
                 logging.info("Timeseries for key %s is length zero, skipping", index_key)
 
     def __str__(self):
-        outbuffer = {
-            "index_keynames" : self.__index_keynames,
-            "value_keynames" : self.__value_keynames,
-            "tsstats" : [self._get_tsstat_dumpfilename(key) for key in self.__stats.keys()],
-            "tsastats" : self.get_dumpfilename(self.__index_keynames)
-            }
-        return json.dumps(outbuffer, indent=4, sort_keys=True)
+        return json.dumps(self.to_data(), indent=4, sort_keys=True)
+
+    to_json = __str__
 
     def __eq__(self, other):
         try:
@@ -154,21 +150,27 @@ class TimeseriesArrayStats(object):
         new_tsastat = TimeseriesArrayStats.from_json(json.dumps(outdata))
         return new_tsastat
 
-    def get_stats(self, value_key):
+    def get_stats(self, value_key, stat_func_name=None):
         """
         returns dictionary of stats of every Timeseries object in Array for this
         specific value_key only
 
         parameters:
         value_key <str> must be in self.value_keys
+        stat_func_name <str> must be in self.stat_func_names or None
 
         returns:
         <dict>
         """
         assert value_key in self.__value_keynames
+        if stat_func_name is not None:
+            assert stat_func_name in TimeseriesStats.get_stat_func_names()
         ret_data = {}
         for key, t_stat in self.__stats.items():
-            ret_data[key] = t_stat.stats[value_key]
+            if stat_func_name is not None:
+                ret_data[key] = t_stat.stats[value_key][stat_func_name]
+            else:
+                ret_data[key] = t_stat.stats[value_key]
         return ret_data
 
     @staticmethod
@@ -312,17 +314,30 @@ class TimeseriesArrayStats(object):
                 tsastats.__stats[key] = TimeseriesStats.load(infile)
         return tsastats
 
+    def to_data(self):
+        """
+        full data will be 3 dimensional, so this method returns only structure,
+        use get_stats to get 2-dimensional data of specific value_keyname
+        """
+        ret_data = {
+            "index_keynames" : self.__index_keynames,
+            "value_keynames" : self.__value_keynames,
+            "tsstats_filenames" : [self._get_tsstat_dumpfilename(key) for key in self.__stats.keys()],
+            "tsastats_filename" : self.get_dumpfilename(self.__index_keynames)
+            }
+        return ret_data
+
     def to_json(self):
-        outdata = []
-        outdata.append(self.__index_keynames)
-        outdata.append(self.__value_keynames)
-        outdata.append([(key, tsstat.stats) for key, tsstat in self.__stats.items()])
-        try:
-            return json.dumps(outdata, indent=4)
-        except TypeError as exc:
-            logging.exception(exc)
-            logging.error(outdata)
-            raise exc
+        """
+        full data will be 3 dimensional, so this method returns only structure,
+        use get_stats to get 2-dimensional data of specific value_keyname
+        """
+        ret_data = [
+            self.__index_keynames,
+            self.__value_keynames,
+            [(key, timeseries.stats) for key, timeseries in self.__stats.items()]
+        ]
+        return json.dumps(ret_data)
 
     @staticmethod
     def from_json(jsondata):

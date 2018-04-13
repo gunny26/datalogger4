@@ -106,14 +106,27 @@ class TimeseriesStats(object):
             series = timeseries.get_serie(key)
             if len(series) == 0:
                 logging.error("%s %s", key, len(timeseries))
-                raise TimeseriesEmptyError("Timeseries without data cannot have stats")
-            if len(series) > 1:
+                raise TimeseriesEmptyError("Timeseries without data cannot have statistics")
+            elif len(series) > 1:
                 self.__stats[key] = {}
                 for func_name, func in self.stat_funcs.items():
                     self.__stats[key][func_name] = func(series)
-            else:
-                logging.error("%s %s", key, len(timeseries))
-                raise TimeseriesEmptyError("some TimeseriesStats need at minimum 2 values")
+            elif len(series) == 1: # special case if there is only one value a day
+                self.__stats[key] = {
+                    "min" : series[0],
+                    "max" : series[0],
+                    "avg" : series[0],
+                    "sum" : series[0],
+                    "std" : 0.0,
+                    "median" : series[0],
+                    "count" : 1,
+                    "first" : series[0],
+                    "last" : series[0],
+                    "mean" : series[0],
+                    "inc" : 0.0,
+                    "dec" : 0.0,
+                    "diff" : 0.0,
+                }
 
     def __eq__(self, other):
         """ test for equality in depth"""
@@ -200,6 +213,11 @@ class TimeseriesStats(object):
         """get statistical function names"""
         return sorted(self.stat_funcs.keys())
 
+    @classmethod
+    def get_stat_func_names(cls):
+        """get statistical function names"""
+        return sorted(cls.stat_funcs.keys())
+
     def get_stats(self):
         """
         return statistics of timeseries object, and if is_dirty is True recreate statistics
@@ -212,7 +230,7 @@ class TimeseriesStats(object):
         """
         return self.__stats
 
-    def get_stat(self, funcname):
+    def get_stat(self, stat_func_name):
         """
         func <str> func must be one of self.stat_funcs.keys()
         get one specific stat value for all value_keys
@@ -222,18 +240,18 @@ class TimeseriesStats(object):
             <float> func(Timeseries)
         """
         try:
-            assert funcname in self.stat_funcs.keys()
+            assert stat_func_name in self.stat_funcs.keys()
         except AssertionError as exc:
             logging.error("func could be only one of %s", self.stat_funcs.keys())
             raise exc
         data = {}
         for key in self.__stats.keys():
-            data[key] = self.__stats[key][funcname]
+            data[key] = self.__stats[key][stat_func_name]
         return data
 
     def dump(self, filehandle):
         """
-        writer internal data to filehandle in json format
+        write internal data to filehandle in json format
 
         parameters:
         filehandle <file>
@@ -265,6 +283,12 @@ class TimeseriesStats(object):
         used to store data in file
         """
         return json.dumps(self.__stats)
+
+    def to_data(self):
+        """
+        return data used to further encode via json
+        """
+        return self.__stats
 
     @staticmethod
     def from_json(jsondata):

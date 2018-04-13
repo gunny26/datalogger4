@@ -124,6 +124,7 @@ class Test(unittest.TestCase):
         pass
 
     def test_keys(self):
+        print("testing keys")
         print(list(self.tsastats.keys()))
         assert list(self.tsastats.keys()) == [('srvwebsql2.tilak.cc',), ('srvdmzsql1.tilak.cc',), ('srvaporti1.tilak.cc',), ('nagios.tilak.cc',), ('srvazwsql1.tilak.cc',)]
 

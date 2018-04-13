@@ -42,11 +42,7 @@ class QuantileArray(object):
         return self.__value_keynames
 
     def __str__(self):
-        ret = {
-            "keys" : self.__keys,
-            "value_keynames" : self.__value_keynames
-        }
-        return json.dumps(ret, indent=4)
+        return json.dumps(self.to_data(), indent=4)
 
     def __getitem__(self, key):
         """
@@ -60,7 +56,7 @@ class QuantileArray(object):
         """
         if isinstance(key, tuple):
             return dict(((value_keyname, self.__data[value_keyname][key]) for value_keyname in self.__value_keynames))
-        elif isinstance(key, basestring):
+        elif isinstance(key, str):
             return self.__data[key]
         else:
             raise KeyError("key %s not found" % key)
@@ -91,6 +87,12 @@ class QuantileArray(object):
         quantille_data = dict(((key, quantille.dumps()) for key, quantille in self.__data.items()))
         with open(os.path.join(outdir, self.__filename), "wt") as outfile:
             json.dump((quantille_data, self.__keys, self.__value_keynames), outfile)
+
+    def to_data(self):
+        return {
+            "keys" : self.__keys,
+            "value_keynames" : self.__value_keynames
+        }
 
     def to_json(self):
         """
@@ -189,6 +191,10 @@ class Quantile(object):
     def quantile(self):
         """get internal data"""
         return self.__quantile
+
+    def to_data(self):
+        """get internal data"""
+        return [[str(key), ] + list(value.values()) for key, value in self.__quantile.items()]
 
     @property
     def maxx(self):

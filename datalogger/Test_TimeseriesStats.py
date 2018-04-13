@@ -5,6 +5,7 @@ import logging
 import datetime
 import gzip
 import os
+import json
 # own modules
 from Timeseries import Timeseries as Timeseries
 from TimeseriesStats import TimeseriesStats as TimeseriesStats
@@ -71,6 +72,12 @@ class Test(unittest.TestCase):
 
     def test_to_json(self):
         assert "\"diff\": 10961584.0" in self.tsstat.to_json()
+
+    def test_to_data(self):
+        data = self.tsstat.to_data()
+        assert data["aborted_clients"]["count"] == 288
+        data_str = json.dumps(data, indent=4)
+        assert isinstance(data_str, str)
 
     def test_from_json(self):
         tsstat = TimeseriesStats.from_json(self.tsstat.to_json())

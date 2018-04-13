@@ -5,6 +5,7 @@ import logging
 import datetime
 import gzip
 import os
+import json
 # own modules
 from Timeseries import Timeseries as Timeseries
 
@@ -98,6 +99,12 @@ class Test(unittest.TestCase):
     def test_to_csv(self):
         print("testing to_csv")
         assert len(list(self.app.to_csv(value_keynames=("uptime", "com_select")))) == 289
+
+    def test_to_data(self):
+        print("testing to_data")
+        data = self.app.to_data()
+        data_json = json.dumps(list(data))
+        assert isinstance(data_json, str)
 
     def test_dump(self):
         print("testing dump, load")

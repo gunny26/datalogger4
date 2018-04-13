@@ -49,7 +49,7 @@ def __datatype_counter(times, series, max_value):
     do not use directly, use counter32, counter64 instead
     first value will always be 0.0
 
-    valid range of values : 
+    valid range of values :
         min: 0.0
         max: max_value
 
@@ -169,7 +169,7 @@ def datatype_gauge32(times, series):
     this counter is not supposed to overflow, so lower next level in time,
     means there was a reset
 
-    in difference to counterreset, gauge32 will calculate 
+    in difference to counterreset, gauge32 will calculate
     difference / duration  to get some e.g. byte/s values
 
     parameters:
@@ -489,11 +489,13 @@ class Timeseries(object):
         function to add new data, and if data exists, aggregate existing data with new ones
         if there is no existing data for this timestamp, simply call add()
 
+        to aggregate perfectly the added data must be in sync with existing data,
+        aggregation will be done if timestamps are equal
+
         parameters:
         timestamp <float>
         values <tuple> of <floats>
         group_func <func> will be called with existing and new values
-        suppress_non_steady_ts <bool> if non steady timestamps will be reported
 
         returns:
         None
@@ -521,7 +523,7 @@ class Timeseries(object):
         """
         resample data to time interval given
         using func as aggregation function for values in between
-        aggregation function is caled for every series on its own, 
+        aggregation function is called for every series on its own,
         so you get a tuple with numerical values and hsa to resturn one single value
 
         parameters:
@@ -605,23 +607,9 @@ class Timeseries(object):
 #                ret_data[row[0]] = tuple((row[index] for index in colnums))
 #        return ret_data
 
-    def to_dict(self, value_keynames=None, start_ts=None, stop_ts=None):
+    def to_data(self, value_keynames=None, start_ts=None, stop_ts=None):
         """
-        return internal data as dict key = ts, of dicts value_key = value
-
-        {
-            ts1: {
-                key1 : value1,
-                key2 : value2,
-                ...
-            }
-             ts2: {
-                key1 : value1,
-                key2 : value2,
-                ...
-            }
-            ...
-        }
+        return internal data as list of dicts for every row
         """
         if value_keynames is None:
             value_keynames = self.__headers # use all columns if None
@@ -633,12 +621,12 @@ class Timeseries(object):
             logging.exception("start_ts and stop_ts has to be the same type and int")
             logging.error("start_ts=%s, stop_ts=%s", start_ts, stop_ts)
             raise exc
-        colnums = [self.__get_colnum(key) for key in value_keynames]
+        colnums = [(value_keyname, self.__get_colnum(value_keyname)) for value_keyname in value_keynames]
         # TODO: return sorted by timestamp as default
         for row in self.data:
             if (start_ts is None) or (start_ts <= row[0] <= stop_ts):
                 # mind the -1 at value_keynames!!
-                row_dict = dict(((value_keynames[index-1], row[index]) for index in colnums))
+                row_dict = dict(((value_keyname, row[index]) for value_keyname, index in colnums))
                 row_dict.update({self.ts_keyname : row[0]})
                 yield row_dict
 

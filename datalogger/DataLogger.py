@@ -246,14 +246,6 @@ class DataLogger(object):
         """return defined interval of timestamps defined in configuration"""
         return self.__meta["interval"]
 
-    def projects(self):
-        """return available project, defined in datalogger.json"""
-        return list(self.__config["projects"].keys())
-
-    def tablenames(self, project):
-        """return available tablenames for projects, defined in datalogger.json"""
-        return list(self.__config["projects"][project].keys())
-
     def __getitem__(self, *args):
         """
         super overloaded __getitem__ function could be either
@@ -266,6 +258,7 @@ class DataLogger(object):
         ["tsastats", <key>] -> return TimeseriesStats
         ["qa"] -> return QuantileArray
         ["qa", <key>] -> return <dict> Quantile
+        ["total_stats"] -> return <dict> total_stats
         """
         if isinstance(args[0], str):
             kind = args[0]
@@ -277,6 +270,8 @@ class DataLogger(object):
                 return self.load_quantile()
             if kind == "caches":
                 return self.get_caches()
+            if kind == "total_stats":
+                return self.load_total_stats()
         if isinstance(args[0], tuple):
             kind, subkey = args[0]
             if kind == "tsa":
@@ -382,6 +377,14 @@ class DataLogger(object):
                 except UnicodeDecodeError as exc:
                     logging.exception(exc)
                     logging.error("UnicodeDecodeError in File %s, line %s, on row: %s, skipping", filename, lineno, row)
+
+    def get_projects(self):
+        """return available project, defined in datalogger.json"""
+        return list(self.__config["projects"].keys())
+
+    def get_tablenames(self, project):
+        """return available tablenames for projects, defined in datalogger.json"""
+        return list(self.__config["projects"][project].keys())
 
     def raw_reader(self):
         """

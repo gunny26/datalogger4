@@ -236,6 +236,20 @@ class TimeseriesArray(object):
         except ValueError:
             return float(value_str.replace(u",", u".")) # try to replace colon with point
 
+    def to_data(self):
+        """
+        return json encodable data
+        """
+        ret_data = {
+            "index_keys" : self.__index_keynames,
+            "value_keys" : self.__value_keynames,
+            "ts_key" : self.__ts_key,
+            "ts_filenames" : [self.get_ts_dumpfilename(key) for key in self.keys()],
+            "tsa_filename" : self.get_dumpfilename(self.__index_keynames),
+            "datatypes" : self.datatypes
+        }
+        return ret_data
+
     def add(self, data, group_func=None):
         """
         provided data must be type <dict> having following keys
