@@ -50,6 +50,7 @@ class Test(unittest.TestCase):
             print("Expected Exception: %s" % exc)
 
     def test__getitem__(self):
+        print("testing __getitem__")
         dl = DataLogger("testdata")
         dl.setup("mysql", "performance", "2018-04-01")
         caches = dl["caches"]
@@ -78,6 +79,7 @@ class Test(unittest.TestCase):
         assert qa[("nagios.tilak.cc",)] == quantile
 
     def test_load_tsa(self):
+        print("testing delete_caches, load_tsa")
         dl = DataLogger("testdata")
         dl.setup("sanportperf", "fcIfC3AccountingTable", "2018-04-01")
         dl.delete_caches()
@@ -90,6 +92,7 @@ class Test(unittest.TestCase):
         #print(tsa)
 
     def test_load_tsastats(self):
+        print("testing delete_caches, load_tsastats")
         dl = DataLogger("testdata")
         dl.setup("sanportperf", "fcIfC3AccountingTable", "2018-04-01")
         dl.delete_caches()
@@ -102,6 +105,7 @@ class Test(unittest.TestCase):
         #print(tsa)
 
     def test_load_quantiles(self):
+        print("testing delete_caches, load_quantile")
         dl = DataLogger("testdata")
         dl.setup("sanportperf", "fcIfC3AccountingTable", "2018-04-01")
         dl.delete_caches()
@@ -114,6 +118,7 @@ class Test(unittest.TestCase):
         #print(tsa)
 
     def test_load_caches(self):
+        print("testing delete_caches, get_caches")
         dl = DataLogger("testdata")
         dl.setup("mysql", "performance", "2018-04-01")
         dl.delete_caches()
@@ -122,6 +127,7 @@ class Test(unittest.TestCase):
         print(dl.get_caches())
 
     def test_total_stats(self):
+        print("testing delete_caches, load_total_stats")
         dl = DataLogger("testdata")
         dl.setup("mysql", "performance", "2018-04-01")
         dl.delete_caches()
@@ -129,6 +135,7 @@ class Test(unittest.TestCase):
         print(json.dumps(total_stats, indent=4))
 
     def test_raw_reader(self):
+        print("testing delete_caches, raw_reader")
         dl = DataLogger("testdata")
         dl.setup("mysql", "performance", "2018-04-01")
         for row in dl.raw_reader():

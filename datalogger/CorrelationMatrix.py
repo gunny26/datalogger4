@@ -66,9 +66,9 @@ class CorrelationMatrixArray(object):
 
     def __init__(self, tsa):
         self.__data = {}
-        for value_key in tsa.value_keys:
-            logging.info("calculating value_key %s", value_key)
-            self.__data[value_key] = CorrelationMatrix(tsa, value_key)
+        for value_keyname in tsa.value_keynames:
+            logging.info("calculating value_key %s", value_keyname)
+            self.__data[value_keyname] = CorrelationMatrix(tsa, value_keyname)
 
     def __eq__(self, other):
         try:

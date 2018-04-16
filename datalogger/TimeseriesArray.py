@@ -481,8 +481,8 @@ class TimeseriesArray(object):
             key_dict = self.get_index_dict(key)
             # dump timeseries as dictionary and spice dict up with
             # key_dict
-            for row in self[key].to_dict():
-                row.update(key_dict)
+            for row in self[key].to_data():
+                row.update(key_dict) # add index_keys to every row
                 yield row
 
     def dump(self, outpath, overwrite=False):

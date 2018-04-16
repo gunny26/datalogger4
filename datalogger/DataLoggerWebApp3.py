@@ -149,12 +149,13 @@ class DataLoggerWebApp3(object):
         self.__dl.setup(project, tablename, "1970-01-01")
         return self.__dl.meta
 
-    def get_caches(self, args):
+    #@outformat
+    def get_caches(self, *args, **kwds):
         """ using DataLogger method """
         project, tablename, datestring = args[:3]
         self.__dl.setup(project, tablename, datestring)
-        caches = self.__dl.get_caches()
-        return json.dumps(caches)
+        caches = self.__dl["caches"]
+        return caches
 
     #@outformat
     def get_tsa(self, *args, **kwds):
@@ -212,6 +213,16 @@ class DataLoggerWebApp3(object):
         self.__dl.setup(project, tablename, datestring)
         return self.__dl["qa", value_keyname].to_data()
 
+    def get_ts_for_datestring(self, *args, **kwds):
+        datestring = args[0]
+        return self.__dl.get_ts_for_datestring(datestring)
+
+    def get_yesterday_datestring(self, *args, **kwds):
+        return self.__dl.get_yesterday_datestring()
+
+    def get_last_business_day_datestring(self, *args, **kwds):
+        return self.__dl.get_last_business_day_datestring()
+
     def POST(self, parameters):
         """
         GET Multiplexer function, according to first argument in URL
@@ -230,7 +241,7 @@ class DataLoggerWebApp3(object):
         method = "post_%s" % args[0].lower()
         try:
             # calling method, or AttributeError if not found
-            return getattr(self, method)(*args[1:])
+            return getattr(self, method)(*args[1:], **query)
         except AttributeError as exc:
             self.logger.error(exc)
         web.ctx.status = "405 unknown method"
@@ -262,7 +273,7 @@ class DataLoggerWebApp3(object):
             self.logger.info("Error while saving received data to")
             return "Error while saving received data to"
         try:
-            tsa = self.__dl["tsa"] # read received data
+            tsa = self.__dl["tsa"] # re-read received data
             assert isinstance(tsa, TimeseriesArrayStats)
         except AssertionError as exc:
             self.logger.exception(exc)
@@ -272,6 +283,37 @@ class DataLoggerWebApp3(object):
         self.logger.info("File stored")
         return "File stored"
 
+    def DELETE(self, parameters):
+        """
+        GET Multiplexer function, according to first argument in URL
+        call this function, and resturn result to client
+
+        parameters:
+        /<str>function_name/...
+
+        return:
+        return function_name(what is left of arguments)
+
+        """
+        self.logger.info("calling %s", parameters)
+        args = parameters.strip("/").split("/")
+        # build method name from url
+        method = "delete_%s" % args[0].lower()
+        query = dict(web.input()) # get query as dict
+        try:
+            # calling method, or AttributeError if not found
+            return getattr(self, method)(*args[1:], **query)
+        except AttributeError as exc:
+            self.logger.error(exc)
+        web.ctx.status = "405 unknown method"
+
+    def delete_caches(self, *args, **kwds):
+        """
+        delete all available caches for this specific entry
+        """
+        project, tablename, datestring = args[:3]
+        self.__dl.setup(project, tablename, datestring)
+        self.__dl.delete_caches()
 
 if __name__ == "__main__":
     # TESTING only
@@ -285,48 +327,68 @@ if __name__ == "__main__":
     #app = web.application(urls, globals())
     #app.run()
     dlw3 = DataLoggerWebApp3()
-    print("testing /projects")
+    print("testing GET /projects")
     projects = dlw3.get_projects()
     print(projects)
     assert projects == ['sanportperf', 'mysql']
-    print("testing /tablenames/mysql")
+    print("testing GET /tablenames/mysql")
     tablenames = dlw3.get_tablenames("mysql")
     print(tablenames)
     assert tablenames == ["performance"]
-    print("testing /meta/mysql/performance")
+    print("testing GET /meta/mysql/performance")
     meta = dlw3.get_meta("mysql", "performance")
     print(json.dumps(meta, indent=4))
     assert meta['index_keynames'] == ('hostname',)
-    print("testing /tsa/mysql/performance/2018-04-01")
+    print("testing GET /tsa/mysql/performance/2018-04-01")
     tsa = dlw3.get_tsa("mysql", "performance", "2018-04-01")
     print(json.dumps(tsa, indent=4))
     assert "ts_KHUnbmFnaW9zLnRpbGFrLmNjJywp.csv.gz" in tsa["ts_filenames"]
-    print("testing /tsastats/mysql/performance/2018-04-01")
+    print("testing GET /tsastats/mysql/performance/2018-04-01")
     tsastats = dlw3.get_tsastats("mysql", "performance", "2018-04-01")
     print(json.dumps(tsastats, indent=4))
     assert "tsstat_KHUnbmFnaW9zLnRpbGFrLmNjJywp.json" in dlw3.get_tsastats("mysql", "performance", "2018-04-01")["tsstats_filenames"]
-    print("testing /total_stats/mysql/performance/2018-04-01")
+    print("testing GET /total_stats/mysql/performance/2018-04-01")
     total_stats = dlw3.get_total_stats("mysql", "performance", "2018-04-01")
     print(json.dumps(total_stats, indent=4))
     assert total_stats["bytes_sent"]["count"] == 1440.0
-    print("testing /ts/mysql/performance/2018-04-01/KHUnbmFnaW9zLnRpbGFrLmNjJywp")
+    print("testing GET /ts/mysql/performance/2018-04-01/KHUnbmFnaW9zLnRpbGFrLmNjJywp")
     ts = dlw3.get_ts("mysql", "performance", "2018-04-01", "KHUnbmFnaW9zLnRpbGFrLmNjJywp")
     print(json.dumps(ts, indent=4))
     assert ts[-1]["ts"] == 1522619702.0
-    print("testing /ts/mysql/performance/2018-04-01/KHUnbmFnaW9zLnRpbGFrLmNjJywp/com_select/com_update")
+    print("testing GET /ts/mysql/performance/2018-04-01/KHUnbmFnaW9zLnRpbGFrLmNjJywp/com_select/com_update")
     ts = dlw3.get_ts("mysql", "performance", "2018-04-01", "KHUnbmFnaW9zLnRpbGFrLmNjJywp", "com_select", "com_update")
     print(json.dumps(ts, indent=4))
     assert ts[-1]["com_select"] == 2.07
-    print("testing /tsstats/mysql/performance/2018-04-01/KHUnbmFnaW9zLnRpbGFrLmNjJywp")
+    print("testing GET /tsstats/mysql/performance/2018-04-01/KHUnbmFnaW9zLnRpbGFrLmNjJywp")
     tsstats = dlw3.get_tsstats("mysql", "performance", "2018-04-01", "KHUnbmFnaW9zLnRpbGFrLmNjJywp")
     print(json.dumps(tsstats, indent=4))
     assert tsstats["questions"]["diff"] == 55.57
-    print("testing /qa/mysql/performance/2018-04-01")
+    print("testing GET /qa/mysql/performance/2018-04-01")
     qa = dlw3.get_qa("mysql", "performance", "2018-04-01")
     print(json.dumps(qa, indent=4))
-    print("testing /quantile/mysql/performance/2018-04-01/com_select")
+    print("testing GET /quantile/mysql/performance/2018-04-01/com_select")
     quantile = dlw3.get_quantile("mysql", "performance", "2018-04-01", "com_select")
     print(json.dumps(quantile, indent=4))
+    print("testing GET /caches/mysql/performance/2018-04-01")
+    caches = dlw3.get_caches("mysql", "performance", "2018-04-01")
+    print(json.dumps(caches, indent=4))
+    print("testing DELETE /caches/mysql/performance/2018-04-01")
+    res = dlw3.delete_caches("mysql", "performance", "2018-04-01")
+    assert res is None
+    print("testing GET /caches/mysql/performance/2018-04-01")
+    caches = dlw3.get_caches("mysql", "performance", "2018-04-01")
+    print(json.dumps(caches, indent=4))
+    assert caches["tsa"]["keys"] == {}
+    print("testing GET /ts_for_datestring/2018-04-01")
+    start, stop = dlw3.get_ts_for_datestring("2018-04-01")
+    assert int(start) == 1522533599
+    assert int(stop) == 1522619998
+    print("testing GET /yesterday_datestring/")
+    datestring = dlw3.get_yesterday_datestring()
+    print(datestring)
+    print("testing GET /last_business_day_datestring/")
+    datestring = dlw3.get_last_business_day_datestring()
+    print(datestring)
 else:
     # if called over WSGI Interface
     CONFIG = tk_web.TkWebConfig("~/DataLoggerWebApp3.json")
