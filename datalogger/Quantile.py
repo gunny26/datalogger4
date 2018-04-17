@@ -31,7 +31,6 @@ class QuantileArray(object):
                 logging.exception(exc)
                 logging.error("skipping value_key %s", value_keyname)
 
-    @property
     def keys(self):
         """all available index_keys"""
         return self.__keys

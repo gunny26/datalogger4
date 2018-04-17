@@ -330,7 +330,7 @@ if __name__ == "__main__":
     print("testing GET /projects")
     projects = dlw3.get_projects()
     print(projects)
-    assert projects == ['sanportperf', 'mysql']
+    assert 'sanportperf' in projects
     print("testing GET /tablenames/mysql")
     tablenames = dlw3.get_tablenames("mysql")
     print(tablenames)
