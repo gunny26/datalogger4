@@ -343,9 +343,9 @@ class Timeseries(object):
             rownum = None
             colnum = None
             # convert row to rownum, depending on type
-            if type(row) == int:
+            if isinstance(row, int):
                 rownum = row
-            elif type(row) == float:
+            elif isinstance(row, float):
                 for index, values in enumerate(self.data):
                     if values[0] == row:
                         rownum = index
@@ -354,7 +354,7 @@ class Timeseries(object):
             else:
                 raise KeyError("Row must be either int (index)  or float (timestamp) not %s" % type(row))
             # convert col to something useful
-            if type(col) == str:
+            if isinstance(col, str):
                 colnum = self.colnames.index(col)
             else:
                 colnum = col
@@ -457,7 +457,7 @@ class Timeseries(object):
             assert isinstance(timestamp, float)
             assert all((isinstance(value, float) for value in values))
             assert len(values) == len(self.__headers)
-        except AssertionError as exc:
+        except AssertionError:
             raise DataFormatError("Values %s are not the same length as format specification %s" % (values, self.__headers))
         try:
             assert self.data[-1][0] < timestamp
@@ -614,9 +614,10 @@ class Timeseries(object):
         if value_keynames is None:
             value_keynames = self.__headers # use all columns if None
         try:
-            assert type(start_ts) == type(stop_ts)
             if start_ts is not None:
-                assert type(start_ts) == int
+                assert isinstance(start_ts, int)
+            if stop_ts is not None:
+                assert isinstance(stop_ts, int)
         except AssertionError as exc:
             logging.exception("start_ts and stop_ts has to be the same type and int")
             logging.error("start_ts=%s, stop_ts=%s", start_ts, stop_ts)
@@ -646,9 +647,10 @@ class Timeseries(object):
         if value_keynames is None:
             value_keynames = self.__headers
         try:
-            assert type(start_ts) == type(stop_ts)
             if start_ts is not None:
-                assert type(start_ts) == int
+                assert isinstance(start_ts, int)
+            if stop_ts is not None:
+                assert isinstance(stop_ts, int)
         except AssertionError as exc:
             logging.exception("start_ts and stop_ts has to be the same type and int")
             logging.error("start_ts=%s, stop_ts=%s", start_ts, stop_ts)
@@ -704,7 +706,7 @@ class Timeseries(object):
         returns:
         <None>
         """
-        if len(self.data) == 0:
+        if not self.data:
             logging.error("Empty Timeseries, nothing to convert")
             return
         colnum = self.__get_colnum(colname)

@@ -16,15 +16,15 @@ from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 
 
 #################### hack begin ##########################
-"""
-hack to mimic some python 2.x behaviour is string
-representation of tuples
-"""
+#
+# hack to mimic some python 2.x behaviour is string
+# representation of tuples
+#
 def _b64encode_p3(list_obj):
     if len(list_obj) == 1:
-        start ="(u'" + list_obj[0] + "',)"
+        start = "(u'" + list_obj[0] + "',)"
     else:
-        start ="(u'" + "', u'".join((str(key) for key in list_obj)) + "')"
+        start = "(u'" + "', u'".join((str(key) for key in list_obj)) + "')"
     encoded = base64.urlsafe_b64encode(start.encode("utf-8")).decode("utf-8")
     #print("%s -> %s -> %s" % (list_obj, encoded, b64decode(encoded)))
     return encoded
@@ -40,7 +40,7 @@ def _b64decode(encoded):
     return decoded
 
 
-if sys.version_info < (3,0):
+if sys.version_info < (3, 0):
     print("using python 2 coding funtions")
     b64encode = _b64encode_p3
     b64decode = _b64decode
@@ -138,7 +138,7 @@ class TimeseriesArray(object):
             assert self.__value_keynames == other.value_keynames
             assert self.__ts_key == other.ts_key
             assert len(self.__data.keys()) == len(other.keys())
-            for key in self.__data.keys():
+            for key in self.__data:
                 if len(self[key]) != len(other[key]):
                     raise AssertionError("timeseries %s data differences in length" % key)
             return True
@@ -148,13 +148,11 @@ class TimeseriesArray(object):
 
     def items(self):
         """mimic dict, but honor autoload feature"""
-        for key in self.keys():
-            yield (key, self[key])
+        return [(key, self[key]) for key in self.keys()]
 
     def values(self):
         """mimic dict, but honor autoload feature"""
-        for key in self.__data.keys():
-            yield self[key]
+        return [self[key] for key in self.__data.keys()]
 
     def keys(self):
         """
@@ -316,7 +314,7 @@ class TimeseriesArray(object):
         """
         #logging.debug("new start : %s, stop: %s, length %s", timeserie[0][0], timeserie[-1][0], len(timeserie))
         assert key not in self.keys()
-        if len(self.keys()) > 0:
+        if self.keys():
             #logging.debug("existing start : %s, stop: %s, length %s", self.data.values()[0][0][0], self.data.values()[0][-1][0], len(self.data.values()[0]))
             try:
                 assert len(timeserie) == len(self.values()[0]) # must be the same length
@@ -476,7 +474,6 @@ class TimeseriesArray(object):
         and you can map(tsa.add(), tsa.export())
         """
         for key in self.keys():
-            timeseries = self[key]
             # convert key tuple to dict
             key_dict = self.get_index_dict(key)
             # dump timeseries as dictionary and spice dict up with

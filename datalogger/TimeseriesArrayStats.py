@@ -296,8 +296,8 @@ class TimeseriesArrayStats(object):
         #logging.info("index_keys: %s", index_keys)
         infilename = os.path.join(path, TimeseriesArrayStats.get_dumpfilename(index_keys))
         try:
-            fh = open(infilename, "rb")
-            indata = json.load(fh)
+            with open(infilename, "rt") as infile:
+                indata = json.load(infile)
         except Exception as exc:
             logging.exception(exc)
             logging.error("something went wrong while loading %s", infilename)
