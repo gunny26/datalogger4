@@ -18,6 +18,8 @@ urls = (
     "/(.*)", "DataLoggerWebApp3",
     )
 
+CONFIG = tk_web.TkWebConfig("testdata/DataLoggerWebApp3.json")
+
 class DataLoggerWebApp3(object):
     """
     retrieve Data from DataLogger
@@ -72,11 +74,22 @@ class DataLoggerWebApp3(object):
         method = "get_%s" % args[0].lower()
         query = dict(web.input()) # get query as dict
         try:
-            # calling method, or AttributeError if not found
-            return getattr(self, method)(*args[1:], **query)
+            func = getattr(self, method)
         except AttributeError as exc:
             self.logger.error(exc)
-        web.ctx.status = "405 unknown method"
+            web.ctx.status = "405 unknown method"
+            return
+        # calling method, or AttributeError if not found
+        try:
+            return func(*args[1:], **query)
+        except KeyError as exc:
+            self.logger.error(exc)
+            web.ctx.status = "404 %s" % exc
+            return
+        except IndexError as exc:
+            self.logger.error(exc)
+            web.ctx.status = "404 %s" % exc
+            return
 
     def doc(self, *args, **kwds):
         """
@@ -205,17 +218,14 @@ class DataLoggerWebApp3(object):
         project, tablename, datestring = args[:3]
         self.__dl.setup(project, tablename, datestring)
         return self.__dl["qa"].to_data()
-
-    #@outformat
-    def get_quantile(self, *args, **kwds):
-        """ using DataLogger method """
-        project, tablename, datestring, value_keyname = args[:4]
-        self.__dl.setup(project, tablename, datestring)
-        return self.__dl["qa", value_keyname].to_data()
+    get_quantile = get_qa
 
     def get_ts_for_datestring(self, *args, **kwds):
         datestring = args[0]
         return self.__dl.get_ts_for_datestring(datestring)
+
+    def get_stat_func_names(self, *args, **kwds):
+        return self.__dl.stat_func_names
 
     def get_yesterday_datestring(self, *args, **kwds):
         return self.__dl.get_yesterday_datestring()
@@ -315,17 +325,36 @@ class DataLoggerWebApp3(object):
         self.__dl.setup(project, tablename, datestring)
         self.__dl.delete_caches()
 
-if __name__ == "__main__":
-    # TESTING only
-    CONFIG = tk_web.TkWebConfig("testdata/DataLoggerWebApp3.json")
-    # prepare IDP Connector to use actual CONFIG
-    #tk_web.IdpConnector.CONFIG = CONFIG
-    #tk_web.IdpConnector.web = web
-    # some decorators, use it as needed
-    #authenticator = tk_web.std_authenticator(web, CONFIG)
-    #outformat = tk_web.std_jsonout(web, CONFIG)
-    #app = web.application(urls, globals())
-    #app.run()
+
+def get_config_pre_processor(config):
+    def inner(handle):
+        print("config_pre_processor called")
+        web.ctx.tk_config = config
+        return handle()
+    return inner
+
+def get_json_post_processor():
+    def inner(handle):
+        print("json_post_processor called")
+        result = handle()
+        if result is not None:
+            return json.dumps(result)
+    return inner
+
+def get_exception_post_processor():
+    def inner(handle):
+        print("exception_post_processor called")
+        try:
+            return handle()
+        except KeyError as exc:
+            web.ctx.status = "404 %s" % exc
+        except IndexError as exc:
+            web.ctx.status = "404 %s" % exc
+        return "error"
+    return inner
+
+
+def test():
     dlw3 = DataLoggerWebApp3()
     print("testing GET /projects")
     projects = dlw3.get_projects()
@@ -389,14 +418,32 @@ if __name__ == "__main__":
     print("testing GET /last_business_day_datestring/")
     datestring = dlw3.get_last_business_day_datestring()
     print(datestring)
+
+
+if __name__ == "__main__":
+    # TESTING only
+    # prepare IDP Connector to use actual CONFIG
+    #tk_web.IdpConnector.CONFIG = CONFIG
+    #tk_web.IdpConnector.web = web
+    # some decorators, use it as needed
+    #authenticator = tk_web.std_authenticator(web, CONFIG)
+    #outformat = tk_web.std_jsonout(web, CONFIG)
+    app = web.application(urls, globals())
+    app.add_processor(get_exception_post_processor())
+    app.add_processor(get_config_pre_processor(CONFIG))
+    app.add_processor(get_json_post_processor())
+    app.run() # will start local webserver
 else:
     # if called over WSGI Interface
-    CONFIG = tk_web.TkWebConfig("~/DataLoggerWebApp3.json")
+    CONFIG = tk_web.TkWebConfig("testdata/DataLoggerWebApp3.json")
     basedir = CONFIG["BASEDIR"]
     # prepare IDP Connector to use actual CONFIG
     tk_web.IdpConnector.CONFIG = CONFIG
     tk_web.IdpConnector.web = web
     # some decorators, use it as needed
-    authenticator = tk_web.std_authenticator(web, CONFIG)
-    outformat = tk_web.std_jsonout(web, CONFIG)
-    application = web.application(urls, globals()).wsgifunc()
+    # authenticator = tk_web.std_authenticator(web, CONFIG)
+    #outformat = tk_web.std_jsonout(web, CONFIG)
+    #app = web.application(urls, globals())
+    #app.add_processor(get_config_pre_processor(CONFIG))
+    #app.add_processor(get_json_post_processor())
+    #app.wsgifunc()

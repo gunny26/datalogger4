@@ -246,6 +246,10 @@ class DataLogger(object):
         """return defined interval of timestamps defined in configuration"""
         return self.__meta["interval"]
 
+    @property
+    def stat_func_names(self):
+        return list(TimeseriesStats.stat_funcs.keys())
+
     def __getitem__(self, *args):
         """
         super overloaded __getitem__ function could be either
