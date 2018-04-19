@@ -101,6 +101,10 @@ class DataLogger(object):
         self.__meta["raw_basedir"] = os.path.join(projectdir, "raw")
         if not os.path.isdir(self.__meta["raw_basedir"]):
             raise AttributeError("project raw input directory %s does not exist" % self.__meta["raw_basedir"])
+        # if headers is dictionary, this should be treated ad description
+        # TODO: this should be default in near future
+        if isinstance(self.__meta["headers"], dict):
+            self.__meta["decsription"] = self.__meta["headers"]
         # convert to tuple
         self.__meta["headers"] = tuple(self.__meta["headers"])
         # transitional hook to implement datatypes without correcting
