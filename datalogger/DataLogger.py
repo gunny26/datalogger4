@@ -15,11 +15,11 @@ import gzip
 import base64
 import pwd
 # own modules
-from TimeseriesArray import TimeseriesArray as TimeseriesArray
-from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
-from TimeseriesStats import TimeseriesStats as TimeseriesStats
-from Quantile import QuantileArray as QuantileArray
-from CustomExceptions import *
+from datalogger.TimeseriesArray import TimeseriesArray as TimeseriesArray
+from datalogger.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
+from datalogger.TimeseriesStats import TimeseriesStats as TimeseriesStats
+from datalogger.Quantile import QuantileArray as QuantileArray
+from datalogger.CustomExceptions import *
 
 class DataLogger(object):
     """
@@ -400,9 +400,17 @@ class DataLogger(object):
 
     def delete_caches(self):
         """delete pre calculates caches"""
+        try:
+            rawfilename = self.__get_raw_filename()
+            pattern_list = ("tsa_", "ts_", "tsastat_", "tsstat_", "quantile.json", "total_stats.json")
+        except DataLoggerRawFileMissing:
+            # raw file is missing, or file is archived
+            # in this case do not delete tsa file
+            logging.info("original raw file is missing, tsa file will not be deleted")
+            pattern_list = ("ts_", "tsastat_", "tsstat_", "quantile.json", "total_stats.json")
         for entry in os.listdir(self.cachedir):
             absfile = os.path.join(self.cachedir, entry)
-            if entry.startswith("tsa_") or entry.startswith("ts_") or entry.startswith("tsastat_") or entry.startswith("tsstat_") or entry.startswith("quantile") or entry.startswith("total_stats"):
+            if any((entry.startswith(pattern) for pattern in pattern_list)):
                 logging.debug("deleting cached file %s", entry)
                 os.unlink(absfile)
 

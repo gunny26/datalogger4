@@ -2,23 +2,23 @@
 
 import os
 import logging
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.INFO)
 import json
 import gzip
 import base64
 import web
 # own modules
 import tk_web
-from CustomExceptions import *
-from DataLogger import DataLogger as DataLogger
-from TimeseriesStats import TimeseriesStats as TimeseriesStats
+from datalogger.CustomExceptions import *
+from datalogger.DataLogger import DataLogger as DataLogger
+from datalogger.TimeseriesStats import TimeseriesStats as TimeseriesStats
 
 urls = (
     "/oauth2/v1/", "tk_web.IdpConnector",
     "/(.*)", "DataLoggerWebApp3",
     )
 
-CONFIG = tk_web.TkWebConfig("testdata/DataLoggerWebApp3.json")
+CONFIG = tk_web.TkWebConfig("/var/www/testdata/DataLoggerWebApp3.json")
 
 class DataLoggerWebApp3(object):
     """
@@ -27,10 +27,14 @@ class DataLoggerWebApp3(object):
     more sophistuicated calculations should be done on higher level apis
     """
 
-    def __init__(self):
-        """__init__"""
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.__dl = DataLogger(CONFIG["BASEDIR"])
+    __dl = DataLogger(CONFIG["BASEDIR"])
+    logger = logging.getLogger("DataLoggerWebApp3")
+
+#    def __init__(self):
+#        __init__ will be called on evenry request
+#        """__init__"""
+#        print("__init__ called")
+#        self.logger = logging.getLogger(self.__class__.__name__)
 
     def OPTIONS(self, args):
         """
@@ -42,7 +46,6 @@ class DataLoggerWebApp3(object):
         web.header('Access-Control-Allow-Headers', 'x-authkey')
         web.header('Access-Control-Allow-Headers', 'x-apikey')
 
-    #@authenticator
     def GET(self, parameters):
         """
         GET Multiplexer function, according to first argument in URL
@@ -91,34 +94,6 @@ class DataLoggerWebApp3(object):
             web.ctx.status = "404 %s" % exc
             return
 
-    def doc(self, *args, **kwds):
-        """
-        get docstrings from methods available
-
-        ex: DataLogger/doc/get_projects/something/or/nothing
-
-        only the first argument after doc is evaluated,
-        the remaining is ignored
-        """
-        # use only the fist argument to find function
-        web.header("Content-Type", "text/html")
-        outbuffer = ["<html><body>"]
-        try:
-            func = eval("self.%s" % args[0])
-            doc = func.__doc__
-            name = func.__name__
-            outbuffer.append("<h1 class=datalogger-function-name>def %s(*args, **kwds)</h1>" % name)
-            outbuffer.append("<div class=datalogger-function-doc>")
-            if doc is not None:
-                outbuffer.append(doc.replace("\n", "<br>"))
-            outbuffer.append("</div>")
-        except AttributeError as exc:
-            self.logger.info(exc)
-            outbuffer.append(str(exc))
-        outbuffer.append("</body></html>")
-        return "\n".join(outbuffer)
-
-    #@outformat
     def get_projects(self, *args, **kwds):
         """
         get available projects for this Datalogger Server
@@ -131,7 +106,6 @@ class DataLoggerWebApp3(object):
         """
         return self.__dl.get_projects()
 
-    #@outformat
     def get_tablenames(self, *args, **kwds):
         """
         get available tablenames, for one particular project
@@ -146,7 +120,6 @@ class DataLoggerWebApp3(object):
         project = args[0]
         return self.__dl.get_tablenames(project)
 
-    #@memcache
     def get_meta(self, *args, **kwds):
         """
         get available tablenames, for one particular project
@@ -162,7 +135,6 @@ class DataLoggerWebApp3(object):
         self.__dl.setup(project, tablename, "1970-01-01")
         return self.__dl.meta
 
-    #@outformat
     def get_caches(self, *args, **kwds):
         """ using DataLogger method """
         project, tablename, datestring = args[:3]
@@ -170,21 +142,18 @@ class DataLoggerWebApp3(object):
         caches = self.__dl["caches"]
         return caches
 
-    #@outformat
     def get_tsa(self, *args, **kwds):
         """ using DataLogger method """
         project, tablename, datestring = args[:3]
         self.__dl.setup(project, tablename, datestring)
         return self.__dl["tsa"].to_data()
 
-    #@outformat
     def get_tsastats(self, *args, **kwds):
         """ using DataLogger method """
         project, tablename, datestring = args[:3]
         self.__dl.setup(project, tablename, datestring)
         return self.__dl["tsastats"].to_data()
 
-    #@outformat
     def get_ts(self, *args, **kwds):
         """ using DataLogger method """
         project, tablename, datestring, index_key_b64 = args[:4]
@@ -197,7 +166,6 @@ class DataLoggerWebApp3(object):
         else:
             return list(self.__dl["tsa", index_key].to_data())
 
-    #@outformat
     def get_tsstats(self, *args, **kwds):
         """ using DataLogger method """
         project, tablename, datestring, index_key_b64 = args[:4]
@@ -205,14 +173,12 @@ class DataLoggerWebApp3(object):
         index_key = tuple(eval(base64.b64decode(index_key_b64)))
         return self.__dl["tsastats", index_key].to_data()
 
-    #@outformat
     def get_total_stats(self, *args, **kwds):
         """ using DataLogger method """
         project, tablename, datestring = args[:3]
         self.__dl.setup(project, tablename, datestring)
         return self.__dl["total_stats"]
 
-    #@outformat
     def get_qa(self, *args, **kwds):
         """ using DataLogger method """
         project, tablename, datestring = args[:3]
@@ -353,6 +319,74 @@ def get_exception_post_processor():
         return "error"
     return inner
 
+def get_std_authenticator(config):
+    """
+    Standard Authenticator for APIKEY and allowed Remote Addresses
+    using global CONFIG Variable, to determine either
+
+    is the calling Client in CONFIG["REMOTE_ADDRS"]
+        if yes 200
+        he is allowed, without checking X-APIKEY
+    else
+        has the request the X-APIKEY Header
+            if not deny with 401
+        else
+            if the provided X-APIKEY in CONFIG["APIKEYS"]
+                if not deny with 401
+                if yes 200
+
+    if something went wrong return 500
+    """
+    config = config
+    logger = logging.getLogger("authenticator")
+    def authenticator(handle):
+        """
+        wrapper called on every call to function
+        """
+        web.header("Access-Control-Allow-Origin", "*")
+        web.header("Access-Control-Allow-Methods", "POST, GET")
+        web.header("Access-Control-Allow-Headers", "origin, x-authkey, x-apikey")
+        web.header("Access-Control-Max-Age", 86400)
+        remote_addr = web.ctx.env.get("REMOTE_ADDR")
+        x_apikey = web.ctx.env.get("HTTP_X_APIKEY")
+        x_authkey = web.ctx.env.get("HTTP_X_AUTHKEY")
+        logger.debug(web.ctx.env)
+        #logging.debug(config)
+        logger.debug("received call from %s X-APIKEY: %s X-AUTHKEY : %s", remote_addr, x_apikey, x_authkey)
+        try:
+            # default: NO-ACCESS
+            allow = False
+            # check if REMOTE_ADDR is valid
+            if remote_addr in config["REMOTE_ADDRS"]:
+                # allowed by REMOTE_ADDR entry in Config
+                logger.info("REMOTE-ADDR %s in list of trusted Clients, allowed", remote_addr)
+                allow = True
+            # check if X-APIKEY is available and valid - for API usage
+            elif x_apikey is not None and x_apikey in config["APIKEYS"]:
+                # if there is some remote_addrs key in CONFIG, check it
+                if "remote_addrs" in config["APIKEYS"][x_apikey] and remote_addr in config["APIKEYS"][x_apikey]["remote_addrs"]:
+                    logger.info("X-APIKEY %s from %s exists and allowed from this station", x_apikey, remote_addr)
+                    allow = True
+                elif "remote_addrs" not in config["APIKEYS"][x_apikey]:
+                    logger.info("X-APIKEY %s from %s allowed by static configured APIKEY", x_apikey, remote_addr)
+                    allow = True
+            # check if X-AUTHKEY is available and valid - mostly for Javascript
+            elif x_authkey is not None and (remote_addr, x_authkey) in config["IDPAPIKEYS"]:
+                logger.info("X-AUTHKEY %s from %s allowed by temporary IDP provided APIKEY", x_authkey, remote_addr)
+                allow = True
+            # deny or allow
+            if allow is True:
+                return handle()
+            else:
+                logger.error("request from %s X-APIKEY: %s X-AUTHKEY : %s not authorized by any condition", remote_addr, x_apikey, x_authkey)
+                web.ctx.status = '401 Unauthorized'
+                return
+        except Exception as exc:
+            #logging.exception(exc)
+            logger.error("call to %s caused Exception %s", call_str, exc)
+            raise exc
+    return authenticator
+
 
 def test():
     dlw3 = DataLoggerWebApp3()
@@ -421,29 +455,13 @@ def test():
 
 
 if __name__ == "__main__":
-    # TESTING only
-    # prepare IDP Connector to use actual CONFIG
-    #tk_web.IdpConnector.CONFIG = CONFIG
-    #tk_web.IdpConnector.web = web
-    # some decorators, use it as needed
-    #authenticator = tk_web.std_authenticator(web, CONFIG)
-    #outformat = tk_web.std_jsonout(web, CONFIG)
+    # TESTING only, starts cherrypy webserver
     app = web.application(urls, globals())
-    app.add_processor(get_exception_post_processor())
-    app.add_processor(get_config_pre_processor(CONFIG))
+    app.add_processor(get_std_authenticator(CONFIG))
     app.add_processor(get_json_post_processor())
     app.run() # will start local webserver
 else:
-    # if called over WSGI Interface
-    CONFIG = tk_web.TkWebConfig("testdata/DataLoggerWebApp3.json")
-    basedir = CONFIG["BASEDIR"]
-    # prepare IDP Connector to use actual CONFIG
-    tk_web.IdpConnector.CONFIG = CONFIG
-    tk_web.IdpConnector.web = web
-    # some decorators, use it as needed
-    # authenticator = tk_web.std_authenticator(web, CONFIG)
-    #outformat = tk_web.std_jsonout(web, CONFIG)
-    #app = web.application(urls, globals())
-    #app.add_processor(get_config_pre_processor(CONFIG))
-    #app.add_processor(get_json_post_processor())
-    #app.wsgifunc()
+    app = web.application(urls, globals())
+    app.add_processor(get_std_authenticator(CONFIG))
+    app.add_processor(get_json_post_processor())
+    application = app.wsgifunc() # this must be named application

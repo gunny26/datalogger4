@@ -11,8 +11,8 @@ import json
 import os
 import gzip
 # own modules
-from Timeseries import Timeseries as Timeseries
-from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
+from datalogger.Timeseries import Timeseries as Timeseries
+from datalogger.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 
 
 #################### hack begin ##########################

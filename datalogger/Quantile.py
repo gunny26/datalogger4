@@ -4,8 +4,8 @@ import json
 import os
 import logging
 # own modules
-from CustomExceptions import *
-from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
+from datalogger.CustomExceptions import *
+from datalogger.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 
 
 class QuantileArray(object):

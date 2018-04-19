@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 import json
 # own modules
-from DataLogger import DataLogger as DataLogger
-from TimeseriesArray import TimeseriesArray as TimeseriesArray
-from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
+from datalogger.DataLogger import DataLogger as DataLogger
+from datalogger.TimeseriesArray import TimeseriesArray as TimeseriesArray
+from datalogger.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 
 def tsa_group_by(tsa, datestring, index_keynames, group_func, interval):
     """

@@ -12,8 +12,8 @@ import base64
 import os
 import logging
 # own modules
-from TimeseriesStats import TimeseriesStats as TimeseriesStats
-from CustomExceptions import *
+from datalogger.TimeseriesStats import TimeseriesStats as TimeseriesStats
+from datalogger.CustomExceptions import *
 
 #################### hack begin ##########################
 """
