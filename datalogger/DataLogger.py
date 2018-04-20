@@ -410,8 +410,8 @@ class DataLogger(object):
         except DataLoggerRawFileMissing:
             # raw file is missing, or file is archived
             # in this case do not delete tsa file
-            logging.info("original raw file is missing, tsa file will not be deleted")
-            pattern_list = ("ts_", "tsastat_", "tsstat_", "quantile.json", "total_stats.json")
+            logging.info("original raw file is missing, tsa_ file and all ts_ files will not be deleted")
+            pattern_list = ("tsastat_", "tsstat_", "quantile.json", "total_stats.json")
         for entry in os.listdir(self.cachedir):
             absfile = os.path.join(self.cachedir, entry)
             if any((entry.startswith(pattern) for pattern in pattern_list)):
