@@ -6,7 +6,7 @@ import shutil
 args = {'name': 'datalogger3',
         'author': 'Arthur Messner',
         'author_email': 'arthur.messner@gmail.com',
-        'description': 'Datalogger python3',
+        'description': 'Datalogger3',
         'long_description': __doc__,
         'platforms': ['any'],
         'license': 'LGPLv2',
