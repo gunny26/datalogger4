@@ -26,14 +26,14 @@ __version__ = "$Revision: 1.2 $"
 __date__ = "$Date: 2013/04/16 06:50:15 $"
 # $Id: __init__.py,v 1.2 2013/04/16 06:50:15 mesznera Exp $
 
-from datalogger.DataLogger import DataLogger as DataLogger
-from datalogger.Timeseries import Timeseries as Timeseries
-from datalogger.TimeseriesArray import TimeseriesArray as TimeseriesArray
-from datalogger.TimeseriesStats import TimeseriesStats as TimeseriesStats
-from datalogger.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
-from datalogger.Quantile import QuantileArray as QuantileArray
-from datalogger.Quantile import Quantile as Quantile
-from datalogger.CorrelationMatrix import CorrelationMatrixArray as CorrelationMatrixArray
-from datalogger.CorrelationMatrixTime import CorrelationMatrixTime as CorrelationMatrixTime
+from datalogger3.DataLogger import DataLogger as DataLogger
+from datalogger3.Timeseries import Timeseries as Timeseries
+from datalogger3.TimeseriesArray import TimeseriesArray as TimeseriesArray
+from datalogger3.TimeseriesStats import TimeseriesStats as TimeseriesStats
+from datalogger3.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
+from datalogger3.Quantile import QuantileArray as QuantileArray
+from datalogger3.Quantile import Quantile as Quantile
+from datalogger3.CorrelationMatrix import CorrelationMatrixArray as CorrelationMatrixArray
+from datalogger3.CorrelationMatrixTime import CorrelationMatrixTime as CorrelationMatrixTime
 # custom exceptions
-from datalogger.CustomExceptions import *
+from datalogger3.CustomExceptions import *
