@@ -3,19 +3,17 @@ from distutils.core import setup, Extension
 import sys, string, os
 import shutil
 
-args = {'name': 'datalogger',
+args = {'name': 'datalogger3',
         'author': 'Arthur Messner',
         'author_email': 'arthur.messner@gmail.com',
-        'description': 'Datalogger',
+        'description': 'Datalogger python3',
         'long_description': __doc__,
         'platforms': ['any'],
         'license': 'LGPLv2',
-        'packages': ['datalogger'],
-        # Make packages in root dir appear in pywbem module
-        'package_dir': {'datalogger': 'datalogger'},
-        # Make extensions in root dir appear in pywbem module
+        'packages': ['datalogger3'],
+        'package_dir': {'datalogger3': 'datalogger3'},
         'ext_package': 'datalogger',
-#        'ext_modules' : cythonize('*.pyx'),
+        'version' : '3.0'
         }
 
 setup(**args)
