@@ -8,46 +8,12 @@ at initialization
 """
 import sys
 import json
-import base64
 import os
 import logging
 # own modules
 from datalogger3.TimeseriesStats import TimeseriesStats as TimeseriesStats
 from datalogger3.CustomExceptions import *
-
-#################### hack begin ##########################
-"""
-hack to mimic some python 2.x behaviour is string
-representation of tuples
-"""
-def _b64encode_p3(list_obj):
-    if len(list_obj) == 1:
-        start ="(u'" + list_obj[0] + "',)"
-    else:
-        start ="(u'" + "', u'".join((str(key) for key in list_obj)) + "')"
-    encoded = base64.urlsafe_b64encode(start.encode("utf-8")).decode("utf-8")
-    #print("%s -> %s -> %s" % (list_obj, encoded, b64decode(encoded)))
-    return encoded
-
-def _b64encode_p2(list_obj):
-    encoded = base64.urlsafe_b64encode(unicode(tuple(list_obj))).decode("utf-8")
-    #print("%s -> %s -> %s" % (list_obj, encoded, b64decode(encoded)))
-    return encoded
-
-def _b64decode(encoded):
-    decoded = base64.b64decode(encoded).decode("utf-8")
-    #print("%s -> %s" % (encoded, decoded))
-    return decoded
-
-
-if sys.version_info < (3,0):
-    print("using python 2 coding funtions")
-    b64encode = _b64encode_p3
-    b64decode = _b64decode
-else:
-    b64encode = _b64encode_p3
-    b64decode = _b64decode
-##################### hack end ###########################
+from datalogger3.b64 import b64encode, b64decode, b64eval
 
 
 class TimeseriesArrayStats(object):
@@ -268,8 +234,12 @@ class TimeseriesArrayStats(object):
         filenames = {}
         for filename in data["tsstat_filenames"]:
             logging.debug("reading key for tsstat from file %s", filename)
-            enc_key = filename.split(".")[0][7:] # only this pattern tsstat_(.*).json
-            key = eval(b64decode(str(enc_key))) # must be str not unicode
+            key_enc = filename.split(".")[0][7:] # only this pattern tsstat_(.*).json
+            # key_dec = b64decode(key_enc)
+            # to not use eval
+            # something like: "(u'srvcx221v2.tilak.cc', u'D:\\', u'HOST-RESOURCES-TYPES::hrStorageCompactDisc')" 
+            # key = tuple(key_dec.replace("(", "").replace("u'","").replace("', ", " ").replace("')", "").split())
+            key = b64eval(key_enc) # must be str not unicode
             key_dict = dict(zip(index_keys, key))
             if filterkeys is not None:
                 if TimeseriesArrayStats._filtermatch(key_dict, filterkeys, matchtype):
