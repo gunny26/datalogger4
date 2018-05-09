@@ -6,48 +6,14 @@ module for TiemseriesArray Class
 import sys
 import re
 import logging
-import base64
 import json
 import os
 import gzip
 # own modules
 from datalogger3.Timeseries import Timeseries as Timeseries
 from datalogger3.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
+from datalogger3.b64 import b64encode, b64decode, b64eval
 
-
-#################### hack begin ##########################
-#
-# hack to mimic some python 2.x behaviour is string
-# representation of tuples
-#
-def _b64encode_p3(list_obj):
-    if len(list_obj) == 1:
-        start = "(u'" + list_obj[0] + "',)"
-    else:
-        start = "(u'" + "', u'".join((str(key) for key in list_obj)) + "')"
-    encoded = base64.urlsafe_b64encode(start.encode("utf-8")).decode("utf-8")
-    #print("%s -> %s -> %s" % (list_obj, encoded, b64decode(encoded)))
-    return encoded
-
-def _b64encode_p2(list_obj):
-    encoded = base64.urlsafe_b64encode(unicode(tuple(list_obj))).decode("utf-8")
-    #print("%s -> %s -> %s" % (list_obj, encoded, b64decode(encoded)))
-    return encoded
-
-def _b64decode(encoded):
-    decoded = base64.b64decode(encoded).decode("utf-8")
-    #print("%s -> %s" % (encoded, decoded))
-    return decoded
-
-
-if sys.version_info < (3, 0):
-    print("using python 2 coding funtions")
-    b64encode = _b64encode_p3
-    b64decode = _b64decode
-else:
-    b64encode = _b64encode_p3
-    b64decode = _b64decode
-##################### hack end ###########################
 
 def is_near(value, target_value, pct=0.05):
     """
@@ -589,7 +555,7 @@ class TimeseriesArray(object):
         for filename in data["ts_filenames"]:
             logging.debug("parsing Timeseries filename %s", filename)
             enc_key = filename.split(".")[0][3:] # only this pattern ts_(.*).csv.gz
-            key = eval(b64decode(enc_key))
+            key = b64eval(enc_key)
             key_dict = dict(zip(index_keys, key))
             if filterkeys is not None:
                 if TimeseriesArray.filtermatch(key_dict, filterkeys, matchtype):
