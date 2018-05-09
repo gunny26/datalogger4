@@ -112,6 +112,7 @@ class TimeseriesStats(object):
                 for func_name, func in self.stat_funcs.items():
                     self.__stats[key][func_name] = func(series)
             elif len(series) == 1: # special case if there is only one value a day
+                logging.debug("special case single-value-day detected")
                 self.__stats[key] = {
                     "min" : series[0],
                     "max" : series[0],
