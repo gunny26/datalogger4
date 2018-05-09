@@ -18,7 +18,7 @@ urls = (
     "/(.*)", "DataLoggerWebApp3",
     )
 
-CONFIG = tk_web.TkWebConfig("/var/www/testdata/DataLoggerWebApp3.json")
+CONFIG = tk_web.TkWebConfig("/var/www/DataLoggerWebApp.json")
 
 class DataLoggerWebApp3(object):
     """
@@ -68,8 +68,8 @@ class DataLoggerWebApp3(object):
         /tsastat/<projectname>/<tablename>/<datestring> -> get TimeseriesArrayStats of this datestring
         /tsstat/<projectname>/<tablename>/<datestring>/<index_key base64 encoded> -> get TimeseriesStats for this index_key
         """
+        self.logger.info("GET calling %s", parameters)
         web.header("Content-Type", "application/json")
-        self.logger.info("calling %s", parameters)
         web.header('Access-Control-Allow-Origin', '*')
         web.header('Access-Control-Allow-Credentials', 'true')
         args = parameters.strip("/").split("/")
@@ -85,11 +85,16 @@ class DataLoggerWebApp3(object):
         # calling method, or AttributeError if not found
         try:
             return func(*args[1:], **query)
+        except DataLoggerRawFileMissing as exc:
+            web.ctx.status = "404 %s" % exc
+            return
         except KeyError as exc:
+            self.logger.exception(exc)
             self.logger.error(exc)
             web.ctx.status = "404 %s" % exc
             return
         except IndexError as exc:
+            self.logger.exception(exc)
             self.logger.error(exc)
             web.ctx.status = "404 %s" % exc
             return
@@ -211,10 +216,11 @@ class DataLoggerWebApp3(object):
         return function_name(what is left of arguments)
 
         """
-        self.logger.info("calling %s", parameters)
+        self.logger.info("POST calling %s", parameters)
         args = parameters.strip("/").split("/")
         # build method name from url
         method = "post_%s" % args[0].lower()
+        query = dict(web.input()) # get query as dict
         try:
             # calling method, or AttributeError if not found
             return getattr(self, method)(*args[1:], **query)
@@ -250,7 +256,6 @@ class DataLoggerWebApp3(object):
             return "Error while saving received data to"
         try:
             tsa = self.__dl["tsa"] # re-read received data
-            assert isinstance(tsa, TimeseriesArrayStats)
         except AssertionError as exc:
             self.logger.exception(exc)
             os.unlink(filename)
@@ -271,7 +276,7 @@ class DataLoggerWebApp3(object):
         return function_name(what is left of arguments)
 
         """
-        self.logger.info("calling %s", parameters)
+        self.logger.info("DELETE calling %s", parameters)
         args = parameters.strip("/").split("/")
         # build method name from url
         method = "delete_%s" % args[0].lower()
@@ -294,14 +299,14 @@ class DataLoggerWebApp3(object):
 
 def get_config_pre_processor(config):
     def inner(handle):
-        print("config_pre_processor called")
+        # print("config_pre_processor called")
         web.ctx.tk_config = config
         return handle()
     return inner
 
 def get_json_post_processor():
     def inner(handle):
-        print("json_post_processor called")
+        # print("json_post_processor called")
         result = handle()
         if result is not None:
             return json.dumps(result)
@@ -309,7 +314,7 @@ def get_json_post_processor():
 
 def get_exception_post_processor():
     def inner(handle):
-        print("exception_post_processor called")
+        # print("exception_post_processor called")
         try:
             return handle()
         except KeyError as exc:
@@ -344,13 +349,13 @@ def get_std_authenticator(config):
         wrapper called on every call to function
         """
         web.header("Access-Control-Allow-Origin", "*")
-        web.header("Access-Control-Allow-Methods", "POST, GET")
-        web.header("Access-Control-Allow-Headers", "origin, x-authkey, x-apikey")
+        web.header("Access-Control-Allow-Methods", "POST,GET,DELETE,OPTIONS")
+        web.header("Access-Control-Allow-Headers", "origin,x-authkey,x-apikey")
         web.header("Access-Control-Max-Age", 86400)
         remote_addr = web.ctx.env.get("REMOTE_ADDR")
         x_apikey = web.ctx.env.get("HTTP_X_APIKEY")
         x_authkey = web.ctx.env.get("HTTP_X_AUTHKEY")
-        logger.debug(web.ctx.env)
+        #logger.info(web.ctx.env)
         #logging.debug(config)
         logger.debug("received call from %s X-APIKEY: %s X-AUTHKEY : %s", remote_addr, x_apikey, x_authkey)
         try:
@@ -364,9 +369,15 @@ def get_std_authenticator(config):
             # check if X-APIKEY is available and valid - for API usage
             elif x_apikey is not None and x_apikey in config["APIKEYS"]:
                 # if there is some remote_addrs key in CONFIG, check it
-                if "remote_addrs" in config["APIKEYS"][x_apikey] and remote_addr in config["APIKEYS"][x_apikey]["remote_addrs"]:
-                    logger.info("X-APIKEY %s from %s exists and allowed from this station", x_apikey, remote_addr)
-                    allow = True
+                if "remote_addrs" in config["APIKEYS"][x_apikey]:
+                    if not config["APIKEYS"][x_apikey]["remote_addrs"]:
+                        logger.debug("remote_addrs for this apikey is empty, ignoring")
+                        allow = True
+                    elif remote_addr in config["APIKEYS"][x_apikey]["remote_addrs"]:
+                        logger.info("X-APIKEY %s from %s exists and allowed from this station", x_apikey, remote_addr)
+                        allow = True
+                    else:
+                        logger.error("X-APIKEY %s from %s not allowed", x_apikey, remote_addr)
                 elif "remote_addrs" not in config["APIKEYS"][x_apikey]:
                     logger.info("X-APIKEY %s from %s allowed by static configured APIKEY", x_apikey, remote_addr)
                     allow = True
@@ -383,7 +394,7 @@ def get_std_authenticator(config):
                 return
         except Exception as exc:
             #logging.exception(exc)
-            logger.error("call to %s caused Exception %s", call_str, exc)
+            #logger.error("call to %s caused Exception %s", call_str, exc)
             raise exc
     return authenticator
 
