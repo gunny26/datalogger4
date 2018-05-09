@@ -12,7 +12,6 @@ import datetime
 import calendar
 import time
 import gzip
-import base64
 import pwd
 # own modules
 from datalogger3.TimeseriesArray import TimeseriesArray as TimeseriesArray
@@ -20,6 +19,7 @@ from datalogger3.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesA
 from datalogger3.TimeseriesStats import TimeseriesStats as TimeseriesStats
 from datalogger3.Quantile import QuantileArray as QuantileArray
 from datalogger3.CustomExceptions import *
+from datalogger3.b64 import b64encode, b64decode, b64eval
 
 class DataLogger(object):
     """
@@ -61,6 +61,7 @@ class DataLogger(object):
         self.__tablename = None
         self.__timedelta = None
         self.__meta = None
+        self.__memcache = None 
 
     def setup(self, project, tablename, datestring, timedelta=0.0):
         """
@@ -75,6 +76,11 @@ class DataLogger(object):
             assert datetime.date.today().isoformat() != datestring
         except AssertionError:
             raise DataLoggerLiveDataError("Reading from live data is not allowed")
+        if project == self.__project and tablename == self.__tablename and datestring == self.__datestring and self.__timedelta == timedelta:
+            logging.info("DataLogger already setup for this configuration")
+            return
+        # cleanup memcache
+        self.__memcache_init()
         self.__datestring = datestring
         self.__project = project
         self.__tablename = tablename
@@ -128,6 +134,19 @@ class DataLogger(object):
         assert all((key in self.__meta["headers"] for key in self.__meta["value_keynames"]))
         # ts_keyname has to be in headers
         assert self.__meta["ts_keyname"] in self.__meta["headers"]
+
+    def __memcache_set(self, key, value):
+        """ raises AtributeError if value is None """
+        if value is None:
+            raise AttributeError("None value is not permitted")
+        self.__memcache[key] = value
+
+    def __memcache_get(self, key):
+        """ raises KeyError if key does not exist """
+        return self.__memcache[key]
+
+    def __memcache_init(self):
+        self.__memcache = {}
 
     def __str__(self):
         ret = {
@@ -268,28 +287,66 @@ class DataLogger(object):
         ["qa", <key>] -> return <dict> Quantile
         ["total_stats"] -> return <dict> total_stats
         """
-        if isinstance(args[0], str):
-            kind = args[0]
-            if kind == "tsa":
-                return self.load_tsa()
-            if kind == "tsastats":
-                return self.load_tsastats()
-            if kind == "qa":
-                return self.load_quantile()
-            if kind == "caches":
-                return self.get_caches()
-            if kind == "total_stats":
-                return self.load_total_stats()
-        if isinstance(args[0], tuple):
-            kind, subkey = args[0]
-            if kind == "tsa":
-                return self.load_tsa()[subkey]
-            if kind == "tsastats":
-                return self.load_tsastats()[subkey]
-            if kind == "qa":
-                return self.load_quantile()[subkey]
-        else:
-            raise KeyError("unknown datatype")
+        try:
+            if isinstance(args[0], str):
+                kind = args[0]
+                if kind == "tsa":
+                    try:
+                        return self.__memcache_get("tsa")
+                    except KeyError:
+                        self.__memcache_set("tsa", self.load_tsa())
+                        return self.__memcache_get("tsa")
+                if kind == "tsastats":
+                    try:
+                        return self.__memcache_get("tsastats")
+                    except KeyError:
+                        self.__memcache_set("tsastats", self.load_tsastats())
+                        return self.__memcache_get("tsastats")
+                if kind == "qa":
+                    try:
+                        return self.__memcache_get("qa")
+                    except KeyError:
+                        self.__memcache_set("qa", self.load_quantile())
+                        return self.__memcache_get("qa")
+                if kind == "caches":
+                    try:
+                        return self.__memcache_get("caches")
+                    except KeyError:
+                        self.__memcache_set("caches", self.get_caches())
+                        return self.__memcache_get("caches")
+                if kind == "total_stats":
+                    try:
+                        return self.__memcache_get("total_stats")
+                    except KeyError:
+                        self.__memcache_set("total_stats", self.load_total_stats())
+                        return self.__memcache_get("total_stats")
+            if isinstance(args[0], tuple):
+                kind, subkey = args[0]
+                if kind == "tsa":
+                    try:
+                        tsa = self.__memcache_get("tsa")
+                    except KeyError:
+                        tsa = self.load_tsa()
+                        self.__memcache_set("tsa", tsa)
+                    return tsa[subkey]
+                if kind == "tsastats":
+                    try:
+                        tsastats = self.__memcache_get("tsastats")
+                    except KeyError:
+                        tsastats = self.load_tsastats()
+                        self.__memcache_set("tsastats", tsastats)
+                    return tsastats[subkey]
+                if kind == "qa":
+                    try:
+                        qa = self.__memcache_get("qa")
+                    except KeyError:
+                        qa = self.load_quantile()
+                        self.__memcache_set("qa", qa)
+                    return qa[subkey]
+            else:
+                raise KeyError("unknown datatype")
+        except DataLoggerRawFileMissing as exc:
+            raise exc
 
     def __parse_line(self, row):
         """
@@ -312,22 +369,6 @@ class DataLogger(object):
             logging.exception(exc)
             logging.error("KeyError on row, skipping this data: %s", str(data))
         return data
-
-#    @staticmethod
-#    def __get_file_handle(filename, mode):
-#        """
-#        return filehandle either for gzip or normal uncompressed file
-#
-#        parameters:
-#        filename <str> fileanme
-#        mode <str> as used in open(<filename>, <mode>)
-#
-#        returns:
-#        <file> handle to opened file, either gzip.open or normal open
-#        """
-#        if filename.endswith(".gz"):
-#            return gzip.open(filename, mode)
-#        return open(filename, mode)
 
     def __get_raw_filename(self):
         """
@@ -412,6 +453,9 @@ class DataLogger(object):
             # in this case do not delete tsa file
             logging.info("original raw file is missing, tsa_ file and all ts_ files will not be deleted")
             pattern_list = ("tsastat_", "tsstat_", "quantile.json", "total_stats.json")
+        # erase memcache
+        self.__memcache_init()
+        # erase files
         for entry in os.listdir(self.cachedir):
             absfile = os.path.join(self.cachedir, entry)
             if any((entry.startswith(pattern) for pattern in pattern_list)):
@@ -690,11 +734,17 @@ class DataLogger(object):
                 # TODO: there are some problems to decode b64string with
                 # urlsafe_b64decode if unicode,
                 # try to use b64decode instead
-                try:
-                    key = eval(base64.urlsafe_b64decode(str(key_encoded)))
-                except TypeError as exc:
-                    logging.exception(exc)
-                    key = eval(base64.b64decode(key_encoded))
+                # key_dec = b64decode(key_encoded)
+                key = b64eval(key_encoded)
+                # to not use eval
+                # something like: "(u'srvcx221v2.tilak.cc', u'D:\\', u'HOST-RESOURCES-TYPES::hrStorageCompactDisc')" 
+                # key = tuple(key_dec.replace("(", "").replace("u'","").replace("', ", " ").replace("')", "").split())
+                # should be tuple
+                #try:
+                #    key = eval(base64.urlsafe_b64decode(str(key_encoded)))
+                #except TypeError as exc:
+                #    logging.exception(exc)
+                #    key = eval(base64.b64decode(key_encoded))
                 assert isinstance(key, tuple)
                 return key
             except Exception as exc:
