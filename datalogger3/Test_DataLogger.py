@@ -57,7 +57,7 @@ class Test(unittest.TestCase):
         print(caches)
         assert isinstance(caches, dict)
         tsa = dl["tsa"]
-        print(tsa)
+        print(tsa, type(tsa))
         assert isinstance(tsa, TimeseriesArray)
         ts = dl["tsa", ("nagios.tilak.cc",)]
         print(ts)
