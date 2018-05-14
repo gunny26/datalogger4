@@ -523,6 +523,32 @@ class DataLogger(object):
         caches["total_stats"]["exists"] = os.path.isfile(os.path.join(self.cachedir, "total_stats.json"))
         return caches
 
+    def generate_caches(self):
+        """
+        meant to generate all cached files from scratch (raw input data)
+        """
+        logging.info("generate_caches() was called")
+        logging.info("calling load_tsa_raw()")
+        tsa = self.load_tsa_raw()
+        logging.info("calling tsa.dump()")
+        tsa.dump(self.cachedir) # save full data
+        tsa.cache = True # to keep data in memory
+        logging.info("calling load_tsa_finalize()")
+        tsa.finalize() # convert Timeseries to Datatypes
+        logging.info("creating tsastats")
+        tsastats = TimeseriesArrayStats(tsa) # calculate
+        logging.info("calling tsastats.dump()")
+        tsastats.dump(self.cachedir) # store
+        logging.info("creating quantile_array")
+        quantile_array = QuantileArray(tsa, tsastats) # caclculate
+        logging.info("calling quantile_array.dump()")
+        quantile_array.dump(self.cachedir) # store
+        logging.info("creating total_stats()")
+        total_stats = self.__caclculate_total_stats(tsastats) # calculate
+        logging.info("calling total_stats.dump() - kind of")
+        self.__dump_total_stats(total_stats) # store
+        logging.info("done generate_caches()")
+ 
     def import_tsa(self, tsa):
         """
         store tsa given in parameter in global_cache to make the data available
@@ -575,9 +601,7 @@ class DataLogger(object):
             tsa = self.load_tsa_raw()
             tsa.dump(self.cachedir) # save full data
             # read the data afterwards to make sure there is no problem,
-            # TODO: is this the fastest way?
-            # corrected 2017-09-21 reread stored data to convert data to correct type
-            # if validate is True:
+            # without setting tsa.cache = true this is only the tsa structure no timeseries data
             tsa = TimeseriesArray.load(self.cachedir, self.index_keynames, filterkeys=filterkeys, index_pattern=index_pattern, datatypes=self.datatypes)
             return tsa
         if not os.path.isfile(cachefilename):
@@ -661,14 +685,8 @@ class DataLogger(object):
             quantile_array = QuantileArray(tsa, tsastats)
             quantile_array.dump(self.cachedir)
         return quantile_array
-
-    def load_total_stats(self):
-        """
-        aggregates all TimeseriesStats available in TimeseriesArrayStats to total_stats dict
-
-        returns:
-        <dict> of statistical functions, and values
-        """
+    
+    def __caclculate_total_stats(self, tsastats):
         aggregator = {
             'median': lambda a, b: 0.0, # median of medians
             'avg': lambda a, b: a + b,
@@ -685,30 +703,55 @@ class DataLogger(object):
             'sum': lambda a, b: a + b,
             'total_count' : lambda a, b: a # to be consistent
         }
+        stats_data = {}
+        for value_keyname in self.value_keynames:
+            stats_data[value_keyname] = dict((key, 0.0) for key in aggregator.keys()) # prefill with 0.0
+            for index_key in tsastats.keys():
+                stats = tsastats[index_key]
+                for stat_func in stats[value_keyname].keys():
+                    stats_data[value_keyname][stat_func] = aggregator[stat_func](stats_data[value_keyname][stat_func], stats[value_keyname][stat_func])
+                stats_data[value_keyname]["total_count"] += 1
+            if stats_data[value_keyname]["total_count"] > 0:
+                stats_data[value_keyname]["total_avg"] = stats_data[value_keyname]["sum"] / stats_data[value_keyname]["total_count"]
+                stats_data[value_keyname]["avg"] /= stats_data[value_keyname]["total_count"]
+            else:
+                stats_data[value_keyname]["total_avg"] = 0.0
+                stats_data[value_keyname]["avg"] = 0.0
+        return stats_data
+
+    def __dump_total_stats(self, total_stats):
+        """
+        dump total_stats to file
+        """
+        cachefilename = os.path.join(self.cachedir, "total_stats.json")
+        with open(cachefilename, "wt") as outfile:
+            json.dump(total_stats, outfile, indent=4)
+ 
+    def __load_total_stats(self):
+        """
+        load total_stats from file
+        """
+        cachefilename = os.path.join(self.cachedir, "total_stats.json")
+        with open(cachefilename, "rt") as infile:
+            total_stats = json.load(infile)
+        return total_stats
+ 
+    def load_total_stats(self):
+        """
+        aggregates all TimeseriesStats available in TimeseriesArrayStats to total_stats dict
+
+        returns:
+        <dict> of statistical functions, and values
+        """
         cachefilename = os.path.join(self.cachedir, "total_stats.json")
         if not os.path.isfile(cachefilename):
             tsastats = self["tsastats"]
-            stats_data = {}
-            for value_keyname in self.value_keynames:
-                stats_data[value_keyname] = dict((key, 0.0) for key in aggregator.keys()) # prefill with 0.0
-                for index_key in tsastats.keys():
-                    stats = tsastats[index_key]
-                    for stat_func in stats[value_keyname].keys():
-                        stats_data[value_keyname][stat_func] = aggregator[stat_func](stats_data[value_keyname][stat_func], stats[value_keyname][stat_func])
-                    stats_data[value_keyname]["total_count"] += 1
-                if stats_data[value_keyname]["total_count"] > 0:
-                    stats_data[value_keyname]["total_avg"] = stats_data[value_keyname]["sum"] / stats_data[value_keyname]["total_count"]
-                    stats_data[value_keyname]["avg"] /= stats_data[value_keyname]["total_count"]
-                else:
-                    stats_data[value_keyname]["total_avg"] = 0.0
-                    stats_data[value_keyname]["avg"] = 0.0
-            with open(cachefilename, "wt") as outfile:
-                json.dump(stats_data, outfile, indent=4)
-            return stats_data
+            total_stats = self.__caclculate_total_stats(tsastats)
+            self.__dump_total_stats(total_stats)
+            return total_stats
         else:
-            with open(cachefilename, "rt") as infile:
-                stats_data = json.load(infile)
-            return stats_data
+            total_stats = self.__load_total_stats()
+            return total_stats
 
     @staticmethod
     def __decode_filename(filename):
@@ -725,26 +768,8 @@ class DataLogger(object):
         try:
             parts = filename.split(".")[0].split("_")
             key_encoded = "_".join(parts[1:]) # there could be more than 2 parts
-            # the first part ist something like tsa_, tsastats_, ts_,
-            # tsstats_ and so on.
-            #_, key_and_ending = filename.split("_")
-            #key_encoded = key_and_ending.split(".")[0]
-            key = None
             try:
-                # TODO: there are some problems to decode b64string with
-                # urlsafe_b64decode if unicode,
-                # try to use b64decode instead
-                # key_dec = b64decode(key_encoded)
                 key = b64eval(key_encoded)
-                # to not use eval
-                # something like: "(u'srvcx221v2.tilak.cc', u'D:\\', u'HOST-RESOURCES-TYPES::hrStorageCompactDisc')" 
-                # key = tuple(key_dec.replace("(", "").replace("u'","").replace("', ", " ").replace("')", "").split())
-                # should be tuple
-                #try:
-                #    key = eval(base64.urlsafe_b64decode(str(key_encoded)))
-                #except TypeError as exc:
-                #    logging.exception(exc)
-                #    key = eval(base64.b64decode(key_encoded))
                 assert isinstance(key, tuple)
                 return key
             except Exception as exc:
@@ -779,118 +804,6 @@ class DataLogger(object):
                 raise exc
         return tsa
     read_day = load_tsa_raw
-
-#    def old_tsa_group_by(self, tsa, subkeys, group_func):
-#        """
-#        TODO: make this method static, inteval should be in tsa
-#        group given tsa by subkeys, and use group_func to aggregate data
-#        first all Timeseries will be aligned in time, to get proper points in timeline
-#
-#        parameters:
-#        tsa <TimeseriesArray>
-#        subkey <tuple> could also be empty, to aggregate everything
-#        group_func <func> like lambda a,b : (a+b)/2 to get averages
-#        slotlength <int> interval in seconds to correct every timeseries to
-#
-#        returns:
-#        <TimeseriesArray>
-#        """
-#        # intermediated tsa
-#        tsa2 = TimeseriesArray(index_keys=subkeys, value_keys=tsa.value_keys, ts_key=tsa.ts_key, datatypes=tsa.datatypes)
-#        start_ts, _ = DataLogger.get_ts_for_datestring(self.__datestring)
-#        ts_keyname = tsa.ts_key
-#        for data in tsa.export():
-#            # align timestamp
-#            nearest_slot = round((data[ts_keyname] - start_ts) / self.__interval)
-#            data[ts_keyname] = int(start_ts + nearest_slot * self.__interval)
-#            #data[ts_keyname] = align_timestamp(data[ts_keyname])
-#            tsa2.group_add(data, group_func)
-#        return tsa2
-#    group_by = tsa_group_by
-
-#    @staticmethod
-#    def old_tsastat_group_by(tsastat, subkey):
-#        """
-#        group given tsastat array by some subkey
-#
-#        parameters:
-#        tsastat <TimeseriesArrayStats>
-#        subkey <tuple> subkey to group by
-#
-#        returns:
-#        <dict>
-#        """
-#        # how to aggregate statistical values
-#        group_funcs = {
-#            u'count' : lambda a, b: a + b,
-#            u'std' : lambda a, b: (a + b)/2,
-#            u'avg': lambda a, b: (a + b)/2,
-#            u'last' : lambda a, b: -1.0, # theres no meaning
-#            u'min' : min,
-#            u'max' : max,
-#            u'sum' : lambda a, b: (a + b) / 2,
-#            u'median' : lambda a, b: (a + b)/2,
-#            u'mean' : lambda a, b: (a + b)/2,
-#            u'diff' : lambda a, b: (a + b)/2,
-#            u'dec' : lambda a, b: (a + b)/2,
-#            u'inc' : lambda a, b: (a + b)/2,
-#            u'first' : lambda a, b: -1.0, # theres no meaning
-#        }
-#        # create new empty TimeseriesArrayStats Object
-#        tsastats_new = TimeseriesArrayStats.__new__(TimeseriesArrayStats)
-#        tsastats_new.index_keys = subkey # only subkey
-#        tsastats_new.value_keys = tsastat.value_keys # same oas original
-#        newdata = {}
-#        for index_key, tsstat in tsastat.items():
-#            key_dict = dict(zip(tsastat.index_keynames, index_key))
-#            newkey = None
-#            if len(subkey) == 0: # no subkey means total aggregation
-#                newkey = ("__total__", )
-#            else:
-#                newkey = tuple([key_dict[key] for key in subkey])
-#            if newkey not in newdata:
-#                newdata[newkey] = {}
-#            for value_key in tsastat.value_keynames:
-#                if value_key not in newdata[newkey]:
-#                    newdata[newkey][value_key] = dict(tsstat[value_key])
-#                else:
-#                    for stat_funcname in tsstat[value_key].keys():
-#                        existing = float(newdata[newkey][value_key][stat_funcname])
-#                        to_group = float(tsstat[value_key][stat_funcname])
-#                        newdata[newkey][value_key][stat_funcname] = group_funcs[stat_funcname](existing, to_group)
-#        tsastats_new.stats = newdata
-#        return tsastats_new
-
-#    @staticmethod
-#    def old_get_scatter_data(tsa, value_keys, stat_func):
-#        """
-#        get data structure to use for highgraph scatter plots,
-#        [
-#            {
-#                name : str(<key>),
-#                data : [stat_func(tsa[key][value_keys[0]]), stat_func(tsa[key][value_keys[1]], ]
-#            },
-#            ...
-#        ]
-#
-#        parameters:
-#        tsa <TimeseriesArray>
-#        value_keys <tuple> with len 2, represents x- and y-axis
-#        stat_fuc <str> statistical function to use to aggregate xcolumn and ycolumns
-#            must exist in Timeseries object
-#
-#        returns:
-#        <list> of <dict> data structure to use directly in highgraph scatter plots, when json encoded
-#        """
-#        assert len(value_keys) == 2
-#        highchart_data = []
-#        for key in tsa.keys():
-#            stats = tsa[key].get_stat(stat_func)
-#            highchart_data.append({
-#                "name" : key[0],
-#                "data" : [[stats[value_keys[0]], stats[value_keys[1]]],]
-#            })
-#        return highchart_data
 
     @staticmethod
     def datestring_to_date(datestring):

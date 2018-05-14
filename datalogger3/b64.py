@@ -2,12 +2,12 @@
 import sys
 import base64
 import binascii
+import logging
 import re
 
 #################### hack begin ##########################
 #
-# hack to mimic some python 2.x behaviour is string
-# representation of tuples
+# hack to mimic some python 2.x behaviour about string representation of tuples
 #
 def _b64encode_p3(list_obj):
     if len(list_obj) == 1:
@@ -27,19 +27,32 @@ def _b64encode_p2(list_obj):
 
 def _b64decode(encoded):
     try:
-        decoded_b = base64.urlsafe_b64decode(encoded)
+        # encoded must be type str not unicode,
+        # otherwise TypeError in b64decodecharacter mapping must return integer, None or unicode
+        decoded_b = base64.urlsafe_b64decode(str(encoded))
         decoded_str = decoded_b.decode("utf-8")
         # print("%s -> %s" % (encoded, decoded_str))
         return decoded_str
     except binascii.Error as exc:
         logging.exception(exc)
-        logging.error("string %s could not be base64-decoded", encoded)
+        logging.error("string %s<%s> could not be base64-decoded", encoded, type(encoded))
+        raise exc
+    except TypeError as exc:
+        logging.exception(exc)
+        logging.error("string %s<%s> could not be base64-decoded", encoded, type(encoded))
+        raise exc
 
 def b64eval(encoded):
     """
-    like 
+    like
     (u'vsanapp3', u'102', u'0', u'19', u'19', u'Primary Layout', u'114') if multiple fields
     (u'vsanapp3', ) if single field
+
+    parameters:
+    encoded <str>
+
+    returns:
+    <tuple>
     """
     decoded = b64decode(encoded)
     matches = re.findall("'(.*?)'", decoded)

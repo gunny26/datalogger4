@@ -56,6 +56,7 @@ class TimeseriesArray(object):
         self.datatypes = datatypes
         self.__group_keyname = None # for future use
         self.__group_func = None # for future use
+        self.__finalized = False # to indicate if the Timeseries are converted to datypes
 
     def __len__(self):
         """mimic dict"""
@@ -230,6 +231,7 @@ class TimeseriesArray(object):
         all value_keys are converted to float
         ts_keyname is converted to float
         """
+        assert self.__finalized is False
         #assert self.__ts_key in data # timestamp key has to be in dict
         #assert (type(data[self.__ts_key]) == int) or (type(data[self.__ts_key]) == float) # timestamp should be int
         #assert all((value_key in data for value_key in self.__value_keynames)) # test if all keys are available
@@ -330,6 +332,27 @@ class TimeseriesArray(object):
             except Exception as exc:
                 logging.exception(exc)
         return ret_data
+
+    def finalize(self):
+        """
+        if this TimeseriesArray was built up by read from raw data
+        tis method will convert every timeseries in it to specified datatype
+        it is further not possible to append something
+
+        this method could probably consume a huge amount of memory
+        """
+        if self.__finalized is True:
+            logging.info("all Timeseries are already finalized")
+            return
+        if self.__cache is False:
+            raise AttributeError("operation only applicable in cache mode, set <TimeseriesArray>.cache=True")
+        # convert raw timeseries to datatype specified
+        for timeseries in self.__data.values():
+            for colname, datatype in self.datatypes.items():
+                if datatype == "asis":
+                    continue
+                timeseries.convert(colname, datatype, None)
+        self.__finalized = True
 
     def convert(self, colname, datatype, newcolname=None):
         """

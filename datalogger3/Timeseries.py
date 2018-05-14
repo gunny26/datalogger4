@@ -881,6 +881,8 @@ class Timeseries(object):
             header = True # first line is header
             timeseries = None
             for row in filehandle:
+                if not row:
+                    continue # skip empty lines
                 if header is True:
                     header_line = row.strip().split(";")
                     timeseries = Timeseries(header_line[1:], header_line[0])

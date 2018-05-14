@@ -1,8 +1,9 @@
 #!/usr/bin/python3
 import sys
 import datetime
+import json
 import logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s : %(message)s")
 import argparse
 # own modules
 from datalogger3 import DataLogger as DataLogger
@@ -15,31 +16,43 @@ def gen_caches(project, tablename, datestring, force):
     dl = DataLogger(basedir)
     dl.setup(project, tablename, datestring)
     if force:
-        print("deleting pre-created caches (-f was used)")
+        logging.info("deleting pre-created caches (-f was used)")
         dl.delete_caches()
-    sys.stdout.write("getting caches")
+    logging.info("getting caches")
     caches = dl["caches"]
     assert isinstance(caches, dict)
-    sys.stdout.write(" OK\n")
     try:
-        sys.stdout.write("creating tsa")
-        tsa = dl["tsa"]
-        assert isinstance(tsa, TimeseriesArray)
-        sys.stdout.write(" OK\n")
-        sys.stdout.write("creating tsastats")
-        tsastats = dl["tsastats"]
-        assert isinstance(tsastats, TimeseriesArrayStats)
-        sys.stdout.write(" OK\n")
-        sys.stdout.write("creating qa")
-        qa = dl["qa"]
-        assert isinstance(qa, QuantileArray)
-        sys.stdout.write(" OK\n")
-        sys.stdout.write("creating total_stats")
-        total_stats = dl["total_stats"]
-        assert isinstance(total_stats, dict)
-        sys.stdout.write(" OK\n")
+        if not caches["tsa"]["keys"]:
+            # there seems to be no caches at all
+            # generate them all, higher memory consumption
+            logging.info("calling generate_caches()")
+            dl.generate_caches()
+        else:
+            # slow way, create every cache step by step
+            logging.info("creating tsa")
+            tsa = dl["tsa"]
+            assert isinstance(tsa, TimeseriesArray)
+            logging.info("creating tsastats")
+            tsastats = dl["tsastats"]
+            assert isinstance(tsastats, TimeseriesArrayStats)
+            logging.info("creating qa")
+            qa = dl["qa"]
+            assert isinstance(qa, QuantileArray)
+            logging.info("creating total_stats")
+            total_stats = dl["total_stats"]
+            assert isinstance(total_stats, dict)
     except DataLoggerRawFileMissing as exc:
-        print("no RAW file avalable")
+        logging.info("no RAW file avalable")
+    dl = DataLogger(basedir)
+    dl.setup(project, tablename, datestring)
+    caches = dl["caches"]
+    num_ts_obj = len(caches["ts"]["keys"].keys())
+    logging.info("stats timeseries objects    : %s", num_ts_obj)
+    meta = dl.meta
+    num_ts = num_ts_obj * len(meta["value_keynames"])
+    logging.info("stats individual timeseries : %s", num_ts)
+    num_points = 24 * 60 * 60 / meta["interval"] * num_ts
+    logging.info("stats individual points     : %s", num_points)
 
 def main():
     datalogger =  DataLogger(basedir)
@@ -48,14 +61,14 @@ def main():
         logging.info("working on datestring %s (from %s to %s)", datestring, start_ts, stop_ts)
         for project in datalogger.get_projects():
             if args.project is not None and project != args.project:
-                logging.debug("skipping project %s", project)
+                logging.debug("skipping whole project %s", project)
                 continue
             logging.info("working on project %s", project)
             for tablename in datalogger.get_tablenames(project):
                 if args.tablename is not None and tablename != args.tablename:
-                    logging.debug("skipping tablename %s", tablename)
+                    logging.debug("skipping %s/%s", project, tablename)
                     continue
-                logging.info("working on tablename %s", tablename)
+                logging.info("working on %s/%s", project, tablename)
                 gen_caches(project, tablename, datestring, args.force)
 
 if __name__ == "__main__":

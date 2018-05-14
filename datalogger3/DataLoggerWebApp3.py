@@ -5,13 +5,13 @@ import logging
 logging.basicConfig(level=logging.INFO)
 import json
 import gzip
-import base64
 import web
 # own modules
 import tk_web
 from datalogger3.CustomExceptions import *
 from datalogger3.DataLogger import DataLogger as DataLogger
 from datalogger3.TimeseriesStats import TimeseriesStats as TimeseriesStats
+from datalogger3.b64 import b64eval
 
 urls = (
     "/oauth2/v1/", "tk_web.IdpConnector",
@@ -163,7 +163,7 @@ class DataLoggerWebApp3(object):
         """ using DataLogger method """
         project, tablename, datestring, index_key_b64 = args[:4]
         self.__dl.setup(project, tablename, datestring)
-        index_key = tuple(eval(base64.b64decode(index_key_b64)))
+        index_key = b64eval(index_key_b64)
         if len(args) >= 5:
             value_keynames = args[4:]
             print(value_keynames)
@@ -175,7 +175,7 @@ class DataLoggerWebApp3(object):
         """ using DataLogger method """
         project, tablename, datestring, index_key_b64 = args[:4]
         self.__dl.setup(project, tablename, datestring)
-        index_key = tuple(eval(base64.b64decode(index_key_b64)))
+        index_key = b64eval(index_key_b64)
         return self.__dl["tsastats", index_key].to_data()
 
     def get_total_stats(self, *args, **kwds):
