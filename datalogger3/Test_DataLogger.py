@@ -142,7 +142,18 @@ class Test(unittest.TestCase):
             pass
         assert row['bytes_received'] == '272517939'
 
-
+    def test_generate_caches(self):
+        print("testing generate_caches")
+        dl = DataLogger("testdata")
+        dl.setup("mysql", "performance", "2018-04-01")
+        dl.delete_caches()
+        cache = dl["caches"]
+        assert not cache["ts"]["keys"]
+        dl.generate_caches()
+        dl = DataLogger("testdata")
+        dl.setup("mysql", "performance", "2018-04-01")
+        cache = dl["caches"]
+        assert cache["ts"]["keys"]
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
