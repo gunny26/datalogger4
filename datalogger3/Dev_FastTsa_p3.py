@@ -128,6 +128,7 @@ def main():
     ts_keyname = headers[0]
     index_keynames = headers[1:3]
     value_keynames = headers[3:]
+    # new TSA structure
     tsa_def = {
         "index_keys": index_keynames,
         "ts_filenames": [],

@@ -3,7 +3,6 @@ import os
 import gzip
 import json
 import time
-import concurrent.futures
 import threading
 from b64 import b64encode
 
@@ -40,7 +39,7 @@ tsa_def = {
     "ts_key": ts_keyname,
     "value_keys": value_keynames
 }
-print(tsa_def)
+# print(tsa_def)
 # raw filename
 raw_filename = os.path.join(basedir, "%s_%s.csv.gz" % (tablename, datestring))
 # read input data
@@ -60,7 +59,7 @@ with gzip.open(raw_filename, "rt") as infile:
             tsa[key] = {}
         tsa[key][ts] = values
         # print(key, ts, values)
-print("done in %0.2f" % (time.time() - starttime))
+print("read from raw done in %0.2f" % (time.time() - starttime))
 starttime = time.time()
 # output TS data
 ts_writer = get_ts_writer(ts_keyname, value_keynames)
@@ -69,7 +68,7 @@ for key in tsa:
     ts_filename = "ts_" + b64encode(key) + ".csv.gz"
     filename = os.path.join(cachedir, ts_filename)
     tsa_def["ts_filenames"].append(ts_filename)
-    print("filename : ", filename)
+    # print("filename : ", filename)
     t = threading.Thread(target=ts_writer, args=(filename, key, tsa[key]))
     #t.daemon = True
     t.start()
@@ -77,4 +76,4 @@ for key in tsa:
 tsa_filename = "tsa_" + b64encode(index_keynames) + ".json"
 print("dumping tsa to ", tsa_filename)
 json.dump(tsa_def, open(os.path.join(basedir, tsa_filename), "wt"), indent=4)
-print("done in %0.2f" % (time.time() - starttime))
+print("dumping tsa and indicidual ts done in %0.2f" % (time.time() - starttime))

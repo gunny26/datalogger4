@@ -13,6 +13,7 @@ import calendar
 import time
 import gzip
 import pwd
+import shutil
 # own modules
 from datalogger3.TimeseriesArray import TimeseriesArray as TimeseriesArray
 from datalogger3.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
@@ -20,6 +21,7 @@ from datalogger3.TimeseriesStats import TimeseriesStats as TimeseriesStats
 from datalogger3.Quantile import QuantileArray as QuantileArray
 from datalogger3.CustomExceptions import *
 from datalogger3.b64 import b64encode, b64decode, b64eval
+# from datalogger3.FastTsa import fast_tsa
 
 class DataLogger(object):
     """
@@ -217,6 +219,11 @@ class DataLogger(object):
         return self.__meta["raw_basedir"]
 
     @property
+    def raw_filename(self):
+        """raw filename or Exception"""
+        return self.__get_raw_filename()
+
+    @property
     def global_cachedir(self):
         """subdirectory where to put caches"""
         return self.__config["cachedir"]
@@ -272,6 +279,16 @@ class DataLogger(object):
     @property
     def stat_func_names(self):
         return list(TimeseriesStats.stat_funcs.keys())
+
+    @property
+    def archivepath(self):
+        """path to archiving drectory for this particular setup, does not include existance of this directory"""
+        return os.path.join(self.__config["archivepath"], self.datestring, self.project, self.tablename)
+
+    @property
+    def archive_filename(self):
+        """filename of archive, does not include existance of file"""
+        return os.path.join(self.archivepath, "%s_%s.csv.gz" % (self.tablename, self.datestring))
 
     def __getitem__(self, *args):
         """
@@ -523,18 +540,25 @@ class DataLogger(object):
         caches["total_stats"]["exists"] = os.path.isfile(os.path.join(self.cachedir, "total_stats.json"))
         return caches
 
-    def generate_caches(self):
+    def generate_caches(self, use_fast=False):
         """
         meant to generate all cached files from scratch (raw input data)
         """
         logging.info("generate_caches() was called")
-        logging.info("calling load_tsa_raw()")
-        tsa = self.load_tsa_raw()
-        logging.info("calling tsa.dump()")
-        tsa.dump(self.cachedir) # save full data
-        tsa.cache = True # to keep data in memory
-        logging.info("calling load_tsa_finalize()")
-        tsa.finalize() # convert Timeseries to Datatypes
+        if use_fast:
+            logging.info("calling fast_tsa() - disabled")
+            fast_tsa(self)
+            logging.info("calling load_tsa()")
+            tsa = self.load_tsa()
+            tsa.cache = True
+        else:
+            logging.info("calling load_tsa_raw()")
+            tsa = self.load_tsa_raw()
+            logging.info("calling tsa.dump()")
+            tsa.dump(self.cachedir) # save full data
+            tsa.cache = True
+            logging.info("calling load_tsa_finalize()")
+            tsa.finalize() # convert Timeseries to Datatypes 
         logging.info("creating tsastats")
         tsastats = TimeseriesArrayStats(tsa) # calculate
         logging.info("calling tsastats.dump()")
@@ -548,6 +572,52 @@ class DataLogger(object):
         logging.info("calling total_stats.dump() - kind of")
         self.__dump_total_stats(total_stats) # store
         logging.info("done generate_caches()")
+        # call this methode to refresh cached informations
+        self.__memcache_init()
+
+    def raw_to_archive(self, force=False):
+        """
+        method to archive raw input files to archivepath destination
+        archivepath is suposed to be much slower than online,
+        and maybe not always present, so it is not supposed to use it regularly
+
+        this is only allowed if there is some existing tsa archive
+
+        parameters:
+        force <bool> to indicate if some pre-existing archived raw file should be replaced
+        """
+        # check raw input file existance
+        raw_filename = self.__get_raw_filename()
+        if not os.path.isfile(raw_filename):
+            logging.info("raw input file %s does not exist, skipping")
+            return
+        # check if tsa is generated
+        if not self["caches"]["ts"]["keys"]:
+            raise AttributeError("TSA Archive must exist to allow archiving of raw input data")
+        # check archivepath existance
+        if not os.path.isdir(self.__config["archivepath"]):
+            raise AttributeError("Archive %s path does not exist", self.__meta["archivepath"])
+        # generate path for this setup
+        archivepath = os.path.join(self.__config["archivepath"], self.datestring, self.project, self.tablename)
+        if raw_filename.endswith(".gz"):
+            archive_filename = os.path.join(archivepath, os.path.basename(raw_filename))
+        else:
+            archive_filename = os.path.join(archivepath, os.path.basename(raw_filename) + ".gz")
+        if os.path.isfile(archive_filename) and force is False:
+            logging.info("archive file %s does aready exists, skipping. Use force to overwrite", archive_filename)
+            return
+        # create subdirs
+        os.makedirs(archivepath)
+        # move to destination
+        if raw_filename.endswith(".gz"):
+            # move if already compressed
+            shutil.move(raw_filename, archive_filename)
+        else:
+            with open(raw_filename, "rt") as infile:
+                with gzip.open(archive_filename, "wt") as outfile:
+                    outfile.write(infile.read())
+            # old file could be deleted
+            shutil.move(raw_filename, raw_filename + ".todelete")
  
     def import_tsa(self, tsa):
         """

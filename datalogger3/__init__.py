@@ -35,5 +35,6 @@ from datalogger3.Quantile import QuantileArray as QuantileArray
 from datalogger3.Quantile import Quantile as Quantile
 from datalogger3.CorrelationMatrix import CorrelationMatrixArray as CorrelationMatrixArray
 from datalogger3.CorrelationMatrixTime import CorrelationMatrixTime as CorrelationMatrixTime
+#from datalogger3.FastTsa import fast_tsa as fast_tsa
 # custom exceptions
 from datalogger3.CustomExceptions import *
