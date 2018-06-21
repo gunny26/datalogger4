@@ -48,8 +48,10 @@ def gen_caches(project, tablename, datestring, force):
         logging.info("reading total_stats - or recreating if not present")
         total_stats = dl["total_stats"]
         assert isinstance(total_stats, dict)
-        #logging.info("archiving original input data to archivepath")
-        #dl.raw_to_archive()
+        # reinitialize caches
+        dl.setup(project, tablename, datestring, force=True)
+        logging.info("archiving original input data to archivepath")
+        dl.raw_to_archive()
     except DataLoggerRawFileMissing as exc:
         logging.info("no RAW file avalable")
     dl = DataLogger(basedir)
