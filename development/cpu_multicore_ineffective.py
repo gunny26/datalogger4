@@ -24,10 +24,9 @@ def get_cpu_singlecore(*args):
     project = "vicenter"
     tablename = "virtualMachineCpuStats6"
     dl.setup(project, tablename, datestring)
-    tsastats = dl["tsastats"].stats
     # aggregate data, use only server with more than 2 cores
     data = {}
-    for index_key, tsstats in dl["tsastats"].stats.items():
+    for index_key, tsstats in dl["tsastats"].items():
         hostname = index_key[0]
         if hostname not in data:
             data[hostname] = []

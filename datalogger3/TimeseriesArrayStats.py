@@ -31,6 +31,7 @@ class TimeseriesArrayStats(object):
         """
         # define instance data
         self.__stats = {}
+        self.__autoload = {} # holding filenames to load key data
         self.__index_keynames = tuple(tsa.index_keynames)
         self.__value_keynames = tuple(tsa.value_keynames)
         for index_key in tsa.keys():
@@ -48,18 +49,23 @@ class TimeseriesArrayStats(object):
         try:
             assert self.__index_keynames == other.index_keynames
             assert self.__value_keynames == other.value_keynames
-            assert len(self.__stats.keys()) == len(other.stats.keys())
-            for key in self.__stats.keys():
-                assert self.__stats[key] == other.stats[key]
+            assert len(self.keys()) == len(other.stats.keys())
+            for key in self.keys():
+                assert self[key] == other.stats[key]
         except AssertionError as exc:
             logging.exception(exc)
             return False
         return True
 
     def __len__(self):
-        return len(self.__stats.keys())
+        return len(self.keys())
 
     def __getitem__(self, key):
+        """
+        autoload tsstats if key is found and value is None
+        """
+        if self.__stats[key] is None:
+            self.__stats[key] = self.__autoload_tsstats(self.__autoload[key])
         return self.__stats[key]
 
     def __delitem__(self, key):
@@ -68,19 +74,21 @@ class TimeseriesArrayStats(object):
     def keys(self):
         return self.__stats.keys()
 
-    def values(self):
-        return self.__stats.values()
-
     def items(self):
-        return self.__stats.items()
+        """mimic dict, but honor autoload feature"""
+        return [(key, self[key]) for key in self.keys()]
+
+    def values(self):
+        """mimic dict, but honor autoload feature"""
+        return [self[key] for key in self.__stats.keys()]
 
     @property
     def stats(self):
-        return self.__stats
+        return dict(self.items())
 
-    @stats.setter
-    def stats(self, value):
-        self.__stats = value
+#    @stats.setter
+#    def stats(self, value):
+#        self.__stats = value
 
     @property
     def index_keynames(self):
@@ -107,7 +115,7 @@ class TimeseriesArrayStats(object):
         outdata.append(self.__index_keynames)
         outdata.append(value_keys)
         tsstat_data = []
-        for key, tsstat in self.__stats.items():
+        for key, tsstat in self.items():
             data = {}
             for value_key in value_keys:
                 data[value_key] = tsstat[value_key]
@@ -132,7 +140,7 @@ class TimeseriesArrayStats(object):
         if stat_func_name is not None:
             assert stat_func_name in TimeseriesStats.get_stat_func_names()
         ret_data = {}
-        for key, t_stat in self.__stats.items():
+        for key, t_stat in self.items():
             if stat_func_name is not None:
                 ret_data[key] = t_stat.stats[value_key][stat_func_name]
             else:
@@ -185,7 +193,7 @@ class TimeseriesArrayStats(object):
             "value_keys" : self.__value_keynames,
             "tsstat_filenames" : []
         }
-        for key, tsstats in self.__stats.items():
+        for key, tsstats in self.items():
             filename = self._get_tsstat_dumpfilename(key)
             fullfilename = os.path.join(outpath, filename)
             if (not os.path.isfile(fullfilename)) or (overwrite is True):
@@ -277,12 +285,22 @@ class TimeseriesArrayStats(object):
         tsastats.__index_keynames = tuple(indata["index_keys"])
         tsastats.__value_keynames = tuple(indata["value_keys"])
         tsastats.__stats = {}
+        tsastats.__autoload = {}
         #for filename in indata["tsstat_filenames"]:
         for key, filename in tsastats._get_load_filenames(path, index_keys, filterkeys, matchtype).items():
             #logging.info("loading TimeseriesStats object from %s", fullfilename)
-            with open(filename, "rt") as infile:
-                tsastats.__stats[key] = TimeseriesStats.load(infile)
+            #with open(filename, "rt") as infile:
+            #    tsastats.__stats[key] = TimeseriesStats.load(infile)
+            tsastats.__autoload[key] = filename
+            tsastats.__stats[key] = None
         return tsastats
+
+    def __autoload_tsstats(self, filename):
+        """
+        autoload some stores TimeseriesStats from disk
+        """
+        with open(filename, "rt") as infile:
+            return TimeseriesStats.load(infile)
 
     def to_data(self):
         """
@@ -292,7 +310,7 @@ class TimeseriesArrayStats(object):
         ret_data = {
             "index_keynames" : self.__index_keynames,
             "value_keynames" : self.__value_keynames,
-            "tsstats_filenames" : [self._get_tsstat_dumpfilename(key) for key in self.__stats.keys()],
+            "tsstats_filenames" : [self._get_tsstat_dumpfilename(key) for key in self.keys()],
             "tsastats_filename" : self.get_dumpfilename(self.__index_keynames)
             }
         return ret_data
@@ -305,7 +323,7 @@ class TimeseriesArrayStats(object):
         ret_data = [
             self.__index_keynames,
             self.__value_keynames,
-            [(key, timeseries.stats) for key, timeseries in self.__stats.items()]
+            [(key, timeseries.stats) for key, timeseries in self.items()]
         ]
         return json.dumps(ret_data)
 
@@ -332,9 +350,9 @@ class TimeseriesArrayStats(object):
         yield ("#key", ) + self.__index_keynames + self.__value_keynames
         data = None
         if sortkey is not None:
-            data = sorted(self.__stats.items(), key=lambda item: item[1][sortkey][stat_func_name], reverse=True)
+            data = sorted(self.items(), key=lambda item: item[1][sortkey][stat_func_name], reverse=True)
         else:
-            data = self.__stats.items()
+            data = self.items()
         for key, value in data:
             values = list(key) + [value[value_key][stat_func_name] for value_key in self.__value_keynames]
             yield (str(key), ) + tuple(values)

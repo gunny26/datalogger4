@@ -11,7 +11,6 @@ first sum, by timeseries, second sum by all timeseries for this day and programn
 """
 import json
 import datetime
-import statistics
 import datalogger3
 from datalogger3.b64 import b64eval
 
@@ -29,13 +28,12 @@ def get_hrSWRunPerfTable_grouped(*args):
     dl.setup(project, tablename, datestring)
     # aggregate data, use only server with more than 2 cores
     data = {}
-    # agregate
-    data = {}
-    for index_key, tsstats in dl["tsastats"].items():
+    for index_key in dl["tsastats"].keys():
         #if tsstats["hrSWRunPerfCPU"]["count"] < 140:
         #    continue
         if "System Idle Process" in index_key:
             continue
+        tsstats = dl["tsastats"][index_key]
         # helpers
         index_dict = dict(zip(dl.index_keynames, index_key))
         name = index_dict["hrSWRunName"]

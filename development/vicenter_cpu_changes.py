@@ -16,10 +16,10 @@ def get_vm_shortage(*args):
     project = "vicenter"
     tablename = "virtualMachineCpuStats6"
     dl.setup(project, tablename, datestring)
-    tsastats = dl["tsastats"].stats
+    # tsastats = dl["tsastats"].stats
     # aggregate data
     data = {}
-    for index_key, tsstats in dl["tsastats"].stats.items():
+    for index_key in dl["tsastats"].keys():
         hostname, instance = index_key
         if len(hostname.split(".")) != 3:
             continue

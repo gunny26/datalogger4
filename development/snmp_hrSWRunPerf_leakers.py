@@ -9,7 +9,6 @@ criterias:
 """
 import json
 import datetime
-import statistics
 import datalogger3
 from datalogger3.b64 import b64eval
 

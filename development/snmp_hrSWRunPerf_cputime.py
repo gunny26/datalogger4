@@ -9,12 +9,9 @@ criterias:
 """
 import json
 import datetime
-import statistics
 import datalogger3
 from datalogger3.b64 import b64eval
 
-def tsstats_2d(tsa, value_keyname=None, stat_func_name=None):
-    assert value_keyname != stat_func_name
         
 def index_dict(index_key, index_keynames):
     return dict(zip(index_keynames, index_key))
@@ -34,10 +31,11 @@ def get_memory_leakers(*args):
     headers = list(dl.index_keynames) + list(dl.value_keynames)
     print(headers)
     data = []
-    for index_key, tsstats in dl["tsastats"].items():
-        if tsstats[keyname]["count"] < 140:
-            continue
+    for index_key in dl["tsastats"].keys():
         if "System Idle Process" in index_key:
+            continue
+        tsstats = dl["tsastats"][index_key]
+        if tsstats[keyname]["count"] < 140:
             continue
         index_dict = dict(zip(dl.index_keynames, index_key))
         value_dict = dict(((value_keyname, tsstats[value_keyname][stat_func_name]) for value_keyname in dl.value_keynames)) 

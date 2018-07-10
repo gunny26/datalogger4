@@ -8,6 +8,7 @@ import gzip
 import json
 import os
 # own modules
+import datalogger3
 from Timeseries import Timeseries as Timeseries
 from TimeseriesStats import TimeseriesStats as TimeseriesStats
 from TimeseriesArray import TimeseriesArray as TimeseriesArray
@@ -126,15 +127,15 @@ class Test(unittest.TestCase):
     def test_keys(self):
         print("testing keys")
         print(list(self.tsastats.keys()))
-        assert list(self.tsastats.keys()) == [('srvwebsql2.tilak.cc',), ('srvdmzsql1.tilak.cc',), ('srvaporti1.tilak.cc',), ('nagios.tilak.cc',), ('srvazwsql1.tilak.cc',)]
+        assert all([key in [('srvwebsql2.tilak.cc',), ('srvdmzsql1.tilak.cc',), ('srvaporti1.tilak.cc',), ('nagios.tilak.cc',), ('srvazwsql1.tilak.cc',)] for key in self.tsastats.keys()])
 
     def test_values(self):
-        assert all((isinstance(value, TimeseriesStats) for value in self.tsastats.values()))
+        assert all((isinstance(value, datalogger3.TimeseriesStats) for value in self.tsastats.values()))
 
     def test_items(self):
         for key, value in self.tsastats.items():
             assert isinstance(key, tuple)
-            assert isinstance(value, TimeseriesStats)
+            assert isinstance(value, datalogger3.TimeseriesStats)
 
     def test_index_keynames(self):
         assert self.tsastats.index_keynames == ('hostname',)

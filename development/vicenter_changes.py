@@ -16,7 +16,6 @@ def get_vm_shortage(*args):
     project = "vicenter"
     tablename = "virtualMachineMemoryStats"
     dl.setup(project, tablename, datestring)
-    tsastats = dl["tsastats"].stats
     # aggregate data
     data = {}
     for index_key, tsstats in dl["tsastats"].stats.items():

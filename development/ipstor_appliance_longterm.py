@@ -14,7 +14,6 @@ def get_ipstor_appliance(*args):
     project = "ipstor"
     tablename = "vrsClientTable"
     dl.setup(project, tablename, datestring)
-    tsastats = dl["tsastats"].stats
     # aggregate data
     data = {}
     for index_key, tsstats in dl["tsastats"].stats.items():
@@ -36,7 +35,7 @@ def get_ipstor_appliance(*args):
 dl = datalogger3.DataLogger("/var/rrd")
 print("showing server with max virtual memory usage over 90% and over physical memory size")
 firstrow = True
-for datestring in dl.datewalker("2016-01-01", "2018-07-04"):
+for datestring in dl.datewalker("2018-01-01", "2018-07-04"):
     #print("-" * 80)
     #print("Analysis for %s" % datestring)
     data = get_ipstor_appliance(datestring)

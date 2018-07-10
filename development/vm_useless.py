@@ -22,10 +22,9 @@ def get_vm_shortage(*args):
     project = "snmp"
     tablename = "hrStorageTable"
     dl.setup(project, tablename, datestring)
-    tsastats = dl["tsastats"].stats
     # aggregate data
     data = {}
-    for index_key, tsstats in sorted(dl["tsastats"].stats.items()):
+    for index_key, tsstats in sorted(dl["tsastats"].items()):
         if "HOST-RESOURCES-TYPES::hrStorageVirtualMemory" == index_key[2] and "virtual memory" == index_key[1].lower():
             hostname = index_key[0] # TODO: use some dict index_key
             if hostname not in data:

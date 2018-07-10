@@ -14,11 +14,11 @@ def get_vm_shortage(*args):
     project = "snmp"
     tablename = "hrStorageTable"
     dl.setup(project, tablename, datestring)
-    tsastats = dl["tsastats"].stats
     # aggregate data
     data = {}
     for index_key, tsstats in dl["tsastats"].stats.items():
         if "HOST-RESOURCES-TYPES::hrStorageVirtualMemory" in index_key:
+            tsstats = dl["tsastats"][index_key]
             hostname = index_key[0] # TODO: use some dict index_key
             if hostname not in data:
                 data[hostname] = {}
@@ -30,6 +30,7 @@ def get_vm_shortage(*args):
             except ZeroDivisionError:
                 data[hostname]["virtual_used_max_to_median"] = -1.0
         if "HOST-RESOURCES-TYPES::hrStorageRam" in index_key:
+            tsstats = dl["tsastats"][index_key]
             hostname = index_key[0] # TODO: use some dict index_key
             if hostname not in data:
                 data[hostname] = {}

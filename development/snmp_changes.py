@@ -16,15 +16,16 @@ def get_vm_shortage(*args):
     project = "snmp"
     tablename = "hrStorageTable"
     dl.setup(project, tablename, datestring)
-    tsastats = dl["tsastats"].stats
+    # tsastats = dl["tsastats"].stats
     # aggregate data
     data = {}
-    for index_key, tsstats in dl["tsastats"].stats.items():
+    for index_key in dl["tsastats"].keys():
         hostname, hrStorageName, hrStorageType = index_key
         if hrStorageType in ("HOST-RESOURCES-TYPES::hrStorageOther", "HOST-RESOURCES-TYPES::hrStorageNetworkDisk", "HOST-RESOURCES-TYPES::hrStorageVirtualMemory", "HOST-RESOURCES-TYPES::hrStorageRemovableDisk"):
             continue
         if hrStorageName.startswith("/run") or hrStorageName.startswith("/dev") or hrStorageName.startswith("/sys"):
             continue
+        tsstats = dl["tsastats"][index_key]
         size = int(tsstats["hrStorageSize"]["last"] * tsstats["hrStorageAllocationUnits"]["last"] / 1024 / 1024)
         data[index_key] = size
     return data
