@@ -33,7 +33,7 @@ def get_vm_shortage(*args):
 dl = datalogger3.DataLogger("/var/rrd")
 print("showing server with max virtual memory usage over 90% and over physical memory size")
 lastdata = None
-for datestring in dl.datewalker("2018-01-01", "2018-07-08"):
+for datestring in dl.datewalker("2018-05-01", "2018-07-08"):
     print("-" * 80)
     print("Analysis for %s" % datestring)
     if lastdata is None:

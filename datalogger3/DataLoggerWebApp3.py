@@ -6,6 +6,7 @@ logging.basicConfig(level=logging.INFO)
 import json
 import gzip
 import datetime
+import time
 import web
 # own modules
 import tk_web
@@ -913,6 +914,65 @@ class DataLoggerWebApp3(object):
             return "Invalid data in uploaded file, see apache error log for details, uploaded file not stored"
         self.logger.info("File stored")
         return "File stored"
+
+################################### PUT Section ###############################################
+
+    @authenticator
+    @jsonout
+    def PUT(self, parameters):
+        """
+        generelle HTTP PUT Method is used to add individual data to some files.
+
+        data can only be added to files of today
+        this method is meant to add live data several times a day
+
+        data must be in json format as list of individual dict
+        dict must be in defines format of project/tablename
+
+        parameters:
+        /project/tablename
+        data = json formatted list of dicts
+        """
+        self.logger.info("PUT calling %s", parameters)
+        args = parameters.strip("/").split("/")
+        # build method name from url
+        project, tablename = args[:2]
+        datestring = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
+        self.__dl.setup(project, tablename, datestring)
+        ts = time.time()
+        filename = os.path.join(self.__dl.raw_basedir, "%s_%s.csv" % (tablename, datestring))
+        data = dict(web.input()) # get query as dict, use input not data
+        # self.logger.info("received data to store %s", data)
+        if not all((index_key in data for index_key in self.__dl.index_keynames)):
+            self.logger.error("some index_key is missing")
+            return
+        if not all((value_key in data for value_key in self.__dl.value_keynames)):
+            self.logger.error("some value_key is missing")
+            return
+        if not self.__dl.ts_keyname in data:
+            self.logger.error("ts_key is missing")
+            return
+        # check timestamp
+        min_ts = ts - 60
+        max_ts = ts + 60
+        if not (min_ts < float(data[self.__dl.ts_keyname]) < max_ts):
+            self.logger.info("timestamp in received data is out of range +/- 60s")
+            return
+        # actualy append or write
+        if os.path.isfile(filename):
+            self.logger.info("raw file does already exist, appending")
+            with open(filename, "at") as outfile:
+                outfile.write("\t".join([data[key] for key in self.__dl.headers]))
+                outfile.write("\n")
+        else:
+            self.logger.info("raw file does not exst, will create new file %s", filename)
+            with open(filename, "wt") as outfile:
+                outfile.write("\t".join(self.__dl.headers))
+                outfile.write("\n")
+                outfile.write("\t".join([data[key] for key in self.__dl.headers]))
+                outfile.write("\n")
+
+################################### PUT Section ###############################################
 
     @authenticator
     @jsonout

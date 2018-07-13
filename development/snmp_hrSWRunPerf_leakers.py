@@ -19,12 +19,12 @@ def get_memory_leakers(*args):
     tablename = "hrSWRunPerfTable"
     mem = "hrSWRunPerfMem"
     dl.setup(project, tablename, datestring)
-    cache = dl["caches"]
+    # cache = dl["caches"]
     # aggregate data, use only server with more than 2 cores
     data = []
-    for index_key_str in cache["tsstat"]["keys"].keys():
-        index_key = eval(index_key_str)
-        tsstats = dl["tsastats", index_key]
+    for index_key in dl["tsastats"].keys():
+        # index_key = eval(index_key_str)
+        tsstats = dl["tsastats"][index_key]
         if tsstats["hrSWRunPerfMem"]["count"] < 140:
             continue
         diff_kb = tsstats["hrSWRunPerfMem"]["diff"]
