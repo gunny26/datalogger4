@@ -11,9 +11,9 @@ args = {'name': 'datalogger3',
         'platforms': ['any'],
         'license': 'LGPLv2',
         'packages': ['datalogger3'],
-        'package_dir': {'datalogger3': 'datalogger3'},
-        'ext_package': 'datalogger',
-        'version' : '3.0'
+        #'package_dir': {'datalogger3': 'datalogger3'},
+        #'ext_package': 'datalogger',
+        'version': '3.0.1',
         }
 
 setup(**args)

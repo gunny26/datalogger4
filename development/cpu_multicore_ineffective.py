@@ -43,7 +43,7 @@ def get_cpu_singlecore(*args):
         #print("\tstd : %0.2f" % std)
         std_pct = 100.0 * std / max_used
         #print("\tstd : %0.2f %%" % std_pct)
-        if std_pct > 10.0:
+        if std_pct > 30.0:
             if hostname not in data3:
                 data3[hostname] = {
                     "max_used" : max_used,
@@ -59,7 +59,10 @@ def get_cpu_singlecore(*args):
 #
 dl = datalogger3.DataLogger("/var/rrd")
 print("showing servers with uneven CPU usage")
-for datestring in dl.datewalker("2018-05-01", "2018-05-31"):
+# use the last two weeks to get data
+start = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
+stop = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
+for datestring in dl.datewalker(start, stop):
     print("-" * 80)
     print("Analysis for %s" % datestring)
     get_cpu_singlecore(datestring)

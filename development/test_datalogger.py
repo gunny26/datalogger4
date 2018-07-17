@@ -76,10 +76,6 @@ def main():
                             print datestring, "Number ob Timeseries and TimeseriesStats should be the same"
                         if len(caches["ts"]["keys"]) > len(caches["tsstat"]["keys"]):
                             print datestring, "some missing TimeseriesStats"
-            except tilak_datalogger.DataLoggerRawFileMissing as exc:
-                #logging.exception(exc)
-                logging.info("%s no RAW Data available", datestring)
-                pass
             except StandardError as exc:
                 logging.exception(exc)
                 pass

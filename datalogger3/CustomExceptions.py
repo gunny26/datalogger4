@@ -4,9 +4,9 @@
 class TimeseriesEmptyError(Exception):
     """raise if the specific Timeseries is length zero"""
 
-class DataLoggerRawFileMissing(Exception):
-    """raised, when there is no available Raw Input File"""
-
+#class DataLoggerRawFileMissing(Exception):
+#    """raised, when there is no available Raw Input File"""
+#
 class DataLoggerLiveDataError(Exception):
     """raised if there is an attempt to read from live data"""
 

@@ -49,7 +49,8 @@ def gen_caches(project, tablename, datestring, force):
         total_stats = dl["total_stats"]
         assert isinstance(total_stats, dict)
         # reinitialize caches
-        dl.setup(project, tablename, datestring, force=True)
+        dl = DataLogger(basedir)
+        dl.setup(project, tablename, datestring)
         logging.info("archiving original input data to archivepath")
         dl.raw_to_archive()
     except DataLoggerRawFileMissing as exc:

@@ -10,7 +10,6 @@ import time
 import web
 # own modules
 import tk_web
-from datalogger3.CustomExceptions import *
 from datalogger3.DataLogger import DataLogger as DataLogger
 from datalogger3.TimeseriesStats import TimeseriesStats as TimeseriesStats
 from datalogger3.b64 import b64eval
@@ -87,9 +86,6 @@ class DataLoggerWebApp3(object):
         # calling method, or AttributeError if not found
         try:
             return func(*args[1:], **query)
-        except DataLoggerRawFileMissing as exc:
-            web.ctx.status = "404 %s" % exc
-            return
         except KeyError as exc:
             self.logger.exception(exc)
             self.logger.error(exc)

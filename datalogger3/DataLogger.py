@@ -304,66 +304,63 @@ class DataLogger(object):
         ["qa", <key>] -> return <dict> Quantile
         ["total_stats"] -> return <dict> total_stats
         """
-        try:
-            if isinstance(args[0], str):
-                kind = args[0]
-                if kind == "tsa":
-                    try:
-                        return self.__memcache_get("tsa")
-                    except KeyError:
-                        self.__memcache_set("tsa", self.load_tsa())
-                        return self.__memcache_get("tsa")
-                if kind == "tsastats":
-                    try:
-                        return self.__memcache_get("tsastats")
-                    except KeyError:
-                        self.__memcache_set("tsastats", self.load_tsastats())
-                        return self.__memcache_get("tsastats")
-                if kind == "qa":
-                    try:
-                        return self.__memcache_get("qa")
-                    except KeyError:
-                        self.__memcache_set("qa", self.load_quantile())
-                        return self.__memcache_get("qa")
-                if kind == "caches":
-                    try:
-                        return self.__memcache_get("caches")
-                    except KeyError:
-                        self.__memcache_set("caches", self.get_caches())
-                        return self.__memcache_get("caches")
-                if kind == "total_stats":
-                    try:
-                        return self.__memcache_get("total_stats")
-                    except KeyError:
-                        self.__memcache_set("total_stats", self.load_total_stats())
-                        return self.__memcache_get("total_stats")
-            if isinstance(args[0], tuple):
-                kind, subkey = args[0]
-                if kind == "tsa":
-                    try:
-                        tsa = self.__memcache_get("tsa")
-                    except KeyError:
-                        tsa = self.load_tsa()
-                        self.__memcache_set("tsa", tsa)
-                    return tsa[subkey]
-                if kind == "tsastats":
-                    try:
-                        tsastats = self.__memcache_get("tsastats")
-                    except KeyError:
-                        tsastats = self.load_tsastats()
-                        self.__memcache_set("tsastats", tsastats)
-                    return tsastats[subkey]
-                if kind == "qa":
-                    try:
-                        qa = self.__memcache_get("qa")
-                    except KeyError:
-                        qa = self.load_quantile()
-                        self.__memcache_set("qa", qa)
-                    return qa[subkey]
-            else:
-                raise KeyError("unknown datatype")
-        except DataLoggerRawFileMissing as exc:
-            raise exc
+        if isinstance(args[0], str):
+            kind = args[0]
+            if kind == "tsa":
+                try:
+                    return self.__memcache_get("tsa")
+                except KeyError:
+                    self.__memcache_set("tsa", self.load_tsa())
+                    return self.__memcache_get("tsa")
+            if kind == "tsastats":
+                try:
+                    return self.__memcache_get("tsastats")
+                except KeyError:
+                    self.__memcache_set("tsastats", self.load_tsastats())
+                    return self.__memcache_get("tsastats")
+            if kind == "qa":
+                try:
+                    return self.__memcache_get("qa")
+                except KeyError:
+                    self.__memcache_set("qa", self.load_quantile())
+                    return self.__memcache_get("qa")
+            if kind == "caches":
+                try:
+                    return self.__memcache_get("caches")
+                except KeyError:
+                    self.__memcache_set("caches", self.get_caches())
+                    return self.__memcache_get("caches")
+            if kind == "total_stats":
+                try:
+                    return self.__memcache_get("total_stats")
+                except KeyError:
+                    self.__memcache_set("total_stats", self.load_total_stats())
+                    return self.__memcache_get("total_stats")
+        if isinstance(args[0], tuple):
+            kind, subkey = args[0]
+            if kind == "tsa":
+                try:
+                    tsa = self.__memcache_get("tsa")
+                except KeyError:
+                    tsa = self.load_tsa()
+                    self.__memcache_set("tsa", tsa)
+                return tsa[subkey]
+            if kind == "tsastats":
+                try:
+                    tsastats = self.__memcache_get("tsastats")
+                except KeyError:
+                    tsastats = self.load_tsastats()
+                    self.__memcache_set("tsastats", tsastats)
+                return tsastats[subkey]
+            if kind == "qa":
+                try:
+                    qa = self.__memcache_get("qa")
+                except KeyError:
+                    qa = self.load_quantile()
+                    self.__memcache_set("qa", qa)
+                return qa[subkey]
+        else:
+            raise KeyError("unknown datatype")
 
     def __parse_line(self, row):
         """
@@ -390,7 +387,7 @@ class DataLogger(object):
     def __get_raw_filename(self):
         """
         return filename of raw input file, if one is available
-        otherwise raise Exception
+        otherwise return None
 
         parameters:
         datestring <str>
@@ -399,7 +396,7 @@ class DataLogger(object):
         if not os.path.isfile(filename):
             filename += ".gz" # try gz version
             if not os.path.isfile(filename):
-                raise DataLoggerRawFileMissing("No Raw Input File named %s (or .gz) found", filename)
+                return None
         return filename
 
     def __read_raw_dict(self):
@@ -413,6 +410,8 @@ class DataLogger(object):
         <dict> of every row
         """
         filename = self.__get_raw_filename()
+        if filename is None:
+            raise AttributeError("no raw input file does exist")
         logging.debug("reading raw data from file %s", filename)
         start_ts, stop_ts = self.get_ts_for_datestring(self.__datestring) # get first and last timestamp of this date
         logging.debug("appropriate timestamps for this date are between %s and %s", start_ts, stop_ts)
@@ -462,10 +461,10 @@ class DataLogger(object):
 
     def delete_caches(self):
         """delete pre calculates caches"""
-        try:
-            rawfilename = self.__get_raw_filename()
+        rawfilename = self.__get_raw_filename()
+        if rawfilename is not None:
             pattern_list = ("tsa_", "ts_", "tsastat_", "tsstat_", "quantile.json", "total_stats.json")
-        except DataLoggerRawFileMissing:
+        else:
             # raw file is missing, or file is archived
             # in this case do not delete tsa file
             logging.info("original raw file is missing, tsa_ file and all ts_ files will not be deleted")
@@ -521,13 +520,7 @@ class DataLogger(object):
         # the original raw file could be deleted, and only the
         # calculated TSA/TSASTATS and so on are available. In this case
         # define None
-        try:
-            caches["tsa"]["raw"] = self.__get_raw_filename() # raises exception if no file was found
-        except DataLoggerRawFileMissing:
-            caches["tsa"]["raw"] = None
-        except Exception as exc:
-            logging.exception(exc)
-            raise
+        caches["tsa"]["raw"] = self.__get_raw_filename() # None if not found
         for cachetype in ("tsa", "ts", "tsastat", "tsstat"):
             file_pattern = os.path.join(self.cachedir, caches[cachetype]["pattern"])
             for abs_filename in glob.glob(file_pattern):
@@ -617,7 +610,8 @@ class DataLogger(object):
                 with gzip.open(archive_filename, "wt") as outfile:
                     outfile.write(infile.read())
             # old file could be deleted
-            shutil.move(raw_filename, raw_filename + ".todelete")
+            os.unlink(raw_filename)
+            # shutil.move(raw_filename, raw_filename + ".todelete")
  
     def import_tsa(self, tsa):
         """
@@ -923,9 +917,6 @@ class DataLogger(object):
                         ret_data[funcname].append((datestring, tsastats[key][value_key][funcname]))
                     else:
                         ret_data[funcname] = [(datestring, tsastats[key][value_key][funcname]), ]
-            except DataLoggerRawFileMissing as exc:
-                logging.exception(exc)
-                logging.error("No Input File for datestring %s found, skipping this date", datestring)
             except DataLoggerLiveDataError as exc:
                 logging.exception(exc)
                 logging.error("Reading from live data is not allowed, skipping this data, and ending loop")
