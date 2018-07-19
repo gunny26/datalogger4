@@ -161,6 +161,11 @@ class DataLogger(object):
         return json.dumps(ret, indent=4)
 
     @property
+    def basedir(self):
+        """basedir on underlying OS"""
+        return self.__basedir
+
+    @property
     def project(self):
         """project is the highest entity"""
         return self.__project
@@ -388,16 +393,15 @@ class DataLogger(object):
         """
         return filename of raw input file, if one is available
         otherwise return None
-
-        parameters:
-        datestring <str>
         """
         filename = os.path.join(self.raw_basedir, "%s_%s.csv" % (self.tablename, self.datestring))
-        if not os.path.isfile(filename):
+        if os.path.isfile(filename):
+            return filename
+        else: # try .gz version
             filename += ".gz" # try gz version
-            if not os.path.isfile(filename):
-                return None
-        return filename
+            if os.path.isfile(filename):
+                return filename
+        # otherwise None
 
     def __read_raw_dict(self):
         """
@@ -581,8 +585,8 @@ class DataLogger(object):
         """
         # check raw input file existance
         raw_filename = self.__get_raw_filename()
-        if not os.path.isfile(raw_filename):
-            logging.info("raw input file %s does not exist, skipping")
+        if raw_filename is None:
+            logging.info("no raw inputfile found, skipping")
             return
         # check if tsa is generated
         if not self["caches"]["ts"]["keys"]:
