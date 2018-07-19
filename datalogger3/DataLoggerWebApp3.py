@@ -7,6 +7,7 @@ import json
 import gzip
 import datetime
 import time
+import re
 import web
 # own modules
 import tk_web
@@ -147,6 +148,7 @@ class DataLoggerWebApp3(object):
             self.__dl.setup(project, tablename, args[2])
         else:
             self.__dl.setup(project, tablename, "1970-01-01")
+        self.logger.info("returning %s", self.__dl.value_keynames)
         return self.__dl.value_keynames
 
     def get_index_keynames(self, *args, **kwds):
@@ -158,6 +160,7 @@ class DataLoggerWebApp3(object):
             self.__dl.setup(project, tablename, args[2])
         else:
             self.__dl.setup(project, tablename, "1970-01-01")
+        self.logger.info("returning %s", self.__dl.index_keynames)
         return self.__dl.index_keynames
 
     def get_caches(self, *args, **kwds):
@@ -875,6 +878,72 @@ class DataLoggerWebApp3(object):
             self.logger.error(exc)
         web.ctx.status = "405 unknown method"
 
+    def post_project(self, *args, **kwds):
+        """
+        will create new project
+        assure the project does not yet exist
+
+        returns:
+        200 - if OK
+        406 - if format not OK
+        409 - if something does already exist
+        """
+        project = args[0]
+        # check string
+        # must be lowercase only
+        # consisting of a-z and 1-9
+        # no other characters allowed
+        # max. length 12
+        if re.match("^[a-z0-9]{0,12}$", project) is None:
+            self.logger.error("project %s does not match formatting criterias", project)
+            raise web.notacceptable("format mismatch")
+        if os.path.isdir(os.path.join(self.__dl.basedir, project)):
+            self.logger.error("project %s subdir does already exist", project)
+            raise web.conflict("project subdir already exists")
+        else:
+            if project in self.__dl.get_projects():
+                self.logger.error("project %s does already exist", project)
+                raise web.conflict("project already exists")
+            else:
+                os.mkdir(os.path.join(self.__dl.basedir, project))
+                os.mkdir(os.path.join(self.__dl.basedir, project, "meta"))
+                os.mkdir(os.path.join(self.__dl.basedir, project, "raw"))
+                # reinit DataLogger object
+                self.__dl = DataLogger(CONFIG["BASEDIR"])
+                self.logger.info("project %s created", project)
+                return "project created"
+
+    def post_tablename(self, *args, **kwds):
+        """
+        will create new project
+        assure the project does not yet exist
+
+        returns
+        200 - if all ok
+        406 - if format is not OK
+        409 - if something already exists
+        """
+        project, tablename = args[:2]
+        # check string
+        # must be lowercase only
+        # consisting of a-z and 1-9
+        # no other characters allowed
+        # max. length 32
+        if re.match("^[a-zA-Z0-9]{0,32}$", tablename) is None:
+            self.logger.error("tablename %s does not match formatting criterias", tablename)
+            raise web.notacceptable("format mismatch")
+        metafile = os.path.join(self.__dl.basedir, project, "meta", "%s.json" % tablename)
+        if os.path.isfile(metafile):
+            self.logger.error("table definition file for tablename %s does already exist", tablename)
+            raise web.conflict("table definition file already exists")
+        data = web.input()
+        meta = json.loads(data.meta) # get query as dict, use input not data
+        with open(metafile, "wt") as outfile:
+            json.dump(meta, outfile, indent=4)
+            # reinit DataLogger object
+            self.__dl = DataLogger(CONFIG["BASEDIR"])
+            return "table %s created" % tablename
+
     def post_raw_file(self, *args, **kwds):
         """
         save receiving file into datalogger structure
@@ -917,7 +986,7 @@ class DataLoggerWebApp3(object):
     @jsonout
     def PUT(self, parameters):
         """
-        generelle HTTP PUT Method is used to add individual data to some files.
+        general HTTP PUT Method is used to add individual data to some files.
 
         data can only be added to files of today
         this method is meant to add live data several times a day
@@ -933,8 +1002,9 @@ class DataLoggerWebApp3(object):
         args = parameters.strip("/").split("/")
         # build method name from url
         project, tablename = args[:2]
-        datestring = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
-        self.__dl.setup(project, tablename, datestring)
+        yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
+        datestring = datetime.date.today().isoformat()
+        self.__dl.setup(project, tablename, yesterday) # TODO: initialize with yesterday, today is not allowed
         ts = time.time()
         filename = os.path.join(self.__dl.raw_basedir, "%s_%s.csv" % (tablename, datestring))
         data = dict(web.input()) # get query as dict, use input not data
@@ -956,12 +1026,12 @@ class DataLoggerWebApp3(object):
             return
         # actualy append or write
         if os.path.isfile(filename):
-            self.logger.info("raw file does already exist, appending")
+            self.logger.info("raw file %s does already exist, appending", filename)
             with open(filename, "at") as outfile:
                 outfile.write("\t".join([data[key] for key in self.__dl.headers]))
                 outfile.write("\n")
         else:
-            self.logger.info("raw file does not exst, will create new file %s", filename)
+            self.logger.info("raw file does not exist, will create new file %s", filename)
             with open(filename, "wt") as outfile:
                 outfile.write("\t".join(self.__dl.headers))
                 outfile.write("\n")
@@ -1003,6 +1073,7 @@ class DataLoggerWebApp3(object):
         project, tablename, datestring = args[:3]
         self.__dl.setup(project, tablename, datestring)
         self.__dl.delete_caches()
+
 
 if __name__ == "__main__":
     # TESTING only, starts cherrypy webserver
