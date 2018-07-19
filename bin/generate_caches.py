@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import sys
+import os
 import datetime
 import json
 import logging
@@ -10,12 +11,36 @@ from datalogger3 import DataLogger as DataLogger
 from datalogger3 import TimeseriesArrayStats as TimeseriesArrayStats
 from datalogger3 import TimeseriesArray as TimeseriesArray
 from datalogger3 import QuantileArray as QuantileArray
-from datalogger3 import DataLoggerRawFileMissing as DataLoggerRawFileMissing
 from FastTsa import fast_tsa
 
 def gen_caches(project, tablename, datestring, force):
     dl = DataLogger(basedir)
     dl.setup(project, tablename, datestring)
+    caches = dl["caches"]
+    raw_exists = None
+    archive_exists = None
+    tsa_exists = None
+    if dl.raw_filename:
+        logging.info("RAW Filename : %s", dl.raw_filename)
+        raw_exists = True
+    else:
+        logging.info("RAW Filename does not exist")
+        raw_exists = False
+    if os.path.isfile(dl.archive_filename):
+        logging.info("Archive Filename : %s", dl.archive_filename)
+        archive_exists = True
+    else:
+        logging.info("Archive Filename does not exist")
+        archive_exists = False
+    if dl["caches"]["tsa"]["keys"]:
+        logging.info("TSA is calculated, keys are available")
+        tsa_exists = True
+    else:
+        logging.info("TSA does not exist")
+        tsa_exists = False
+    if raw_exists is False and archive_exists is False and tsa_exists is False:
+        logging.error("skipping, no raw file, no archive_file and no tsa, nothing to do")
+        return
     if force:
         logging.info("deleting pre-created caches (-f was used) and creating TSA from scratch")
         dl.delete_caches()
@@ -26,35 +51,32 @@ def gen_caches(project, tablename, datestring, force):
     logging.info("getting caches")
     caches = dl["caches"]
     assert isinstance(caches, dict)
-    try:
-        if not caches["tsa"]["keys"]:
-            # there seems to be no caches at all
-            # generate them all, higher memory consumption
-            logging.info("no existing TSA and TS Files found, creating from scratch")
-            logging.info("calling fast_tsa()")
-            fast_tsa(dl)
-            #logging.info("archiving to archivepath")
-            #dl.raw_to_archive()
-        logging.info("reading tsa - or recreating if not present")
-        tsa = dl["tsa"] # if tsa exists already only loads structure
-        tsa.cache = True
-        assert isinstance(tsa, TimeseriesArray)
-        logging.info("reading tsastats - or recreating if not present")
-        tsastats = dl["tsastats"]
-        assert isinstance(tsastats, TimeseriesArrayStats)
-        logging.info("reading qa - or recreating if not present")
-        qa = dl["qa"]
-        assert isinstance(qa, QuantileArray)
-        logging.info("reading total_stats - or recreating if not present")
-        total_stats = dl["total_stats"]
-        assert isinstance(total_stats, dict)
-        # reinitialize caches
-        dl = DataLogger(basedir)
-        dl.setup(project, tablename, datestring)
-        logging.info("archiving original input data to archivepath")
-        dl.raw_to_archive()
-    except DataLoggerRawFileMissing as exc:
-        logging.info("no RAW file avalable")
+    if not caches["tsa"]["keys"]:
+        # there seems to be no caches at all
+        # generate them all, higher memory consumption
+        logging.info("no existing TSA and TS Files found, creating from scratch")
+        logging.info("calling fast_tsa()")
+        fast_tsa(dl)
+        #logging.info("archiving to archivepath")
+        #dl.raw_to_archive()
+    logging.info("reading tsa - or recreating if not present")
+    tsa = dl["tsa"] # if tsa exists already only loads structure
+    tsa.cache = True
+    assert isinstance(tsa, TimeseriesArray)
+    logging.info("reading tsastats - or recreating if not present")
+    tsastats = dl["tsastats"]
+    assert isinstance(tsastats, TimeseriesArrayStats)
+    logging.info("reading qa - or recreating if not present")
+    qa = dl["qa"]
+    assert isinstance(qa, QuantileArray)
+    logging.info("reading total_stats - or recreating if not present")
+    total_stats = dl["total_stats"]
+    assert isinstance(total_stats, dict)
+    # reinitialize caches
+    dl = DataLogger(basedir)
+    dl.setup(project, tablename, datestring)
+    logging.info("archiving original input data to archivepath")
+    dl.raw_to_archive()
     dl = DataLogger(basedir)
     dl.setup(project, tablename, datestring)
     caches = dl["caches"]

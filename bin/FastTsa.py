@@ -163,10 +163,13 @@ def fast_tsa(dl):
     if os.path.isfile(dl.archive_filename):
         logging.info("found archived raw input file %s", dl.archive_filename)
         raw_reader = get_raw_reader(dl.archive_filename, dl.meta["delimiter"], list(dl.meta["headers"]), tsa_def)
-    else:
+    elif dl.raw_filename is not None:
         logging.info("searching original raw input file %s", dl.raw_filename)
         # this will raise Exception if fil does not exist
         raw_reader = get_raw_reader(dl.raw_filename, dl.meta["delimiter"], list(dl.meta["headers"]), tsa_def)
+    else:
+        logging.error("either archived nor raw file is available")
+        return 
     tsa = raw_reader()
     logging.debug("done in %0.2f" % (time.time() - starttime))
     starttime = time.time()
