@@ -1001,6 +1001,20 @@ class DataLoggerWebApp3(object):
         self.logger.info("PUT calling %s", parameters)
         args = parameters.strip("/").split("/")
         # build method name from url
+        method = "put_%s" % args[0].lower()
+        query = dict(web.input()) # get query as dict
+        try:
+            # calling method, or AttributeError if not found
+            return getattr(self, method)(*args[1:], **query)
+        except AttributeError as exc:
+            self.logger.error(exc)
+        web.ctx.status = "405 unknown method"
+
+    def put_append(self, *args, **kwds):
+        """
+        appening some data to actual live raw datafile
+        TODO: quality check and return codes
+        """
         project, tablename = args[:2]
         yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
         datestring = datetime.date.today().isoformat()
@@ -1037,6 +1051,53 @@ class DataLoggerWebApp3(object):
                 outfile.write("\n")
                 outfile.write("\t".join([data[key] for key in self.__dl.headers]))
                 outfile.write("\n")
+
+    def put_appendmany(self, *args, **kwds):
+        """
+        appening many data rows to some project/tablename -s actual live data
+        for historical data use post_raw_file
+
+        TODO: quality check and return codes, and improvements
+        """
+        project, tablename = args[:2]
+        yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
+        datestring = datetime.date.today().isoformat()
+        self.__dl.setup(project, tablename, yesterday) # TODO: initialize with yesterday, today is not allowed
+        ts = time.time()
+        filename = os.path.join(self.__dl.raw_basedir, "%s_%s.csv" % (tablename, datestring))
+        data = web.input()
+        rows = json.loads(data.rows) # TODO: has to be list json formatted
+        for row in rows:
+            # self.logger.info("received data to store %s", row)
+            if not all((index_key in row for index_key in self.__dl.index_keynames)):
+                self.logger.error("some index_key is missing")
+                raise web.notacceptable("some index_key is missing")
+            if not all((value_key in row for value_key in self.__dl.value_keynames)):
+                self.logger.error("some value_key is missing")
+                raise web.notacceptable("some value_key is missing")
+            if not self.__dl.ts_keyname in row:
+                self.logger.error("ts_key is missing")
+                raise web.notacceptable("ts_key is missing")
+            # check timestamp
+            min_ts = ts - 60
+            max_ts = ts + 60
+            if not (min_ts < float(row[self.__dl.ts_keyname]) < max_ts):
+                self.logger.info("timestamp in received data is out of range +/- 60s")
+                raise web.notacceptable("timestamp in received data is out of range +/- 60s")
+            # actualy append or write
+            # TODO: not efficient to place this in loop
+            if os.path.isfile(filename):
+                self.logger.info("raw file %s does already exist, appending", filename)
+                with open(filename, "at") as outfile:
+                    outfile.write("\t".join([str(row[key]) for key in self.__dl.headers]))
+                    outfile.write("\n")
+            else:
+                self.logger.info("raw file does not exist, will create new file %s", filename)
+                with open(filename, "wt") as outfile:
+                    outfile.write("\t".join(self.__dl.headers))
+                    outfile.write("\n")
+                    outfile.write("\t".join([str(row[key]) for key in self.__dl.headers]))
+                    outfile.write("\n")
 
 ################################### PUT Section ###############################################
 
