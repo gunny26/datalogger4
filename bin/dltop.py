@@ -123,7 +123,7 @@ if __name__ == "__main__":
     basedir = "/var/rrd"
     datestring = datetime.date.today().isoformat()
     dl = datalogger3.DataLogger(basedir)
-    dl.setup("sanportperf", "fcIfC3AccountingTable", dl.get_last_business_day_datestring())
+    dl.setup("ucs", "ifXTable", dl.get_last_business_day_datestring())
     data = {
         "project" : dl.project,
         "datestring" : datestring,
@@ -137,7 +137,7 @@ if __name__ == "__main__":
         "data" : {},
         "mtime" : 0.0,
         "filename" : None,
-        "sort_key" : "fcIfC3OutFrames",
+        "sort_key" : dl.value_keynames[0],
         "index_key_filter" : ["System Idle Process", ]
     }
     fname = os.path.join(basedir, dl.project, "raw", "%s_%s.csv" % (dl.tablename, datestring))
