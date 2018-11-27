@@ -10,6 +10,7 @@ import sys
 import datetime
 import gzip
 import argparse
+import pwd
 import logging
 logging.basicConfig(level=logging.INFO)
 # own modules
@@ -47,7 +48,8 @@ def main():
     parser.add_argument("-e", '--enddate', default=yesterday_datestring, help="stop date in isoformat YYY-MM-DD")
     parser.add_argument("-q", '--quiet', action='store_true', help="set to loglevel ERROR")
     parser.add_argument("-v", '--verbose', action='store_true', help="set to loglevel DEBUG")
-    args = parser.parse_args("-b 2".split())
+    # args = parser.parse_args("-b 2".split())
+    args = parser.parse_args()
     if args.quiet is True:
         logging.getLogger("").setLevel(logging.ERROR)
     if args.verbose is True:
@@ -72,18 +74,18 @@ def main():
     for datestring in datewalk(startdate, args.enddate):
         filename = os.path.join(basedir, project, "raw", "%s_%s.csv.gz" % (tablename, datestring))
         if os.path.isfile(filename):
-            logging.info("skipping this datestring, raw data %s already available" % filename)
+            logging.info("skipping this datestring, raw data %s already available", filename)
             continue
         try:
-            logging.info("getting data for %s and storing in %s" % (datestring, filename))
+            logging.info("getting data for %s and storing in %s", datestring, filename)
             with gzip.open(filename, "wt") as outfile:
                 hlwc = HaproxyLogWebClient()
                 for line in hlwc.datalogger(datestring):
                     outfile.write(line + "\n")
-                os.fchown(outfile, pwd.getpwnam("www-data").pw_uid, pwd.getpwnam("www-data").pw_gid)
         except IOError as exc:
             logging.error(exc)
             logging.error("Exception on file datestring %s, skipping this date", datestring)
+        os.chown(filename, pwd.getpwnam("www-data").pw_uid, pwd.getpwnam("www-data").pw_gid)
     logging.info("--- done ---")
 
 if __name__ == "__main__":
