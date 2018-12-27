@@ -35,8 +35,11 @@ class DataLoggerWebApp3(object):
     more sophistuicated calculations should be done on higher level apis
     """
 
-    __dl = DataLogger(CONFIG["BASEDIR"])
-    logger = logging.getLogger("DataLoggerWebApp3")
+    def __init__(self):
+        # make sure this thread has its own datalogger instance
+        # to prevent that another thread will change the state
+        self.__dl = DataLogger(CONFIG["BASEDIR"])
+        self.logger = logging.getLogger("DataLoggerWebApp3")
 
     def OPTIONS(self, args):
         """

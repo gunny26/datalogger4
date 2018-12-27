@@ -3,6 +3,23 @@
 Datalogger Core functionality to get to the data
 
 special functions should be placed in different modules
+To get some special formats for HighCharts or DataTable there will be special modules.
+
+Design considerations:
+    * every call will return json message
+    * only real server faults will result in 500
+    * use status code to indicate failure
+        200 - OK
+        400 - bad request - something is wrong with request
+        401 - unauthorized - something in request is missing to authorize
+        403 - forbidden - you are not allowed
+        404 - not found
+        406 - not aceptable - one or more parameters are not correct
+    * check for X-APIKEY to authorized scripts
+    * check for X-AUTH-KEY to authorized JS Applications with User authentication
+    * keep it simple, do one thing only
+    * use central config in yaml format
+ 
 """
 import os
 import json
@@ -12,85 +29,22 @@ import time
 import re
 import logging
 logging.basicConfig(level=logging.INFO)
+# non stdlib
+# import yaml
 from flask import Flask, Response, request, abort, jsonify
+from flask_cors import CORS
 # own modules
-#import tk_web
+from flask_tk.TkWebConfig import TkWebConfig # main config
+from flask_tk.TkFlaskDecorators import xapikey, jsonout # decorators
 from datalogger3.CustomExceptions import DataLoggerLiveDataError
-from datalogger3.DataLogger import DataLogger as DataLogger
+from datalogger3.DataLogger import DataLogger
 
-
-def xapikey(config):
-    def _xapikey(func):
-        """
-        decorator to check for existance and validity of X-APIKEY header
-        """
-        def __xapikey(*args, **kwds):
-            if request.remote_addr in config["REMOTE_ADDRS"]:
-                app.logger.error("call from trusted client %s", request.remote_addr)
-                return func(*args, **kwds)
-            x_token = request.headers.get("x-apikey")
-            if not x_token:
-                app.logger.error("X-APIKEY header not provided")
-                return "wrong usage", 401
-            if x_token not in config["APIKEYS"]:
-                app.logger.error("X-APIKEY is unknown")
-                abort(403)
-            if config["APIKEYS"][x_token]["remote_addrs"] and request.remote_addr not in config["APIKEYS"][x_token]["remote_addrs"]:
-                app.logger.error("call from %s with %s not allowed", request.remote_addr, x_token)
-                abort(403)
-            app.logger.info("authorized call from %s with %s", request.remote_addr, x_token)
-            return func(*args, **kwds)
-        __xapikey.__name__ = func.__name__ # crucial setting to not confuse flask
-        __xapikey.__doc__ = func.__doc__ # crucial setting to not confuse flask
-        return __xapikey
-    return _xapikey
-
-def jsonout(func):
-    """
-    decorator to format response in json format
-    """
-    def _jsonout(*args, **kwds):
-        data = None # default value
-        try:
-            ret = func(*args, **kwds)
-            if isinstance(ret, tuple):
-                if len(ret) == 3:
-                    message, status_code, data = ret
-                elif len(ret) == 2:
-                    message, status_code = ret
-                    data = None
-                elif len(ret) == 1:
-                    message = ret[0]
-                    status_code = 200
-                    data = message
-            message = "call to %s done" % func.__name__
-            status_code = 200
-            data = ret
-        except (KeyError, IndexError) as exc:
-            logger.error(exc)
-            status_code = 404
-            message = str(exc)
-        except (IOError, OSError) as exc:
-            logger.error(exc)
-            status_code = 500
-            message = str(exc)
-        except AttributeError as exc:
-            logger.error(exc)
-            status_code = 406
-            message = str(exc)
-        return jsonify({
-            "message" : message,
-            "status_code" : status_code,
-            "data" : data
-        })
-    _jsonout.__name__ = func.__name__ # crucial setting to not confuse flask
-    _jsonout.__doc__ = func.__doc__ # crucial setting to not confuse flask
-    return _jsonout
-
-CONFIG = json.load(open("/var/www/DataLoggerWebApp.json", "rt"))
-_dl = DataLogger(CONFIG["BASEDIR"])
 logger = logging.getLogger("DataLoggerFlask")
+CONFIG = TkWebConfig("/var/www/DataLoggerWebApp.yaml")
+BASEDIR = CONFIG["custom"]["basedir"]
+_dl = DataLogger(BASEDIR)
 app = Flask(__name__)
+CORS(app) # enable CORS for all methods
 application = app # WSGI Module will call application.run()
 
 @app.route("/")
@@ -98,88 +52,110 @@ application = app # WSGI Module will call application.run()
 @jsonout
 def index():
     """return main config"""
-    return "DataLoggerFask v 0.1"
+    return "DataLoggerFlask v 1.0"
 
 @app.route("/ts_for_datestring/<datestring>")
+@xapikey(CONFIG)
 @jsonout
 def get_ts_for_datestring(datestring):
+    """return fist an last timestamp for this datestring"""
     first_ts, last_ts = _dl.get_ts_for_datestring(datestring)
     return {"first_ts" : first_ts, "last_ts": last_ts}
 
 @app.route("/stat_func_names")
+@xapikey(CONFIG)
 @jsonout
 def get_stat_func_names():
+    """return all statistical function names"""
     return _dl.stat_func_names
 
 @app.route("/yesterday_datestring")
+@xapikey(CONFIG)
 @jsonout
 def get_yesterday_datestring():
+    """return datestring of yesterday"""
     return _dl.get_yesterday_datestring()
 
 @app.route("/last_business_day_datestring")
+@xapikey(CONFIG)
 @jsonout
 def get_last_business_day_datestring():
+    """return datestring of last businessday"""
     return _dl.get_last_business_day_datestring()
 
 @app.route("/projects", methods=["GET"])
+@xapikey(CONFIG)
 @jsonout
 def get_projects():
     """return all available projects"""
     return _dl.get_projects()
 
 @app.route("/tablenames/<project>", methods=["GET"])
+@xapikey(CONFIG)
 @jsonout
 def get_tablenames(project):
     """return all available tablenames for this project"""
     return _dl.get_tablenames(project)
 
 @app.route("/desc/<project>/<tablename>", methods=["GET"])
+@xapikey(CONFIG)
 @jsonout
 def get_desc(project, tablename):
-    """return structure of specified tablename"""
+    """return structure of tablename in project"""
     _dl.setup(project, tablename, "1970-01-01")
     return _dl.meta
 
+@app.route("/caches/<project>/<tablename>/<datestring>", methods=["GET"])
+@xapikey(CONFIG)
+@jsonout
+def get_caches(project, tablename, datestring):
+    """return structure of tablename in project"""
+    _dl.setup(project, tablename, datestring)
+    return _dl["caches"]
+
 @app.route("/index_keys/<project>/<tablename>/<datestring>", methods=["GET"])
+@xapikey(CONFIG)
 @jsonout
 def get_index_keys(project, tablename, datestring):
-    """return all available index_keys"""
+    """return all available index_keys for this data"""
     _dl.setup(project, tablename, datestring)
     caches = _dl["caches"]
     return list(caches["tsa"]["keys"].keys())
 
 @app.route("/tsa/<project>/<tablename>/<datestring>", methods=["GET"])
+@xapikey(CONFIG)
 @jsonout
 def get_tsa(project, tablename, datestring):
-    """return Timeseries, filter in data
-    """
+    """return TimeseriesArray Structure"""
     _dl.setup(project, tablename, datestring)
     return _dl["tsa"].to_data()
 
-@app.route("/tsastat/<project>/<tablename>/<datestring>", methods=["GET"])
+@app.route("/tsastats/<project>/<tablename>/<datestring>", methods=["GET"])
+@xapikey(CONFIG)
 @jsonout
-def get_tsastat(project, tablename, datestring):
-    """return Timeseries, filter in data
-    """
+def get_tsastats(project, tablename, datestring):
+    """return TimeseriesArrayStats Structure"""
     _dl.setup(project, tablename, datestring)
     return _dl["tsastats"].to_data()
 
 @app.route("/quantile/<project>/<tablename>/<datestring>", methods=["GET"])
+@xapikey(CONFIG)
 @jsonout
 def get_quantile(project, tablename, datestring):
-    """return Timeseries, filter in data
-    """
+    """return Quantile structure"""
     _dl.setup(project, tablename, datestring)
     return _dl["qa"].to_data()
 
 @app.route("/total_stats/<project>/<tablename>/<datestring>")
+@xapikey(CONFIG)
 @jsonout
 def get_total_stats(project, tablename, datestring):
-    """ using DataLogger method """
+    """return total stats for this project/tablename/datestring"""
     _dl.setup(project, tablename, datestring)
     return _dl["total_stats"]
 
 @app.route("/ts", methods=["GET"])
+@xapikey(CONFIG)
 @jsonout
 def get_ts():
     """
@@ -200,9 +176,10 @@ def get_ts():
             result[str(index_key)] = list(_dl["tsa", index_key].to_data())
     return "returned %d timeseries" % len(result), 200, result
 
-@app.route("/tsstat", methods=["GET"])
+@app.route("/tsstats", methods=["GET"])
+@xapikey(CONFIG)
 @jsonout
-def get_tsstat():
+def get_tsstats():
     """return Timeseries, filter in data
     datestring = required
     index_key = required
@@ -218,6 +195,7 @@ def get_tsstat():
     return "returned %d timeseries" % len(result), 200, result
 
 @app.route("/project/<project>", methods=["POST"])
+@xapikey(CONFIG)
 @jsonout
 def post_project(project):
     """
@@ -247,16 +225,18 @@ def post_project(project):
     os.mkdir(os.path.join(_dl.basedir, project, "meta"))
     os.mkdir(os.path.join(_dl.basedir, project, "raw"))
     # reinit DataLogger object
-    _dl = DataLogger(CONFIG["BASEDIR"])
+    _dl = DataLogger(BASEDIR)
     logger.info("project %s created", project)
     return "project created"
 
 @app.route("/tablename/<project>/<tablename>", methods=["POST"])
+@xapikey(CONFIG)
 @jsonout
 def post_tablename(project, tablename):
     """
-    will create new project
-    assure the project does not yet exist
+    will create new tablename in project
+    table definition must be provided in data segment of body
+    request must be application/json
 
     returns
     200 - if all ok
@@ -276,18 +256,19 @@ def post_tablename(project, tablename):
     if os.path.isfile(metafile):
         logger.error("table definition file for tablename %s does already exist", tablename)
         return "table definition file already exists", 409
-    meta = data["meta"] # get query as dict, use input not data
     with open(metafile, "wt") as outfile:
-        json.dump(meta, outfile, indent=4)
+        json.dump(data["meta"], outfile, indent=4)
         # reinit DataLogger object
-        _dl = DataLogger(CONFIG["BASEDIR"])
+        _dl = DataLogger(BASEDIR)
     return "table %s created" % tablename
 
 @app.route("/raw_file/<project>/<tablename>/<datestring>", methods=["POST"])
+@xapikey(CONFIG)
 @jsonout
 def post_raw_file(project, tablename, datestring):
     """
-    save receiving file into datalogger structure
+    save received data for whole day datafile
+    file must not exist in prior
 
     /project/tablename/datestring
     """
@@ -310,6 +291,7 @@ def post_raw_file(project, tablename, datestring):
         os.unlink(filename)
         logger.info("Error while saving received data to")
         return "Error while saving received data to file", 500
+    # reread saved data
     try:
         tsa = _dl["tsa"] # re-read received data
     except AssertionError as exc:
@@ -321,22 +303,25 @@ def post_raw_file(project, tablename, datestring):
     return "File stored"
 
 @app.route("/append/<project>/<tablename>/<datestring>", methods=["PUT"])
+@xapikey(CONFIG)
 @jsonout
 def put_append(project, tablename, datestring):
     """
-    appening some data to actual live raw datafile
+    appending some data to actual live raw datafile
+    request contains only one single line of data
+
     TODO: quality check and return codes
     """
-    datestring = datetime.date.today().isoformat()
-    yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
-    _dl.setup(project, tablename, yesterday) # TODO: initialize with yesterday, today is not allowed
+    datestring = datetime.date.today().isoformat() # today
+    yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat() # used to initialize datalogger
+    _dl.setup(project, tablename, yesterday) # TODO: initialization could only be done for datestring in the past
     row = request.get_json() # get query as dict, use input not data
-    ts = time.time()
-    valid, message, status_code = _row_is_valid(row, ts)
+    ts = time.time() # timestamp data was received
+    valid, message, status_code = _row_is_valid(row, ts) # check validity
     if valid is False:
         return message, status_code
     filename = os.path.join(_dl.raw_basedir, "%s_%s.csv" % (tablename, datestring))
-    firstline = False
+    firstline = False # inidcate headerline or not
     if not os.path.isfile(filename):
         fh = open(filename, "wt")
         firstline = True
@@ -346,18 +331,20 @@ def put_append(project, tablename, datestring):
         # actually write
         if firstline is True:
             logger.info("raw file does not exist, will create new file %s", filename)
-            outfile.write("\t".join(_dl.headers) + "\n")
+            outfile.write("\t".join(_dl.headers) + "\n") # TODO: use delimiter defined in meta
             firstline = False
         logger.info("raw file %s does already exist, appending", filename)
         outfile.write("\t".join([str(row[key]) for key in _dl.headers]) + "\n")
     return "data appended", 200
 
 @app.route("/appendmany/<project>/<tablename>/<datestring>", methods=["PUT"])
+@xapikey(CONFIG)
 @jsonout
 def put_appendmany(project, tablename, datestring):
     """
     appening many data rows to some project/tablename -s actual live data
     for historical data use post_raw_file
+    request contains many lines of data
 
     TODO: quality check and return codes, and improvements
     """
@@ -382,13 +369,14 @@ def put_appendmany(project, tablename, datestring):
             # actually write
             if firstline is True:
                 logger.info("raw file does not exist, will create new file %s", filename)
-                outfile.write("\t".join(_dl.headers) + "\n")
+                outfile.write("\t".join(_dl.headers) + "\n") # TODO: use delimiter defined
                 firstline = False
             logger.info("raw file %s does already exist, appending", filename)
             outfile.write("\t".join([str(row[key]) for key in _dl.headers]) + "\n")
     return "%d rows appended" % len(rows)
 
-@app.route("/caches/<project>/<tablename>/<datestring>")
+@app.route("/caches/<project>/<tablename>/<datestring>", methods=["DELETE"])
+@xapikey(CONFIG)
 @jsonout
 def delete_caches(project, tablename, datestring):
     """
@@ -442,8 +430,8 @@ def _row_is_valid(row, ts):
         logger.info("timestamp in received data is out of range +/- 60s")
         return False, "timestamp in received data is out of range +/- 60s", 409
     return True, "row is valid", 200
-    
+
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0")
+    app.run(host="0.0.0.0") # when started as program
