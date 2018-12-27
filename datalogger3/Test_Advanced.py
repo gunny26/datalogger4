@@ -8,6 +8,7 @@ import gzip
 import json
 import os
 # own modules
+import datalogger3 # for assertIsInstance Testing
 import Advanced
 from DataLogger import DataLogger as DataLogger
 from Timeseries import Timeseries as Timeseries
@@ -46,13 +47,13 @@ class Test(unittest.TestCase):
         assert len(tsastats) == 712
         tsastats_grouped = Advanced.tsastats_group_by(tsastats, index_keynames=("hostname",))
         assert len(tsastats_grouped) == 24
-        assert isinstance(tsastats_grouped, TimeseriesArrayStats)
-        assert isinstance(tsastats_grouped[('fcb-sr3-4gb-32',)], TimeseriesStats)
+        self.assertIsInstance(tsastats_grouped, datalogger3.TimeseriesArrayStats)
+        self.assertIsInstance(tsastats_grouped[('fcb-sr3-4gb-32',)], datalogger3.TimeseriesStats)
         print(tsastats_grouped[('fcb-sr3-4gb-32',)])
         tsastats_total = Advanced.tsastats_group_by(tsastats, index_keynames=())
         assert len(tsastats_total) == 1
-        assert isinstance(tsastats_total, TimeseriesArrayStats)
-        assert isinstance(tsastats_total[('__total__',)], TimeseriesStats)
+        self.assertIsInstance(tsastats_total, datalogger3.TimeseriesArrayStats)
+        self.assertIsInstance(tsastats_total[('__total__',)], datalogger3.TimeseriesStats)
         print(tsastats_total[('__total__',)])
 
     def test_get_scatterdata(self):

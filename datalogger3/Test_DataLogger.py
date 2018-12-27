@@ -8,6 +8,7 @@ import gzip
 import json
 import os
 # own modules
+import datalogger3 # to use assertIsInstance for testing
 from DataLogger import DataLogger as DataLogger
 from Timeseries import Timeseries as Timeseries
 from TimeseriesArray import TimeseriesArray as TimeseriesArray
@@ -58,21 +59,21 @@ class Test(unittest.TestCase):
         assert isinstance(caches, dict)
         tsa = dl["tsa"]
         print(tsa, type(tsa))
-        assert isinstance(tsa, TimeseriesArray)
+        self.assertIsInstance(tsa, datalogger3.TimeseriesArray)
         ts = dl["tsa", ("nagios.tilak.cc",)]
         print(ts)
-        assert isinstance(ts, Timeseries)
+        self.assertIsInstance(ts, datalogger3.Timeseries)
         assert tsa[("nagios.tilak.cc",)] == ts
         tsastats = dl["tsastats"]
         print(tsastats)
-        assert isinstance(tsastats, TimeseriesArrayStats)
+        self.assertIsInstance(tsastats, datalogger3.TimeseriesArrayStats)
         tsstats = dl["tsastats", ("nagios.tilak.cc",)]
         print(tsstats)
-        assert isinstance(tsstats, TimeseriesStats)
+        self.assertIsInstance(tsstats, datalogger3.TimeseriesStats)
         assert tsastats[("nagios.tilak.cc",)] == tsstats
         qa = dl["qa"]
         print(qa)
-        assert isinstance(qa, QuantileArray)
+        self.assertIsInstance(qa, datalogger3.QuantileArray)
         quantile = dl["qa", ("nagios.tilak.cc",)]
         print(quantile)
         assert isinstance(quantile, dict)

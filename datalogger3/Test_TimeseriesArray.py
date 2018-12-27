@@ -7,6 +7,7 @@ import datetime
 import gzip
 import os
 # own modules
+import datalogger3 # for assertIsInstance
 from Timeseries import Timeseries as Timeseries
 from TimeseriesArray import TimeseriesArray as TimeseriesArray
 from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
@@ -110,18 +111,18 @@ class Test(unittest.TestCase):
     def test_items(self):
         print("testing items")
         for key, value in self.app.items():
-            assert isinstance(key, tuple)
-            assert isinstance(value, Timeseries)
+            self.assertIsInstance(key, tuple)
+            self.assertIsInstance(value, datalogger3.Timeseries)
 
     def test_values(self):
         print("testing values")
         for value in self.app.values():
-            assert isinstance(value, Timeseries)
+            self.assertIsInstance(value, datalogger3.Timeseries)
 
     def test_keys(self):
         print("testing keys")
         for key in self.app.keys():
-            assert isinstance(key, tuple)
+            self.assertIsInstance(key, tuple)
 
     def test_getitem(self):
         print("testing __getitem__")
@@ -150,7 +151,7 @@ class Test(unittest.TestCase):
     def test_stats(self):
         print("testing stats")
         stats = self.app.stats
-        assert isinstance(stats, TimeseriesArrayStats)
+        self.assertIsInstance(stats, datalogger3.TimeseriesArrayStats)
 
     def test_cache(self):
         print("testing cache")

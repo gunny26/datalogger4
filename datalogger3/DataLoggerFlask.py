@@ -302,10 +302,10 @@ def post_raw_file(project, tablename, datestring):
     logger.info("File stored")
     return "File stored"
 
-@app.route("/append/<project>/<tablename>/<datestring>", methods=["PUT"])
+@app.route("/append/<project>/<tablename>", methods=["PUT"])
 @xapikey(CONFIG)
 @jsonout
-def put_append(project, tablename, datestring):
+def put_append(project, tablename):
     """
     appending some data to actual live raw datafile
     request contains only one single line of data
@@ -337,10 +337,10 @@ def put_append(project, tablename, datestring):
         outfile.write("\t".join([str(row[key]) for key in _dl.headers]) + "\n")
     return "data appended", 200
 
-@app.route("/appendmany/<project>/<tablename>/<datestring>", methods=["PUT"])
+@app.route("/appendmany/<project>/<tablename>", methods=["PUT"])
 @xapikey(CONFIG)
 @jsonout
-def put_appendmany(project, tablename, datestring):
+def put_appendmany(project, tablename):
     """
     appening many data rows to some project/tablename -s actual live data
     for historical data use post_raw_file
@@ -351,7 +351,7 @@ def put_appendmany(project, tablename, datestring):
     datestring = datetime.date.today().isoformat()
     yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
     _dl.setup(project, tablename, yesterday) # TODO: initialize with yesterday, today is not allowed
-    data = request.get_json()
+    data = request.get_json() # will raise BadRequest if not json formatted
     ts = time.time()
     rows = data["rows"] # TODO: has to be list json formatted
     filename = os.path.join(_dl.raw_basedir, "%s_%s.csv" % (tablename, datestring))
