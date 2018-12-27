@@ -14,6 +14,8 @@ import time
 import gzip
 import pwd
 import shutil
+# non std
+import yaml
 # own modules
 from datalogger3.TimeseriesArray import TimeseriesArray as TimeseriesArray
 from datalogger3.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
@@ -136,6 +138,8 @@ class DataLogger(object):
         assert all((key in self.__meta["headers"] for key in self.__meta["value_keynames"]))
         # ts_keyname has to be in headers
         assert self.__meta["ts_keyname"] in self.__meta["headers"]
+        # dump new style yaml file
+        self._convert_to_yaml()
 
     def __memcache_set(self, key, value):
         """ raises AtributeError if value is None """
@@ -159,6 +163,51 @@ class DataLogger(object):
             "meta" : self.__meta,
         }
         return json.dumps(ret, indent=4)
+
+    def _convert_to_yaml(self):
+        """
+        dump actual config to new style yaml file,
+        only if this yaml file does not exist yet
+
+        it is safe to call this function also if yaml file exists
+
+        TODO: remove this method when every config file is converted
+        """
+        metadir = os.path.join(self.basedir, self.project, "meta")
+        metafile = os.path.join(metadir, "%s.yaml" % self.tablename)
+        meta = {
+            "interval" : self.interval,
+            "description": {},
+            "delimiter" : self.delimiter,
+        }
+        description = meta["description"]
+        for colpos, header in enumerate(self.headers):
+            if header in self.value_keynames:
+                coltype = "value"
+            elif header in self.index_keynames:
+                coltype = "index"
+            elif header == self.ts_keyname:
+                coltype = "ts"
+            elif header in self.blacklist:
+                coltype = "blacklist"
+            else:
+                coltype = "unknown"
+            if header in self.datatypes:
+                datatype = self.datatypes[header]
+            else:
+                datatype = None
+            description[header] = {
+                "colpos": colpos,
+                "coltype": coltype,
+                "datatype": datatype,
+                "label_text": "some text to show as label text",
+                "label_unit": "something/s"
+            }
+        if not os.path.isfile(metafile):
+            logging.info("writing %s", metafile)
+            with open(metafile, "wt") as outfile:
+                outfile.write(yaml.dump(meta))
+
 
     @property
     def basedir(self):

@@ -21,6 +21,139 @@
         "created_tmp_disk_tables",
         "aborted_clients"
     ],
+    "descriptions": {
+        "hostname": {
+            "colpos" : 1,
+            "coltype" : "index",
+            "label_text": "FQDN of server", 
+            "label_unit": ""
+        }, 
+        "com_select": {
+            "colpos" : 2,
+            "coltype" : "value",
+            "datatype": "persecond",
+            "label_text": "number of SELECT commands", 
+            "label_unit": "number"
+        }, 
+        "uptime": {
+            "colpos" : 3,
+            "coltype" : "value",
+            "datatype": "asis",
+            "label_text": "uptime in seconds", 
+            "label_unit": "byte"
+        }, 
+        "com_insert": {
+            "colpos" : 4,
+            "coltype" : "value",
+            "datatype": "persecond",
+            "label_text": "number of INSERT commands", 
+            "label_unit": ""
+        }, 
+        "slow_queries": {
+            "colpos" : 5,
+            "coltype" : "value",
+            "datatype": "asis",
+            "label_text": "number of sow queries", 
+            "label_unit": "number"
+        }, 
+        "bytes_sent": {
+            "colpos" : 6,
+            "coltype" : "value",
+            "datatype": "persecond",
+            "label_text": "number of bytes sent", 
+            "label_unit": "bytes/second"
+        }, 
+        "com_update": {
+            "colpos" : 7,
+            "coltype" : "value",
+            "datatype": "persecond",
+            "label_text": "number of update commands", 
+            "label_unit": "number"
+        }, 
+        "connections": {
+            "colpos" : 8,
+            "coltype" : "value",
+            "datatype": "persecond",
+            "label_text": "number of connections", 
+            "label_unit": "number"
+        },
+        "com_delete": {
+            "colpos" : 9,
+            "coltype" : "value",
+            "datatype": "persecond",
+            "label_text": "number of delete commands", 
+            "label_unit": "number"
+        },
+        "qcache_hits": {
+            "colpos" : 10,
+            "coltype" : "value",
+            "datatype": "persecond",
+            "label_text": "number of query cache hits", 
+            "label_unit": "number"
+        },
+        "questions": {
+            "colpos" : 11,
+            "coltype" : "value",
+            "datatype": "persecond",
+            "label_text": "number of questions", 
+            "label_unit": "number"
+        },
+        "opened_tables": {
+            "colpos" : 12,
+            "coltype" : "value",
+            "datatype": "asis",
+            "label_text": "number of opened tables", 
+            "label_unit": "number"
+        },
+        "aborted_connects": {
+            "colpos" : 13,
+            "coltype" : "value",
+            "datatype": "persecond",
+            "label_text": "aborted connects", 
+            "label_unit": "number"
+        },
+        "bytes_received": {
+            "colpos" : 14,
+            "coltype" : "value",
+            "datatype": "persecond",
+            "label_text": "bytes received", 
+            "label_unit": "bytes/second"
+        },
+        "created_tmp_tables": {
+            "colpos" : 15,
+            "coltype" : "value",
+            "datatype": "persecond",
+            "label_text": "number of temporary tables created", 
+            "label_unit": "number"
+        },
+        "created_tmp_disk_tables": {
+            "colpos" : 16,
+            "coltype" : "value",
+            "datatype": "persecond",
+            "label_text": "number of temporary tables created on disk", 
+            "label_unit": "number"
+        },
+        "aborted_clients": {
+            "colpos" : 17,
+            "coltype" : "value",
+            "datatype": "persecond",
+            "label_text": "number of client aborted connection", 
+            "label_unit": "number"
+        },
+        "ts": {
+            "colpos" : 0,
+            "coltype" : "ts",
+            "label_text": "unix timestamp", 
+            "label_unit": "s"
+        },
+        "read_write_ratio" : {
+            "colpos" : null,
+            "coltype" : "post",
+            "label_text": "ratio between read and write commands", 
+            "label_unit": "percent",
+            "lambda": "lambda row: 100 * row['com_select'] / row['com_update']"
+        }
+    }, 
     "index_keynames": [
         "hostname"
     ],
