@@ -1,0 +1,40 @@
+delimiter: "\t"
+description:
+  aborted_clients: {colpos: 17, coltype: value, datatype: persecond, label_text: some
+      text to show as label text, label_unit: something/s}
+  aborted_connects: {colpos: 13, coltype: value, datatype: persecond, label_text: some
+      text to show as label text, label_unit: something/s}
+  bytes_received: {colpos: 14, coltype: value, datatype: persecond, label_text: some
+      text to show as label text, label_unit: something/s}
+  bytes_sent: {colpos: 6, coltype: value, datatype: persecond, label_text: some text
+      to show as label text, label_unit: something/s}
+  com_delete: {colpos: 9, coltype: value, datatype: persecond, label_text: some text
+      to show as label text, label_unit: something/s}
+  com_insert: {colpos: 4, coltype: value, datatype: persecond, label_text: some text
+      to show as label text, label_unit: something/s}
+  com_select: {colpos: 2, coltype: value, datatype: persecond, label_text: some text
+      to show as label text, label_unit: something/s}
+  com_update: {colpos: 7, coltype: value, datatype: persecond, label_text: some text
+      to show as label text, label_unit: something/s}
+  connections: {colpos: 8, coltype: value, datatype: persecond, label_text: some text
+      to show as label text, label_unit: something/s}
+  created_tmp_disk_tables: {colpos: 16, coltype: value, datatype: persecond, label_text: some
+      text to show as label text, label_unit: something/s}
+  created_tmp_tables: {colpos: 15, coltype: value, datatype: persecond, label_text: some
+      text to show as label text, label_unit: something/s}
+  hostname: {colpos: 1, coltype: index, datatype: null, label_text: some text to show
+      as label text, label_unit: something/s}
+  opened_tables: {colpos: 12, coltype: value, datatype: asis, label_text: some text
+      to show as label text, label_unit: something/s}
+  qcache_hits: {colpos: 10, coltype: value, datatype: persecond, label_text: some
+      text to show as label text, label_unit: something/s}
+  questions: {colpos: 11, coltype: value, datatype: persecond, label_text: some text
+      to show as label text, label_unit: something/s}
+  slow_queries: {colpos: 5, coltype: value, datatype: asis, label_text: some text
+      to show as label text, label_unit: something/s}
+  ts: {colpos: 0, coltype: ts, datatype: null, label_text: some text to show as label
+      text, label_unit: something/s}
+  uptime: {colpos: 3, coltype: value, datatype: asis, label_text: some text to show
+      as label text, label_unit: something/s}
+index_keynames: !!python/tuple [hostname]
+interval: 300

@@ -1,0 +1,22 @@
+delimiter: "\t"
+description:
+  fcIfC3Discards: {colpos: 0, coltype: value, datatype: counter64, label_text: some
+      text to show as label text, label_unit: something/s}
+  fcIfC3InFrames: {colpos: 1, coltype: value, datatype: counter64, label_text: some
+      text to show as label text, label_unit: something/s}
+  fcIfC3InOctets: {colpos: 2, coltype: value, datatype: counter64, label_text: some
+      text to show as label text, label_unit: something/s}
+  fcIfC3OutFrames: {colpos: 3, coltype: value, datatype: counter64, label_text: some
+      text to show as label text, label_unit: something/s}
+  fcIfC3OutOctets: {colpos: 4, coltype: value, datatype: counter64, label_text: some
+      text to show as label text, label_unit: something/s}
+  hostname: {colpos: 5, coltype: index, datatype: null, label_text: some text to show
+      as label text, label_unit: something/s}
+  ifDescr: {colpos: 6, coltype: index, datatype: null, label_text: some text to show
+      as label text, label_unit: something/s}
+  index: {colpos: 7, coltype: value, datatype: asis, label_text: some text to show
+      as label text, label_unit: something/s}
+  ts: {colpos: 8, coltype: ts, datatype: null, label_text: some text to show as label
+      text, label_unit: something/s}
+index_keynames: !!python/tuple [hostname, ifDescr]
+interval: 300
