@@ -140,6 +140,8 @@ class DataLogger(object):
         assert self.__meta["ts_keyname"] in self.__meta["headers"]
         # dump new style yaml file
         self._convert_to_yaml()
+        # verify it
+        self._verify_yaml_config()
 
     def __memcache_set(self, key, value):
         """ raises AtributeError if value is None """
@@ -207,6 +209,52 @@ class DataLogger(object):
             logging.info("writing %s", metafile)
             with open(metafile, "wt") as outfile:
                 outfile.write(yaml.dump(meta))
+
+    def _verify_yaml_config(self):
+        """
+        method to verify new style yaml file against old style config
+        TODO: rmeove this in future, if every config is yaml style
+        """
+        metadir = os.path.join(self.basedir, self.project, "meta")
+        metafile = os.path.join(metadir, "%s.yaml" % self.tablename)
+        if os.path.isfile(metafile):
+            logging.info("loading yaml style file %s", metafile)
+            with open(metafile, "rt") as infile:
+                meta = yaml.load(infile)
+            try: 
+                assert meta["interval"] == self.interval
+                assert meta["delimiter"] == self.delimiter
+                description = meta["description"]
+                index_keynames = tuple([key for key in description if description[key]["coltype"] == "index"])
+                #print("index_keynames:", index_keynames)
+                assert index_keynames == self.index_keynames
+                value_keynames = tuple([key for key in description if description[key]["coltype"] == "value"])
+                #print("value_kenames:", value_keynames)
+                assert sorted(value_keynames) == sorted(self.value_keynames)
+                ts_keyname = [key for key in description if description[key]["coltype"] == "ts"][0]
+                #print("ts_keyname:", ts_keyname)
+                assert ts_keyname == self.ts_keyname
+                datatypes = dict([(key, description[key]["datatype"]) for key in description if description[key]["coltype"] == "value"])
+                #print("datatypes:", datatypes)
+                assert datatypes == self.datatypes
+                blacklist = tuple([key for key in description if description[key]["coltype"] == "blacklist"])
+                #print("blacklist:", blacklist)
+                assert datatypes == self.datatypes
+                headers_unsorted = [(key, description[key]["colpos"]) for key in description if description[key]["colpos"] is not None]
+                headers = tuple([item[0] for item in sorted(headers_unsorted, key=lambda item: item[1])])
+                assert headers == self.headers
+                #print("headers:", headers)
+                label_texts = dict([(key, description[key]["label_text"]) for key in description])
+                #print("label:", label_texts)
+                label_units = dict([(key, description[key]["label_unit"]) for key in description])
+                #print("label units:", label_units)
+                logging.info("new style yaml config %s is verified", metafile)
+            except AssertionError as exc:
+                logging.exception(exc)
+                logging.error("new style config in %s is not the same as old style one", metafile)
+                logging.error(json.dumps(meta, indent=4))
+        else:
+            print("new yaml config file %s not found" % metafile)
 
     @property
     def basedir(self):
