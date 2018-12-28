@@ -270,22 +270,25 @@ def post_raw_file(project, tablename, datestring):
     save received data for whole day datafile
     file must not exist in prior
 
+    file data must be placed as myfile=<bytestring> in body
+
     /project/tablename/datestring
+    
+    ATTENTION: requests must be sent Content-Type: multipart/form-data to work properly
     """
+    if "myfile" not in request.files:
+        logger.info("No myfile part in request")
+        return "no myfile part in request", 406
     _dl.setup(project, tablename, datestring)
     filename = os.path.join(_dl.raw_basedir, "%s_%s.csv.gz" % (tablename, datestring))
     if os.path.isfile(filename):
         logger.info("File already exists")
         return "File already exists", 409
     try:
-        with gzip.open(filename, "wt") as outfile:
-            x = web.input(myfile={})
-            logger.info(x.keys())
+        filedata = request.files["myfile"]
+        with gzip.open(filename, "wb") as outfile: # has to be bytes
             logger.info("Storing data to %s", filename)
-            if "filedata" in x: # curl type
-                outfile.write(x["filedata"])
-            else: # requests or urllib3 type
-                outfile.write(x["myfile"].file.read())
+            filedata.save(outfile) # stores to filename or handle
     except Exception as exc:
         logger.exception(exc)
         os.unlink(filename)
