@@ -81,7 +81,7 @@ class DataLogger(object):
         except AssertionError:
             raise DataLoggerLiveDataError("Reading from live data is not allowed")
         if project == self.__project and tablename == self.__tablename and datestring == self.__datestring and self.__timedelta == timedelta:
-            logging.info("DataLogger already setup for this configuration")
+            logging.debug("DataLogger already setup for this configuration")
             return
         # cleanup memcache
         self.__memcache_init()
@@ -96,40 +96,18 @@ class DataLogger(object):
         # loading specific configuration, first look for project directory
         projectdir = os.path.join(self.__basedir, project)
         if not os.path.isdir(projectdir):
-            raise AttributeError("project Directory %s does not exist" % projectdir)
-        # load table definition from meta subdir, dir and subdir must exist
-        # define some working directories
+            raise AttributeError("project directory %s does not exist" % projectdir)
         metadir = os.path.join(projectdir, "meta")
         if not os.path.isdir(metadir):
             raise AttributeError("project meta directory %s does not exist" % metadir)
-        metafile = os.path.join(metadir, "%s.json" % self.__tablename)
-        if not os.path.isfile(metafile):
-            raise AttributeError("table definition file %s does not exist" % metafile)
-        with open(metafile, "rt") as infile:
-            self.__meta = json.load(infile)
-        # where to find raw input files
-        self.__meta["raw_basedir"] = os.path.join(projectdir, "raw")
-        if not os.path.isdir(self.__meta["raw_basedir"]):
-            raise AttributeError("project raw input directory %s does not exist" % self.__meta["raw_basedir"])
-        # if headers is dictionary, this should be treated ad description
-        # TODO: this should be default in near future
-        if isinstance(self.__meta["headers"], dict):
-            self.__meta["decsription"] = self.__meta["headers"]
-        # convert to tuple
-        self.__meta["headers"] = tuple(self.__meta["headers"])
-        # transitional hook to implement datatypes without correcting
-        # all meta files at once
-        if isinstance(self.__meta["value_keynames"], dict):
-            self.__meta["datatypes"] = self.__meta["value_keynames"]
-            self.__meta["value_keynames"] = tuple(self.__meta["value_keynames"].keys())
-        elif isinstance(self.__meta["value_keynames"], list):
-            # if old stype, keep all datatype asis, and print warning
-            logging.error("You should define value_keynames as dict with datatypes")
-            self.__meta["datatypes"] = dict(zip(self.__meta["value_keynames"], ("asis",) * len(self.__meta["value_keynames"])))
-            self.__meta["value_keynames"] = tuple(self.__meta["value_keynames"])
-        self.__meta["index_keynames"] = tuple(self.__meta["index_keynames"])
-        self.__meta["blacklist"] = tuple(self.__meta["blacklist"])
+        raw_basedir = os.path.join(projectdir, "raw")
+        if not os.path.isdir(raw_basedir):
+            raise AttributeError("project raw input directory %s does not exist" % raw_basedir)
+        # metadir exists, so try to load something
+        self.__meta = self._load_meta(metadir, tablename)
         # add available Statistical function names to meta structure
+        # TODO: thats ugly
+        self.__meta["raw_basedir"] = raw_basedir
         self.__meta["stat_func_names"] = list(TimeseriesStats.stat_funcs.keys())
         # make some assertions
         # every index_keyname has to be in headers
@@ -138,10 +116,6 @@ class DataLogger(object):
         assert all((key in self.__meta["headers"] for key in self.__meta["value_keynames"]))
         # ts_keyname has to be in headers
         assert self.__meta["ts_keyname"] in self.__meta["headers"]
-        # dump new style yaml file
-        self._convert_to_yaml()
-        # verify it
-        self._verify_yaml_config()
 
     def __memcache_set(self, key, value):
         """ raises AtributeError if value is None """
@@ -166,36 +140,117 @@ class DataLogger(object):
         }
         return json.dumps(ret, indent=4)
 
-    def _convert_to_yaml(self):
+    def _load_meta(self, metadir, tablename):
+        """
+        load either new yaml style config or old json style config
+        check that metadir exists
+        tablename is used to build filename
+        """
+        meta = None
+        # first choice yaml style
+        metafile = os.path.join(metadir, "%s.yaml" % tablename)
+        if os.path.isfile(metafile):
+            meta = self._load_meta_yaml(metafile)
+        else:
+            metafile = os.path.join(metadir, "%s.json" % tablename)
+            if os.path.isfile(metafile):
+                meta = self._load_meta_json(metafile)
+                new_metafile = os.path.join(metadir, "%s.yaml" % tablename)
+                self._convert_to_yaml(new_metafile, meta)
+            else:
+                raise AttributeError("table definition file %s does not exist" % metafile_yaml)
+        return meta
+
+    def _load_meta_yaml(self, metafile):
+        """
+        method to load config data from yaml file
+        check that metafile exists
+
+        returns <dict> meta
+        """
+        logging.info("loading yaml style file %s", metafile)
+        with open(metafile, "rt") as infile:
+            data = yaml.load(infile)
+            meta = {}
+            meta["interval"] = data["interval"]
+            meta["delimiter"] = data["delimiter"]
+            meta["index_keynames"] = tuple(data["index_keynames"]) # order matters!!
+            description = data["description"] # shortcut
+            meta["value_keynames"] = tuple([key for key in description if description[key]["coltype"] == "value"])
+            meta["ts_keyname"] = [key for key in description if description[key]["coltype"] == "ts"][0]
+            meta["datatypes"] = dict([(key, description[key]["datatype"]) for key in description if description[key]["coltype"] == "value"])
+            meta["blacklist"] = tuple([key for key in description if description[key]["coltype"] == "blacklist"])
+            headers_unsorted = [(key, description[key]["colpos"]) for key in description if description[key]["colpos"] is not None]
+            meta["headers"] = tuple([item[0] for item in sorted(headers_unsorted, key=lambda item: item[1])])
+            meta["label_texts"] = dict([(key, description[key]["label_text"]) for key in description])
+            meta["label_units"] = dict([(key, description[key]["label_unit"]) for key in description])
+            return meta
+
+    def _load_meta_json(self, metafile):
+        """
+        load meta inforation from json file
+        TODO: remove this if all configs are yaml
+
+        check that metafile exists
+
+        returns <dict> meta
+        """
+        with open(metafile, "rt") as infile:
+            data = json.load(infile)
+            meta = {}
+            meta["interval"] = data["interval"]
+            meta["delimiter"] = data["delimiter"]
+            meta["index_keynames"] = tuple(data["index_keynames"])
+            # if headers is dictionary, this should be treated as description
+            # TODO: this should be default in near future
+            if isinstance(data["headers"], dict):
+                meta["description"] = data["headers"]
+            # convert to tuple
+            meta["headers"] = tuple(data["headers"])
+            # transitional hook to implement datatypes without correcting
+            # all meta files at once
+            if isinstance(data["value_keynames"], dict):
+                meta["datatypes"] = data["value_keynames"]
+                meta["value_keynames"] = tuple(data["value_keynames"].keys())
+            elif isinstance(meta["value_keynames"], list):
+                # if old stype, keep all datatype asis, and print warning
+                logging.error("You should define value_keynames as dict with datatypes")
+                meta["datatypes"] = dict(zip(data["value_keynames"], ("asis",) * len(data["value_keynames"])))
+                meta["value_keynames"] = tuple(data["value_keynames"])
+            meta["blacklist"] = tuple(data["blacklist"])
+            return meta
+
+    def _convert_to_yaml(self, metafile, meta):
         """
         dump actual config to new style yaml file,
         only if this yaml file does not exist yet
 
         it is safe to call this function also if yaml file exists
 
-        TODO: remove this method when every config file is converted
+        check that metadir exists
+
+        returns: None
         """
-        metadir = os.path.join(self.basedir, self.project, "meta")
-        metafile = os.path.join(metadir, "%s.yaml" % self.tablename)
         meta = {
-            "interval" : self.interval,
+            "interval" : meta["interval"],
             "description": {},
-            "delimiter" : self.delimiter,
+            "delimiter" : meta["self.delimiter"],
+            "index_keynames": list(meta["index_keynames"]), # it is important to preserve order of this fields
         }
         description = meta["description"]
-        for colpos, header in enumerate(self.headers):
-            if header in self.value_keynames:
+        for colpos, header in enumerate(meta["headers"]):
+            if header in meta["value_keynames"]:
                 coltype = "value"
-            elif header in self.index_keynames:
+            elif header in meta["index_keynames"]:
                 coltype = "index"
-            elif header == self.ts_keyname:
+            elif header == meta["ts_keyname"]:
                 coltype = "ts"
-            elif header in self.blacklist:
+            elif header in meta["blacklist"]:
                 coltype = "blacklist"
             else:
                 coltype = "unknown"
-            if header in self.datatypes:
-                datatype = self.datatypes[header]
+            if header in meta["datatypes"]:
+                datatype = meta["datatypes"][header]
             else:
                 datatype = None
             description[header] = {
@@ -205,10 +260,10 @@ class DataLogger(object):
                 "label_text": "some text to show as label text",
                 "label_unit": "something/s"
             }
-        if not os.path.isfile(metafile):
-            logging.info("writing %s", metafile)
-            with open(metafile, "wt") as outfile:
-                outfile.write(yaml.dump(meta))
+        # if not os.path.isfile(metafile):
+        logging.info("writing %s", metafile)
+        with open(metafile, "wt") as outfile:
+            outfile.write(yaml.dump(meta))
 
     def _verify_yaml_config(self):
         """
@@ -224,10 +279,10 @@ class DataLogger(object):
             try: 
                 assert meta["interval"] == self.interval
                 assert meta["delimiter"] == self.delimiter
-                description = meta["description"]
-                index_keynames = tuple([key for key in description if description[key]["coltype"] == "index"])
-                #print("index_keynames:", index_keynames)
+                index_keynames = tuple(meta["index_keynames"]) # order matters!!
+                print(index_keynames)
                 assert index_keynames == self.index_keynames
+                description = meta["description"]
                 value_keynames = tuple([key for key in description if description[key]["coltype"] == "value"])
                 #print("value_kenames:", value_keynames)
                 assert sorted(value_keynames) == sorted(self.value_keynames)
