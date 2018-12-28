@@ -208,7 +208,6 @@ class DataLogger(object):
             with open(metafile, "wt") as outfile:
                 outfile.write(yaml.dump(meta))
 
-
     @property
     def basedir(self):
         """basedir on underlying OS"""
