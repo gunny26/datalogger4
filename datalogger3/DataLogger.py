@@ -22,8 +22,8 @@ from datalogger3.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesA
 from datalogger3.TimeseriesStats import TimeseriesStats as TimeseriesStats
 from datalogger3.Quantile import QuantileArray as QuantileArray
 from datalogger3.CustomExceptions import *
-from datalogger3.b64 import b64encode, b64decode, b64eval
-# from datalogger3.FastTsa import fast_tsa
+from datalogger3.b64 import b64eval
+from datalogger3.FastTsa import fast_tsa
 
 class DataLogger(object):
     """
@@ -63,9 +63,10 @@ class DataLogger(object):
         self.__datestring = None
         self.__project = None
         self.__tablename = None
+        self.__raw_basedir = None
         self.__timedelta = None
         self.__meta = None
-        self.__memcache = None 
+        self.__memcache = None
 
     def setup(self, project, tablename, datestring, timedelta=0.0):
         """
@@ -100,15 +101,11 @@ class DataLogger(object):
         metadir = os.path.join(projectdir, "meta")
         if not os.path.isdir(metadir):
             raise AttributeError("project meta directory %s does not exist" % metadir)
-        raw_basedir = os.path.join(projectdir, "raw")
-        if not os.path.isdir(raw_basedir):
-            raise AttributeError("project raw input directory %s does not exist" % raw_basedir)
+        self.__raw_basedir = os.path.join(projectdir, "raw")
+        if not os.path.isdir(self.__raw_basedir):
+            raise AttributeError("project raw input directory %s does not exist" % self.__raw_basedir)
         # metadir exists, so try to load something
         self.__meta = self._load_meta(metadir, tablename)
-        # add available Statistical function names to meta structure
-        # TODO: thats ugly
-        self.__meta["raw_basedir"] = raw_basedir
-        self.__meta["stat_func_names"] = list(TimeseriesStats.stat_funcs.keys())
         # make some assertions
         # every index_keyname has to be in headers
         assert all((key in self.__meta["headers"] for key in self.__meta["index_keynames"]))
@@ -158,7 +155,7 @@ class DataLogger(object):
                 new_metafile = os.path.join(metadir, "%s.yaml" % tablename)
                 self._convert_to_yaml(new_metafile, meta)
             else:
-                raise AttributeError("table definition file %s does not exist" % metafile_yaml)
+                raise AttributeError("table definition file %s does not exist" % metafile)
         return meta
 
     def _load_meta_yaml(self, metafile):
@@ -265,51 +262,51 @@ class DataLogger(object):
         with open(metafile, "wt") as outfile:
             outfile.write(yaml.dump(meta))
 
-    def _verify_yaml_config(self):
-        """
-        method to verify new style yaml file against old style config
-        TODO: rmeove this in future, if every config is yaml style
-        """
-        metadir = os.path.join(self.basedir, self.project, "meta")
-        metafile = os.path.join(metadir, "%s.yaml" % self.tablename)
-        if os.path.isfile(metafile):
-            logging.info("loading yaml style file %s", metafile)
-            with open(metafile, "rt") as infile:
-                meta = yaml.load(infile)
-            try: 
-                assert meta["interval"] == self.interval
-                assert meta["delimiter"] == self.delimiter
-                index_keynames = tuple(meta["index_keynames"]) # order matters!!
-                print(index_keynames)
-                assert index_keynames == self.index_keynames
-                description = meta["description"]
-                value_keynames = tuple([key for key in description if description[key]["coltype"] == "value"])
-                #print("value_kenames:", value_keynames)
-                assert sorted(value_keynames) == sorted(self.value_keynames)
-                ts_keyname = [key for key in description if description[key]["coltype"] == "ts"][0]
-                #print("ts_keyname:", ts_keyname)
-                assert ts_keyname == self.ts_keyname
-                datatypes = dict([(key, description[key]["datatype"]) for key in description if description[key]["coltype"] == "value"])
-                #print("datatypes:", datatypes)
-                assert datatypes == self.datatypes
-                blacklist = tuple([key for key in description if description[key]["coltype"] == "blacklist"])
-                #print("blacklist:", blacklist)
-                assert datatypes == self.datatypes
-                headers_unsorted = [(key, description[key]["colpos"]) for key in description if description[key]["colpos"] is not None]
-                headers = tuple([item[0] for item in sorted(headers_unsorted, key=lambda item: item[1])])
-                assert headers == self.headers
-                #print("headers:", headers)
-                label_texts = dict([(key, description[key]["label_text"]) for key in description])
-                #print("label:", label_texts)
-                label_units = dict([(key, description[key]["label_unit"]) for key in description])
-                #print("label units:", label_units)
-                logging.info("new style yaml config %s is verified", metafile)
-            except AssertionError as exc:
-                logging.exception(exc)
-                logging.error("new style config in %s is not the same as old style one", metafile)
-                logging.error(json.dumps(meta, indent=4))
-        else:
-            print("new yaml config file %s not found" % metafile)
+#    def _verify_yaml_config(self):
+#        """
+#        method to verify new style yaml file against old style config
+#        TODO: rmeove this in future, if every config is yaml style
+#        """
+#        metadir = os.path.join(self.basedir, self.project, "meta")
+#        metafile = os.path.join(metadir, "%s.yaml" % self.tablename)
+#        if os.path.isfile(metafile):
+#            logging.info("loading yaml style file %s", metafile)
+#            with open(metafile, "rt") as infile:
+#                meta = yaml.load(infile)
+#            try:
+#                assert meta["interval"] == self.interval
+#                assert meta["delimiter"] == self.delimiter
+#                index_keynames = tuple(meta["index_keynames"]) # order matters!!
+#                print(index_keynames)
+#                assert index_keynames == self.index_keynames
+#                description = meta["description"]
+#                value_keynames = tuple([key for key in description if description[key]["coltype"] == "value"])
+#                #print("value_kenames:", value_keynames)
+#                assert sorted(value_keynames) == sorted(self.value_keynames)
+#                ts_keyname = [key for key in description if description[key]["coltype"] == "ts"][0]
+#                #print("ts_keyname:", ts_keyname)
+#                assert ts_keyname == self.ts_keyname
+#                datatypes = dict([(key, description[key]["datatype"]) for key in description if description[key]["coltype"] == "value"])
+#                #print("datatypes:", datatypes)
+#                assert datatypes == self.datatypes
+#                blacklist = tuple([key for key in description if description[key]["coltype"] == "blacklist"])
+#                #print("blacklist:", blacklist)
+#                assert datatypes == self.datatypes
+#                headers_unsorted = [(key, description[key]["colpos"]) for key in description if description[key]["colpos"] is not None]
+#                headers = tuple([item[0] for item in sorted(headers_unsorted, key=lambda item: item[1])])
+#                assert headers == self.headers
+#                #print("headers:", headers)
+#                label_texts = dict([(key, description[key]["label_text"]) for key in description])
+#                #print("label:", label_texts)
+#                label_units = dict([(key, description[key]["label_unit"]) for key in description])
+#                #print("label units:", label_units)
+#                logging.info("new style yaml config %s is verified", metafile)
+#            except AssertionError as exc:
+#                logging.exception(exc)
+#                logging.error("new style config in %s is not the same as old style one", metafile)
+#                logging.error(json.dumps(meta, indent=4))
+#        else:
+#            print("new yaml config file %s not found" % metafile)
 
     @property
     def basedir(self):
@@ -328,10 +325,12 @@ class DataLogger(object):
 
     @property
     def datestring(self):
+        """return actual datestring"""
         return self.__datestring
 
     @property
     def timedelta(self):
+        """return actual defined datestring"""
         return self.__timedelta
 
     @property
@@ -372,7 +371,7 @@ class DataLogger(object):
     @property
     def raw_basedir(self):
         """subdirectory under wich to find raw inout files"""
-        return self.__meta["raw_basedir"]
+        return self.__raw_basedir
 
     @property
     def raw_filename(self):
@@ -706,7 +705,7 @@ class DataLogger(object):
             tsa.dump(self.cachedir) # save full data
             tsa.cache = True
             logging.info("calling load_tsa_finalize()")
-            tsa.finalize() # convert Timeseries to Datatypes 
+            tsa.finalize() # convert Timeseries to Datatypes
         logging.info("creating tsastats")
         tsastats = TimeseriesArrayStats(tsa) # calculate
         logging.info("calling tsastats.dump()")
@@ -744,7 +743,7 @@ class DataLogger(object):
             raise AttributeError("TSA Archive must exist to allow archiving of raw input data")
         # check archivepath existance
         if not os.path.isdir(self.__config["archivepath"]):
-            raise AttributeError("Archive %s path does not exist", self.__meta["archivepath"])
+            raise AttributeError("Archive %s path does not exist" % self.__config["archivepath"])
         # generate path for this setup
         archivepath = os.path.join(self.__config["archivepath"], self.datestring, self.project, self.tablename)
         if raw_filename.endswith(".gz"):
@@ -767,7 +766,7 @@ class DataLogger(object):
             # old file could be deleted
             os.unlink(raw_filename)
             # shutil.move(raw_filename, raw_filename + ".todelete")
- 
+
     def import_tsa(self, tsa):
         """
         store tsa given in parameter in global_cache to make the data available
@@ -904,16 +903,16 @@ class DataLogger(object):
             quantile_array = QuantileArray(tsa, tsastats)
             quantile_array.dump(self.cachedir)
         return quantile_array
-    
+
     def __caclculate_total_stats(self, tsastats):
         aggregator = {
             'median': lambda a, b: 0.0, # median of medians
             'avg': lambda a, b: a + b,
             'last': lambda a, b: 0.0,
             'diff': lambda a, b: 0.0,
-            'max': lambda a, b: max(a, b),
+            'max': max,
             'first': lambda a, b: 0.0,
-            'min': lambda a, b: min(a, b),
+            'min': min,
             'std': lambda a, b: 0.0,
             'count': lambda a, b: a + b,
             'mean': lambda a, b: 0.0,
@@ -924,7 +923,7 @@ class DataLogger(object):
         }
         stats_data = {}
         for value_keyname in self.value_keynames:
-            stats_data[value_keyname] = dict((key, 0.0) for key in aggregator.keys()) # prefill with 0.0
+            stats_data[value_keyname] = dict((key, 0.0) for key in aggregator) # prefill with 0.0
             for index_key in tsastats.keys():
                 stats = tsastats[index_key]
                 for stat_func in stats[value_keyname].keys():
@@ -945,7 +944,7 @@ class DataLogger(object):
         cachefilename = os.path.join(self.cachedir, "total_stats.json")
         with open(cachefilename, "wt") as outfile:
             json.dump(total_stats, outfile, indent=4)
- 
+
     def __load_total_stats(self):
         """
         load total_stats from file
@@ -954,7 +953,7 @@ class DataLogger(object):
         with open(cachefilename, "rt") as infile:
             total_stats = json.load(infile)
         return total_stats
- 
+
     def load_total_stats(self):
         """
         aggregates all TimeseriesStats available in TimeseriesArrayStats to total_stats dict
@@ -967,10 +966,9 @@ class DataLogger(object):
             tsastats = self["tsastats"]
             total_stats = self.__caclculate_total_stats(tsastats)
             self.__dump_total_stats(total_stats)
-            return total_stats
         else:
             total_stats = self.__load_total_stats()
-            return total_stats
+        return total_stats
 
     @staticmethod
     def __decode_filename(filename):

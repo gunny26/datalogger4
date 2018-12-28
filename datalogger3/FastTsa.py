@@ -7,7 +7,7 @@ import concurrent.futures
 import logging
 # own modules
 from datalogger3.b64 import b64encode
-import datalogger3
+# import datalogger3
 
 def get_ts_writer(ts_keyname, value_keynames):
     def ts_writer(filename, key, data):

@@ -11,7 +11,7 @@ from datalogger3 import DataLogger as DataLogger
 from datalogger3 import TimeseriesArrayStats as TimeseriesArrayStats
 from datalogger3 import TimeseriesArray as TimeseriesArray
 from datalogger3 import QuantileArray as QuantileArray
-from FastTsa import fast_tsa
+from datalogger3 import fast_tsa
 
 def gen_caches(project, tablename, datestring, force):
     dl = DataLogger(basedir)
