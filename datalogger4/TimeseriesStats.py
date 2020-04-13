@@ -6,7 +6,7 @@ Modules deals with timeseries statistics
 import json
 import logging
 # own modules
-from datalogger3.CustomExceptions import *
+from CustomExceptions import *
 
 
 def mean(data):

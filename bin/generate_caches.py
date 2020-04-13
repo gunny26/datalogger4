@@ -7,11 +7,11 @@ import logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s : %(message)s")
 import argparse
 # own modules
-from datalogger3 import DataLogger as DataLogger
-from datalogger3 import TimeseriesArrayStats as TimeseriesArrayStats
-from datalogger3 import TimeseriesArray as TimeseriesArray
-from datalogger3 import QuantileArray as QuantileArray
-from datalogger3 import fast_tsa
+from datalogger4 import DataLogger
+from datalogger4 import TimeseriesArrayStats
+from datalogger4 import TimeseriesArray
+from datalogger4 import QuantileArray
+from datalogger4 import fast_tsa
 
 def gen_caches(project, tablename, datestring, force):
     dl = DataLogger(basedir)

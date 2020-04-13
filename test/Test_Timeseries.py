@@ -7,7 +7,7 @@ import gzip
 import os
 import json
 # own modules
-from Timeseries import Timeseries as Timeseries
+from datalogger4 import Timeseries
 
 
 class Test(unittest.TestCase):

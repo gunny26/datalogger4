@@ -8,7 +8,7 @@ import os
 import time
 import datetime
 import threading
-import datalogger3
+import datalogger4
 
 class LiveReaderData(object):
 
