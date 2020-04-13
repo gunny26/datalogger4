@@ -1,7 +1,0 @@
-{"ClusterName1": 
-    {"clusternode1.local": 
-        {"username": "adminorother", "password": "somepassword"}, 
-    "clusternode2.local": 
-        {"username": "adminorother", "password": "somepassword"}
-    }
-}
