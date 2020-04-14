@@ -1,13 +1,15 @@
 {
-    "user" : "mesznera",
-    "group" : "mesznera",
-    "cachedir" : "cache",
-    "projects" : {
-        "sanportperf" : {
-            "fcIfC3AccountingTable" : "1"
+    "cachedir": "cache",
+    "archivepath": "archiv",
+    "user": "mesznera",
+    "group": "mesznera",
+    "projects": {
+        "mysql": {
+            "performance": "mysql server performance metrics"
         },
-        "mysql" : {
-            "performance" : "1"
-        }
+        "sanportperf": {
+            "fcIfC3AccountingTable": "san switch fc-port metrics"
+        },
+        "testproject": {}
     }
 }

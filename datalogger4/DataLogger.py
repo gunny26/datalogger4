@@ -34,7 +34,7 @@ class DataLogger(object):
     most of the time the pre-calculation will be done with the first call for this kind of data
     """
 
-    def __init__(self, basedir, configfilename="datalogger.json"):
+    def __init__(self, basedir):
         """
         loads some meta information of this raw data table in this project
         to get name of headers, and index columns
@@ -49,24 +49,21 @@ class DataLogger(object):
         # checking and loading config
         if not os.path.isdir(self.__basedir):
             raise AttributeError("global Base Directory %s does not exist" % self.__basedir)
-        self.__config_filename = os.path.join(basedir, configfilename)
         # loading global configuration
-        with open(self.__config_filename, "rt") as infile:
-            self.__config = json.load(infile)
-        if "cachedir" not in self.__config:
-            logging.info("you should define 'cachedir' in main configuration file, fallback to global_cache subdir under basedir")
-            self.__config["cachedir"] = os.path.join(basedir, "global_cache") # TODO: remove fallback in future
-        else:
-            self.__config["cachedir"] = os.path.join(basedir, self.__config["cachedir"])
-        if not os.path.isdir(self.__config["cachedir"]):
-            raise AttributeError("global Cache Directory %s does not exist" % self.__config["cachedir"])
+        self.__config = self._load_config(self.__basedir)
+        if self.__config["cachedir"][0] == "/": # use as absolute path
+            self.__cachedir = self.__config["cachedir"]
+        else: # or relative
+            self.__cachedir = os.path.join(basedir, self.__config["cachedir"])
+        if not os.path.isdir(self.__cachedir):
+            raise AttributeError("global Cache Directory %s does not exist" % self.__cachedir)
         self.__datestring = None
         self.__project = None
         self.__tablename = None
-        self.__raw_basedir = None
         self.__timedelta = None
-        self.__meta = None
-        self.__memcache = None
+        self.__raw_basedir = None # subdir to project
+        self.__meta = None # table_config, old name
+        self.__memcache = None # in memory store
 
     def setup(self, project, tablename, datestring, timedelta=0.0):
         """
@@ -77,6 +74,10 @@ class DataLogger(object):
         datestring <str> some datestring like 2018-12-31 in the past
         timedelta <int> defaults to 0
         """
+        if project not in self.__config["projects"]:
+            raise AttributeError("called project %s is not defined in main configuration file" % project)
+        if tablename not in self.__config["projects"][project]:
+            raise AttributeError("called tablename %s is not defined in project" % tablename)
         try:
             assert datetime.date.today().isoformat() != datestring
         except AssertionError:
@@ -90,29 +91,12 @@ class DataLogger(object):
         self.__project = project
         self.__tablename = tablename
         self.__timedelta = timedelta
-        if project not in self.__config["projects"]:
-            raise AttributeError("called project %s is not defined in main configuration file" % project)
-        if tablename not in self.__config["projects"][project]:
-            raise AttributeError("called tablename %s is not defined in project" % tablename)
-        # loading specific configuration, first look for project directory
-        projectdir = os.path.join(self.__basedir, project)
-        if not os.path.isdir(projectdir):
-            raise AttributeError("project directory %s does not exist" % projectdir)
-        metadir = os.path.join(projectdir, "meta")
-        if not os.path.isdir(metadir):
-            raise AttributeError("project meta directory %s does not exist" % metadir)
-        self.__raw_basedir = os.path.join(projectdir, "raw")
-        if not os.path.isdir(self.__raw_basedir):
-            raise AttributeError("project raw input directory %s does not exist" % self.__raw_basedir)
-        # metadir exists, so try to load something
-        self.__meta = self._load_meta(metadir, tablename)
-        # make some assertions
-        # every index_keyname has to be in headers
-        assert all((key in self.__meta["headers"] for key in self.__meta["index_keynames"]))
-        # ever value_keyname has to be in headers
-        assert all((key in self.__meta["headers"] for key in self.__meta["value_keynames"]))
-        # ts_keyname has to be in headers
-        assert self.__meta["ts_keyname"] in self.__meta["headers"]
+        # initializing project dir stucure if not present
+        self._init_project(self.__basedir, project) # initialize directory structure if not present
+        self.__raw_basedir = os.path.join(self.__basedir, project, "raw")
+        table_config = self._load_table_config(self.__basedir, project, tablename)
+        self._check_table_config(table_config)
+        self.__meta = table_config
 
     def __memcache_set(self, key, value):
         """ raises AtributeError if value is None """
@@ -137,176 +121,139 @@ class DataLogger(object):
         }
         return json.dumps(ret, indent=4)
 
-    def _load_meta(self, metadir, tablename):
+    @staticmethod
+    def _init_project(basedir, project):
         """
-        load either new yaml style config or old json style config
-        check that metadir exists
-        tablename is used to build filename
+        create basic project directory structure
+
+        :param basedir <str>:
+        :param project <str>: name of project
         """
-        meta = None
-        # first choice yaml style
-        metafile = os.path.join(metadir, "%s.yaml" % tablename)
+        projectdir = os.path.join(basedir, project)
+        if not os.path.isdir(projectdir):
+            os.mkdir(projectdir)
+        metadir = os.path.join(projectdir, "meta")
+        if not os.path.isdir(metadir):
+            os.mkdir(metadir)
+        rawdir = os.path.join(projectdir, "raw")
+        if not os.path.isdir(rawdir):
+            os.mkdir(rawdir)
+
+    @staticmethod
+    def _load_table_config(basedir, project, tablename):
+        """
+        load table definition and returnin table_config
+
+        :param basedir <str>: directory
+        :param project <str>: name of project
+        :param tablename <str>: name of table
+        :return <dict>:
+        :raises  AttributerError of file is missing:
+        """
+        metafile = os.path.join(basedir, project, "meta", "%s.yaml" % tablename)
         if os.path.isfile(metafile):
-            meta = self._load_meta_yaml(metafile)
-        else:
-            metafile = os.path.join(metadir, "%s.json" % tablename)
-            if os.path.isfile(metafile):
-                meta = self._load_meta_json(metafile)
-                new_metafile = os.path.join(metadir, "%s.yaml" % tablename)
-                self._convert_to_yaml(new_metafile, meta)
-            else:
-                raise AttributeError("table definition file %s does not exist" % metafile)
-        return meta
+            with open(metafile, "rt") as infile:
+                data = yaml.load(infile)
+                data["index_keynames"] = tuple(data["index_keynames"]) # order matters!!
+                description = data["description"] # shortcut
+                data["value_keynames"] = tuple([key for key in description if description[key]["coltype"] == "value"])
+                data["ts_keyname"] = [key for key in description if description[key]["coltype"] == "ts"][0]
+                data["datatypes"] = dict([(key, description[key]["datatype"]) for key in description if description[key]["coltype"] == "value"])
+                data["blacklist"] = tuple([key for key in description if description[key]["coltype"] == "blacklist"])
+                headers_unsorted = [(key, description[key]["colpos"]) for key in description if description[key]["colpos"] is not None]
+                data["headers"] = tuple([item[0] for item in sorted(headers_unsorted, key=lambda item: item[1])])
+                data["label_texts"] = dict([(key, description[key]["label_text"]) for key in description])
+                data["label_units"] = dict([(key, description[key]["label_unit"]) for key in description])
+                return data
+        raise AttributeError("table definition file %s does not exist" % metafile)
 
-    def _load_meta_yaml(self, metafile):
+    @staticmethod
+    def _save_table_config(basedir, project, tablename, table_config):
         """
-        method to load config data from yaml file
-        check that metafile exists
+        dump provided table_config to file
 
-        returns <dict> meta
+        :param basedir <str>:
+        :param project <str>:
+        :param tablename <str>:
+        :param table_config <dict>:
         """
-        logging.info("loading yaml style file %s", metafile)
-        with open(metafile, "rt") as infile:
-            data = yaml.load(infile)
-            meta = {}
-            meta["interval"] = data["interval"]
-            meta["delimiter"] = data["delimiter"]
-            meta["index_keynames"] = tuple(data["index_keynames"]) # order matters!!
-            description = data["description"] # shortcut
-            meta["value_keynames"] = tuple([key for key in description if description[key]["coltype"] == "value"])
-            meta["ts_keyname"] = [key for key in description if description[key]["coltype"] == "ts"][0]
-            meta["datatypes"] = dict([(key, description[key]["datatype"]) for key in description if description[key]["coltype"] == "value"])
-            meta["blacklist"] = tuple([key for key in description if description[key]["coltype"] == "blacklist"])
-            headers_unsorted = [(key, description[key]["colpos"]) for key in description if description[key]["colpos"] is not None]
-            meta["headers"] = tuple([item[0] for item in sorted(headers_unsorted, key=lambda item: item[1])])
-            meta["label_texts"] = dict([(key, description[key]["label_text"]) for key in description])
-            meta["label_units"] = dict([(key, description[key]["label_unit"]) for key in description])
-            return meta
+        metafile = os.path.join(basedir, project, "meta", f"{tablename}.yaml")
+        print(f"storing table definition to {metafile}")
+        outstring = yaml.dump(table_config)
+        if outstring:
+            with open(metafile, "wt") as outfile:
+                outfile.write(yaml.dump(table_config))
 
-    def _load_meta_json(self, metafile):
+    @staticmethod
+    def _delete_table_config(basedir, project, tablename):
         """
-        load meta inforation from json file
-        TODO: remove this if all configs are yaml
+        delete table definition on filesystem
 
-        check that metafile exists
-
-        returns <dict> meta
+        :param basedir <str>:
+        :param project <str>:
+        :param tablename <str>:
         """
-        with open(metafile, "rt") as infile:
-            data = json.load(infile)
-            meta = {}
-            meta["interval"] = data["interval"]
-            meta["delimiter"] = data["delimiter"]
-            meta["index_keynames"] = tuple(data["index_keynames"])
-            # if headers is dictionary, this should be treated as description
-            # TODO: this should be default in near future
-            if isinstance(data["headers"], dict):
-                meta["description"] = data["headers"]
-            # convert to tuple
-            meta["headers"] = tuple(data["headers"])
-            # transitional hook to implement datatypes without correcting
-            # all meta files at once
-            if isinstance(data["value_keynames"], dict):
-                meta["datatypes"] = data["value_keynames"]
-                meta["value_keynames"] = tuple(data["value_keynames"].keys())
-            elif isinstance(meta["value_keynames"], list):
-                # if old stype, keep all datatype asis, and print warning
-                logging.error("You should define value_keynames as dict with datatypes")
-                meta["datatypes"] = dict(zip(data["value_keynames"], ("asis",) * len(data["value_keynames"])))
-                meta["value_keynames"] = tuple(data["value_keynames"])
-            meta["blacklist"] = tuple(data["blacklist"])
-            return meta
+        metafile = os.path.join(basedir, project, "meta", f"{tablename}.yaml")
+        os.unlink(metafile)
 
-    def _convert_to_yaml(self, metafile, meta):
+    @staticmethod
+    def _check_table_config(table_config):
         """
-        dump actual config to new style yaml file,
-        only if this yaml file does not exist yet
+        check table_config
 
-        it is safe to call this function also if yaml file exists
-
-        check that metadir exists
-
-        returns: None
+        :param table_config <dict>: table configuration
+        :returns True if everything is ok:
+        :raises AttributeError if something is wrong
         """
-        meta = {
-            "interval" : meta["interval"],
-            "description": {},
-            "delimiter" : meta["self.delimiter"],
-            "index_keynames": list(meta["index_keynames"]), # it is important to preserve order of this fields
-        }
-        description = meta["description"]
-        for colpos, header in enumerate(meta["headers"]):
-            if header in meta["value_keynames"]:
-                coltype = "value"
-            elif header in meta["index_keynames"]:
-                coltype = "index"
-            elif header == meta["ts_keyname"]:
-                coltype = "ts"
-            elif header in meta["blacklist"]:
-                coltype = "blacklist"
-            else:
-                coltype = "unknown"
-            if header in meta["datatypes"]:
-                datatype = meta["datatypes"][header]
-            else:
-                datatype = None
-            description[header] = {
-                "colpos": colpos,
-                "coltype": coltype,
-                "datatype": datatype,
-                "label_text": "some text to show as label text",
-                "label_unit": "something/s"
-            }
-        # if not os.path.isfile(metafile):
-        logging.info("writing %s", metafile)
-        with open(metafile, "wt") as outfile:
-            outfile.write(yaml.dump(meta))
+        print(f"checking : {json.dumps(table_config, indent=4)}")
+        required_keys = ["delimiter", "description", "index_keynames", "interval"]
+        if any((key not in table_config for key in required_keys)):
+            raise AttributeError("table config is invalid")
+        if len(table_config["delimiter"]) != 1:
+            raise AttributeError("delimiter is exactly one character")
+        if len(table_config["description"]) < 3:
+            raise AttributeError("at least three column must be defined")
+        if len([table_config["description"][key] for key in table_config["description"] if table_config["description"][key]["coltype"] == "ts"]) != 1:
+            raise AttributeError("one column must be defined as ts")
+        if len([table_config["description"][key] for key in table_config["description"] if table_config["description"][key]["coltype"] == "value"]) == 0:
+            raise AttributeError("at least one column must be defined as value")
+        if len([table_config["description"][key] for key in table_config["description"] if table_config["description"][key]["coltype"] == "index"]) == 0:
+            raise AttributeError("at least one column must be defined as index")
+        if len(table_config["index_keynames"]) == 0:
+            raise AttributeError("at least one column must be defined as index")
+        if not all([col in table_config["description"] for col in table_config["index_keynames"]]):
+            raise AttributeError("mismatch between defined index_keynames and defined columns")
+        if not isinstance(table_config["interval"], int):
+            raise AttributeError("interval must be type int")
+        return True
 
-#    def _verify_yaml_config(self):
-#        """
-#        method to verify new style yaml file against old style config
-#        TODO: rmeove this in future, if every config is yaml style
-#        """
-#        metadir = os.path.join(self.basedir, self.project, "meta")
-#        metafile = os.path.join(metadir, "%s.yaml" % self.tablename)
-#        if os.path.isfile(metafile):
-#            logging.info("loading yaml style file %s", metafile)
-#            with open(metafile, "rt") as infile:
-#                meta = yaml.load(infile)
-#            try:
-#                assert meta["interval"] == self.interval
-#                assert meta["delimiter"] == self.delimiter
-#                index_keynames = tuple(meta["index_keynames"]) # order matters!!
-#                print(index_keynames)
-#                assert index_keynames == self.index_keynames
-#                description = meta["description"]
-#                value_keynames = tuple([key for key in description if description[key]["coltype"] == "value"])
-#                #print("value_kenames:", value_keynames)
-#                assert sorted(value_keynames) == sorted(self.value_keynames)
-#                ts_keyname = [key for key in description if description[key]["coltype"] == "ts"][0]
-#                #print("ts_keyname:", ts_keyname)
-#                assert ts_keyname == self.ts_keyname
-#                datatypes = dict([(key, description[key]["datatype"]) for key in description if description[key]["coltype"] == "value"])
-#                #print("datatypes:", datatypes)
-#                assert datatypes == self.datatypes
-#                blacklist = tuple([key for key in description if description[key]["coltype"] == "blacklist"])
-#                #print("blacklist:", blacklist)
-#                assert datatypes == self.datatypes
-#                headers_unsorted = [(key, description[key]["colpos"]) for key in description if description[key]["colpos"] is not None]
-#                headers = tuple([item[0] for item in sorted(headers_unsorted, key=lambda item: item[1])])
-#                assert headers == self.headers
-#                #print("headers:", headers)
-#                label_texts = dict([(key, description[key]["label_text"]) for key in description])
-#                #print("label:", label_texts)
-#                label_units = dict([(key, description[key]["label_unit"]) for key in description])
-#                #print("label units:", label_units)
-#                logging.info("new style yaml config %s is verified", metafile)
-#            except AssertionError as exc:
-#                logging.exception(exc)
-#                logging.error("new style config in %s is not the same as old style one", metafile)
-#                logging.error(json.dumps(meta, indent=4))
-#        else:
-#            print("new yaml config file %s not found" % metafile)
+    @staticmethod
+    def _save_config(basedir, config, filename="datalogger.json"):
+        """
+        save global configuration to disk, renaming old file, appending timestamp
+
+        :param basedir <str>:
+        :param config <dict>:
+        :param filename <str>: defaults to datalogger.json
+        """
+        config_filename = os.path.join(basedir, filename)
+        os.rename(config_filename, f"{config_filename}.{time.time()}") # rename existing
+        outstring = json.dumps(config, indent=4)
+        if outstring:
+            with open(config_filename, "wt") as outfile:
+                outfile.write(outstring)
+
+    @staticmethod
+    def _load_config(basedir, filename="datalogger.json"):
+        """
+        loading global config from json file
+
+        :param basedir <str>:
+        :param filename <str>: defaults to datalogger.json
+        """
+        config_filename = os.path.join(basedir, filename)
+        with open(config_filename, "rt") as infile:
+            return json.load(infile)
 
     @property
     def basedir(self):
@@ -381,7 +328,7 @@ class DataLogger(object):
     @property
     def global_cachedir(self):
         """subdirectory where to put caches"""
-        return self.__config["cachedir"]
+        return self.__cachedir
 
     @property
     def meta(self):
@@ -410,7 +357,7 @@ class DataLogger(object):
         returns:
         <str> directory path
         """
-        subdir = os.path.join(self.__config["cachedir"], self.datestring, self.project, self.tablename)
+        subdir = os.path.join(self.__cachedir, self.datestring, self.project, self.tablename)
         if not os.path.exists(subdir):
             os.makedirs(subdir)
         # try to set ownership of created directories
@@ -418,9 +365,9 @@ class DataLogger(object):
         try:
             uid = pwd.getpwnam(username).pw_uid
             gid = pwd.getpwnam(username).pw_gid
-            os.chown(os.path.join(self.__config["cachedir"], self.datestring), uid, gid)
-            os.chown(os.path.join(self.__config["cachedir"], self.datestring, self.project), uid, gid)
-            os.chown(os.path.join(self.__config["cachedir"], self.datestring, self.project, self.tablename), uid, gid)
+            os.chown(os.path.join(self.__cachedir, self.datestring), uid, gid)
+            os.chown(os.path.join(self.__cachedir, self.datestring, self.project), uid, gid)
+            os.chown(os.path.join(self.__cachedir, self.datestring, self.project, self.tablename), uid, gid)
         except KeyError as exc:
             logging.exception(exc)
             logging.error("User %s does not exist on this systemi, default permission will be applied to created directories", username)
@@ -491,7 +438,7 @@ class DataLogger(object):
                 except KeyError:
                     self.__memcache_set("total_stats", self.load_total_stats())
                     return self.__memcache_get("total_stats")
-        if isinstance(args[0], tuple):
+        elif isinstance(args[0], tuple):
             kind, subkey = args[0]
             if kind == "tsa":
                 try:
@@ -514,8 +461,7 @@ class DataLogger(object):
                     qa = self.load_quantile()
                     self.__memcache_set("qa", qa)
                 return qa[subkey]
-        else:
-            raise KeyError("unknown datatype")
+        raise KeyError("unknown datatype")
 
     def __parse_line(self, row):
         """
@@ -547,10 +493,9 @@ class DataLogger(object):
         filename = os.path.join(self.raw_basedir, "%s_%s.csv" % (self.tablename, self.datestring))
         if os.path.isfile(filename):
             return filename
-        else: # try .gz version
-            filename += ".gz" # try gz version
-            if os.path.isfile(filename):
-                return filename
+        filename += ".gz" # try gz version
+        if os.path.isfile(filename):
+            return filename
         # otherwise None
 
     def __read_raw_dict(self):
@@ -687,7 +632,7 @@ class DataLogger(object):
         caches["total_stats"]["exists"] = os.path.isfile(os.path.join(self.cachedir, "total_stats.json"))
         return caches
 
-    def generate_caches(self, use_fast=False):
+    def generate_caches(self, use_fast=True):
         """
         meant to generate all cached files from scratch (raw input data)
         """
@@ -715,9 +660,7 @@ class DataLogger(object):
         logging.info("calling quantile_array.dump()")
         quantile_array.dump(self.cachedir) # store
         logging.info("creating total_stats()")
-        total_stats = self.__caclculate_total_stats(tsastats) # calculate
-        logging.info("calling total_stats.dump() - kind of")
-        self.__dump_total_stats(total_stats) # store
+        self.load_total_stats() # calculate
         logging.info("done generate_caches()")
         # call this methode to refresh cached informations
         self.__memcache_init()
@@ -767,31 +710,31 @@ class DataLogger(object):
             os.unlink(raw_filename)
             # shutil.move(raw_filename, raw_filename + ".todelete")
 
-    def import_tsa(self, tsa):
-        """
-        store tsa given in parameter in global_cache to make the data available
-
-        usually this could be modfied existing tsa extended by some keys, or filtered or ...
-        the structure has to be predefined in meta data
-
-        the tsa can afterwards be accessed via normal frontends (web, api)
-
-        parameters:
-        tsa <TimeseriesArray> object
-        """
-        if self.index_keynames != tsa.index_keynames:
-            raise AssertionError("provided index_keynames does not match defined index_keynames")
-        if self.value_keynames != tuple(tsa.value_keynames):
-            raise AssertionError("provided value_keynames does not match defined value_keynames")
-        cachefilename = os.path.join(self.cachedir, TimeseriesArray.get_dumpfilename(tsa.index_keynames))
-        if not os.path.isfile(cachefilename):
-            tsa.dump(self.cachedir)
-            tsastats = TimeseriesArrayStats(tsa)
-            tsastats.dump(self.cachedir)
-            qantile = QuantileArray(tsa, tsastats)
-            qantile.dump(self.cachedir)
-        else:
-            raise Exception("TSA Archive %s exists already in cache" % cachefilename)
+#    def import_tsa(self, tsa):
+#        """
+#        store tsa given in parameter in global_cache to make the data available
+#
+#        usually this could be modfied existing tsa extended by some keys, or filtered or ...
+#        the structure has to be predefined in meta data
+#
+#        the tsa can afterwards be accessed via normal frontends (web, api)
+#
+#        parameters:
+#        tsa <TimeseriesArray> object
+#        """
+#        if self.index_keynames != tsa.index_keynames:
+#            raise AssertionError("provided index_keynames does not match defined index_keynames")
+#        if self.value_keynames != tuple(tsa.value_keynames):
+#            raise AssertionError("provided value_keynames does not match defined value_keynames")
+#        cachefilename = os.path.join(self.cachedir, TimeseriesArray.get_dumpfilename(tsa.index_keynames))
+#        if not os.path.isfile(cachefilename):
+#            tsa.dump(self.cachedir)
+#            tsastats = TimeseriesArrayStats(tsa)
+#            tsastats.dump(self.cachedir)
+#            qantile = QuantileArray(tsa, tsastats)
+#            qantile.dump(self.cachedir)
+#        else:
+#            raise Exception("TSA Archive %s exists already in cache" % cachefilename)
 
     def load_tsa(self, filterkeys=None, index_pattern=None):
         """
@@ -843,15 +786,9 @@ class DataLogger(object):
         caching version to load_tsa_raw
         if never called, get ts from load_tsa_raw, and afterwards dump_tsa
         on every consecutive call read from cached version
-        use cleancache to remove caches
 
-        parameters:
-        datestring <str>
-        timedelta <int>
-        cleancache <bool>
-
-        returns
-        <TimeseriesArray> object read from cachefile or from raw data
+        :param filerkeys <dict>: pattern to filter while loading tsastats
+        :return <TimeseriesArray>: object read from cachefile or from raw data
         """
         cachefilename = os.path.join(self.cachedir, TimeseriesArrayStats.get_dumpfilename(self.index_keynames))
         def fallback():
@@ -884,11 +821,7 @@ class DataLogger(object):
         retuns quantile for this specific tsa, either load cache version,
         or recreate from tsa
 
-        parameters:
-        datestring <str>
-
-        returns:
-        <QuantileArray>
+        :return <QuantileArray>:
         """
         cachefilename = QuantileArray.get_dumpfilename(self.cachedir)
         quantile_array = None
@@ -904,7 +837,11 @@ class DataLogger(object):
             quantile_array.dump(self.cachedir)
         return quantile_array
 
-    def __caclculate_total_stats(self, tsastats):
+    @staticmethod
+    def _calculate_total_stats(value_keynames, tsastats):
+        """
+        helping funtion to aggregate all timeseriesstats to one total_stats structure
+        """
         aggregator = {
             'median': lambda a, b: 0.0, # median of medians
             'avg': lambda a, b: a + b,
@@ -922,7 +859,7 @@ class DataLogger(object):
             'total_count' : lambda a, b: a # to be consistent
         }
         stats_data = {}
-        for value_keyname in self.value_keynames:
+        for value_keyname in value_keynames:
             stats_data[value_keyname] = dict((key, 0.0) for key in aggregator) # prefill with 0.0
             for index_key in tsastats.keys():
                 stats = tsastats[index_key]
@@ -937,38 +874,60 @@ class DataLogger(object):
                 stats_data[value_keyname]["avg"] = 0.0
         return stats_data
 
-    def __dump_total_stats(self, total_stats):
-        """
-        dump total_stats to file
-        """
-        cachefilename = os.path.join(self.cachedir, "total_stats.json")
-        with open(cachefilename, "wt") as outfile:
-            json.dump(total_stats, outfile, indent=4)
-
-    def __load_total_stats(self):
-        """
-        load total_stats from file
-        """
-        cachefilename = os.path.join(self.cachedir, "total_stats.json")
-        with open(cachefilename, "rt") as infile:
-            total_stats = json.load(infile)
-        return total_stats
-
     def load_total_stats(self):
         """
         aggregates all TimeseriesStats available in TimeseriesArrayStats to total_stats dict
 
-        returns:
-        <dict> of statistical functions, and values
+        :returns <dict>: of statistical functions, and values
         """
         cachefilename = os.path.join(self.cachedir, "total_stats.json")
         if not os.path.isfile(cachefilename):
             tsastats = self["tsastats"]
-            total_stats = self.__caclculate_total_stats(tsastats)
-            self.__dump_total_stats(total_stats)
+            total_stats = self._calculate_total_stats(self.value_keynames, tsastats)
+            with open(cachefilename, "wt") as outfile:
+                json.dump(total_stats, outfile, indent=4)
         else:
-            total_stats = self.__load_total_stats()
+            with open(cachefilename, "rt") as infile:
+                total_stats = json.load(infile)
         return total_stats
+
+    def add_table(self, project, tablename, table_config, table_description="some table description"):
+        """
+        adding some table to project providing table_config as definition
+        storing in config_file and creating table definition
+
+        :param project <str>: name of project, if not existing, create it
+        :param tablename <str>: name of table
+        :param table_config <dict>: structure of table
+        """
+        print("add_table started")
+        self._check_table_config(table_config)
+        self._init_project(self.__basedir, project)
+        # storing table definition
+        self._save_table_config(self.__basedir, project, tablename, table_config)
+        # adding project in config data structure
+        if project not in self.__config["projects"]:
+            self.__config["projects"][project] = {}
+        if tablename not in self.__config["projects"][project]:
+            self.__config["projects"][project] = { # TODO: list is sufficient
+                tablename : table_description
+            }
+        self._save_config(self.__basedir, self.__config)
+
+    def delete_table(self, project, tablename):
+        """
+        delete table definition from peject and delete table config file
+        actual data will not be erased
+
+        :param project <str>: name of project, if not existing, create it
+        :param tablename <str>: name of table
+        """
+        if project in self.__config["projects"]:
+            if tablename in self.__config["projects"][project]:
+                self._delete_table_config(self.__basedir, project, tablename)
+                # delete also in config
+                del self.__config["projects"][project][tablename]
+                self._save_config(self.__basedir, self.__config)
 
     @staticmethod
     def __decode_filename(filename):

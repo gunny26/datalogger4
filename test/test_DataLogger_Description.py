@@ -67,7 +67,7 @@ class Test(unittest.TestCase):
         if not os.path.isfile(metafile):
             meta = {
                 "interval" : dl.interval,
-                "descriptions": {},
+                "description": {},
                 "delimiter" : dl.delimiter,
             }
             description = meta["description"]
@@ -109,7 +109,7 @@ class Test(unittest.TestCase):
                 meta = yaml.load(infile) 
             self.assertEqual(meta["interval"], dl.interval)
             self.assertEqual(meta["delimiter"], dl.delimiter)
-            description = meta["descriptions"]
+            description = meta["description"]
             index_keynames = tuple([key for key in description if description[key]["coltype"] == "index"])
             print("index_keynames:", index_keynames)
             self.assertEqual(index_keynames, dl.index_keynames)

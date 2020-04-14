@@ -21,16 +21,17 @@ __author__ = "Arthur Messner <arthur.messner@gmail.com>"
 __copyright__ = "Copyright (c) 2008 Arthur Messner"
 __license__ = "GPL"
 __version__ = "$Revision: 4.0.0 $"
-
-from datalogger4.DataLogger import DataLogger
-from datalogger4.Timeseries import Timeseries
-from datalogger4.TimeseriesArray import TimeseriesArray
-from datalogger4.TimeseriesStats import TimeseriesStats
-from datalogger4.TimeseriesArrayStats import TimeseriesArrayStats
-from datalogger4.Quantile import QuantileArray
-from datalogger4.Quantile import Quantile
-from datalogger4.CorrelationMatrix import CorrelationMatrixArray
-from datalogger4.CorrelationMatrixTime import CorrelationMatrixTime
-from datalogger4.FastTsa import fast_tsa
+print("running __init__")
+from .DataLogger import DataLogger as DataLogger
+from .Timeseries import Timeseries as Timeseries
+from .TimeseriesArray import TimeseriesArray as TimeseriesArray
+from .TimeseriesStats import TimeseriesStats as TimeseriesStats
+from .TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
+from .Quantile import QuantileArray as QuantileArray
+from .Quantile import Quantile as Quantile
+from .CorrelationMatrix import CorrelationMatrixArray as CorrelationMatrixArray
+from .CorrelationMatrixTime import CorrelationMatrixTime as CorrelationMatrixTime
+from .FastTsa import fast_tsa
+from .b64 import b64eval, b64encode, b64decode
 # custom exceptions
-from datalogger4.CustomExceptions import *
+from .CustomExceptions import *

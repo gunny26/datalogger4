@@ -1,10 +1,12 @@
 #!/usr/bin/python3
+"""
+script to analyze data periodically
+usually this should be run daily to analyze new data
+"""
 import sys
 import os
 import datetime
-import json
 import logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s : %(message)s")
 import argparse
 # own modules
 from datalogger4 import DataLogger
@@ -13,7 +15,18 @@ from datalogger4 import TimeseriesArray
 from datalogger4 import QuantileArray
 from datalogger4 import fast_tsa
 
-def gen_caches(project, tablename, datestring, force):
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s : %(message)s")
+
+def analyze(basedir, project, tablename, datestring, force):
+    """
+    analyze or reanalyze given project/tablename/datestring combination
+    generating TimeseriesArray, Timeseries, TimeseriesArrayStats, TimeseriesStats, QuantileArray, Quantile
+
+    :param project <str>: name of project
+    :param tablename <str>: name of table in project
+    :param datestring <str>: datestring
+    :param force <bool>: if True, recreate from original input file (raw)
+    """
     dl = DataLogger(basedir)
     dl.setup(project, tablename, datestring)
     caches = dl["caches"]
@@ -47,7 +60,7 @@ def gen_caches(project, tablename, datestring, force):
         dl = DataLogger(basedir)
         dl.setup(project, tablename, datestring)
         logging.info("calling fast_tsa()")
-        fast_tsa(dl)
+        fast_tsa(dl) # read from input and split into Timeseries
     logging.info("getting caches")
     caches = dl["caches"]
     assert isinstance(caches, dict)
@@ -89,7 +102,12 @@ def gen_caches(project, tablename, datestring, force):
     logging.info("stats individual points     : %s", num_points)
 
 def main():
-    datalogger =  DataLogger(basedir)
+    """
+    walk from start to enddate and analyze data
+    if the specific day is already analyzed, nothing will happen
+    otherwise this data will be analyzed
+    """
+    datalogger = DataLogger(args.basedir)
     for datestring in tuple(datalogger.datewalker(startdate, args.enddate)):
         start_ts, stop_ts = datalogger.get_ts_for_datestring(datestring)
         logging.info("working on datestring %s (from %s to %s)", datestring, start_ts, stop_ts)
@@ -103,10 +121,9 @@ def main():
                     logging.debug("skipping %s/%s", project, tablename)
                     continue
                 logging.info("working on %s/%s/%s", project, tablename, datestring)
-                gen_caches(project, tablename, datestring, args.force)
+                analyze(args.basedir, project, tablename, datestring, args.force)
 
 if __name__ == "__main__":
-    basedir = "/var/rrd"
     yesterday_datestring = (datetime.date.today() - datetime.timedelta(1)).isoformat()
     parser = argparse.ArgumentParser(description='generate TimeseriesArrays on local backend')
     parser.add_argument('--basedir', default="/var/rrd", help="basedirectory of datalogger data on local machine, default : %(default)s")

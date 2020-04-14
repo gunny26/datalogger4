@@ -156,6 +156,43 @@ class Test(unittest.TestCase):
         cache = dl["caches"]
         assert cache["ts"]["keys"]
 
+    def test_add_table(self):
+        print("testing add_table, delete_table")
+        table_config = {
+            "delimiter": "\t",
+            "description": {
+                "ts_col": {
+                    "colpos": 0,
+                    "coltype": "ts",
+                    "datatype": None,
+                    "label_text": "unixtimestamp",
+                    "label_unit": "s"
+                },
+                "index_col": {
+                    "colpos": 1,
+                    "coltype": "index",
+                    "datatype": None,
+                    "label_text": "some index",
+                    "label_unit": "index text"
+                },
+                "value_col": {
+                    "colpos": 2,
+                    "coltype": "value",
+                    "datatype": "asis",
+                    "label_text": "some value",
+                    "label_unit": "some unit/s"
+                }
+            },
+            "index_keynames": ["index_col"],
+            "interval": 300
+        }
+        dl = DataLogger("testdata")
+        dl.add_table("testproject", "testtable", table_config)
+        assert "testproject" in dl.get_projects()
+        assert "testtable" in dl.get_tablenames("testproject")
+        dl.delete_table("testproject", "testtable")
+        assert "testtable" not in dl.get_tablenames("testproject")
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     unittest.main()
