@@ -17,13 +17,13 @@ import shutil
 # non std
 import yaml
 # own modules
-from TimeseriesArray import TimeseriesArray
-from TimeseriesArrayStats import TimeseriesArrayStats
-from TimeseriesStats import TimeseriesStats
-from Quantile import QuantileArray
-from CustomExceptions import *
-from b64 import b64eval
-from FastTsa import fast_tsa
+from datalogger4.TimeseriesArray import TimeseriesArray
+from datalogger4.TimeseriesArrayStats import TimeseriesArrayStats
+from datalogger4.TimeseriesStats import TimeseriesStats
+from datalogger4.Quantile import QuantileArray
+from datalogger4.CustomExceptions import *
+from datalogger4.b64 import b64eval
+from datalogger4.FastTsa import fast_tsa
 
 class DataLogger(object):
     """

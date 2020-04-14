@@ -9,14 +9,14 @@ import json
 import yaml
 import os
 # own modules
-import datalogger3 # to use assertIsInstance for testing
-from DataLogger import DataLogger as DataLogger
-from Timeseries import Timeseries as Timeseries
-from TimeseriesArray import TimeseriesArray as TimeseriesArray
-from TimeseriesStats import TimeseriesStats as TimeseriesStats
-from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
-from Quantile import QuantileArray as QuantileArray
-from Quantile import Quantile as Quantile
+import datalogger4 # to use assertIsInstance for testing
+from datalogger4.DataLogger import DataLogger
+from datalogger4.Timeseries import Timeseries
+from datalogger4.TimeseriesArray import TimeseriesArray
+from datalogger4.TimeseriesStats import TimeseriesStats
+from datalogger4.TimeseriesArrayStats import TimeseriesArrayStats
+from datalogger4.Quantile import QuantileArray
+from datalogger4.Quantile import Quantile
 
 class Test(unittest.TestCase):
 

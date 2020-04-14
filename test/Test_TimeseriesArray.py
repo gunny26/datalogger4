@@ -7,10 +7,10 @@ import datetime
 import gzip
 import os
 # own modules
-import datalogger3 # for assertIsInstance
-from Timeseries import Timeseries as Timeseries
-from TimeseriesArray import TimeseriesArray as TimeseriesArray
-from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
+import datalogger4 # for assertIsInstance
+from datalogger4.Timeseries import Timeseries as Timeseries
+from datalogger4.TimeseriesArray import TimeseriesArray as TimeseriesArray
+from datalogger4.TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
 
 meta2 = {
     "blacklist": [],
@@ -112,12 +112,12 @@ class Test(unittest.TestCase):
         print("testing items")
         for key, value in self.app.items():
             self.assertIsInstance(key, tuple)
-            self.assertIsInstance(value, datalogger3.Timeseries)
+            self.assertIsInstance(value, datalogger4.Timeseries)
 
     def test_values(self):
         print("testing values")
         for value in self.app.values():
-            self.assertIsInstance(value, datalogger3.Timeseries)
+            self.assertIsInstance(value, datalogger4.Timeseries)
 
     def test_keys(self):
         print("testing keys")
@@ -151,7 +151,7 @@ class Test(unittest.TestCase):
     def test_stats(self):
         print("testing stats")
         stats = self.app.stats
-        self.assertIsInstance(stats, datalogger3.TimeseriesArrayStats)
+        self.assertIsInstance(stats, datalogger4.TimeseriesArrayStats)
 
     def test_cache(self):
         print("testing cache")

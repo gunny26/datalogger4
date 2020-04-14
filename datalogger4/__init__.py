@@ -22,15 +22,15 @@ __copyright__ = "Copyright (c) 2008 Arthur Messner"
 __license__ = "GPL"
 __version__ = "$Revision: 4.0.0 $"
 
-from DataLogger import DataLogger
-from Timeseries import Timeseries
-from TimeseriesArray import TimeseriesArray
-from TimeseriesStats import TimeseriesStats
-from TimeseriesArrayStats import TimeseriesArrayStats
-from Quantile import QuantileArray
-from Quantile import Quantile
-from CorrelationMatrix import CorrelationMatrixArray
-from CorrelationMatrixTime import CorrelationMatrixTime
-from FastTsa import fast_tsa
+from datalogger4.DataLogger import DataLogger
+from datalogger4.Timeseries import Timeseries
+from datalogger4.TimeseriesArray import TimeseriesArray
+from datalogger4.TimeseriesStats import TimeseriesStats
+from datalogger4.TimeseriesArrayStats import TimeseriesArrayStats
+from datalogger4.Quantile import QuantileArray
+from datalogger4.Quantile import Quantile
+from datalogger4.CorrelationMatrix import CorrelationMatrixArray
+from datalogger4.CorrelationMatrixTime import CorrelationMatrixTime
+from datalogger4.FastTsa import fast_tsa
 # custom exceptions
-from CustomExceptions import *
+from datalogger4.CustomExceptions import *

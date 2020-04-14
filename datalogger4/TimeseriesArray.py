@@ -10,9 +10,9 @@ import json
 import os
 import gzip
 # own modules
-from Timeseries import Timeseries
-from TimeseriesArrayStats import TimeseriesArrayStats
-from b64 import b64encode, b64decode, b64eval
+from datalogger4.Timeseries import Timeseries
+from datalogger4.TimeseriesArrayStats import TimeseriesArrayStats
+from datalogger4.b64 import b64encode, b64decode, b64eval
 
 
 def is_near(value, target_value, pct=0.05):

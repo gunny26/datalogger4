@@ -8,14 +8,14 @@ import gzip
 import json
 import os
 # own modules
-import datalogger3 # to use assertIsInstance for testing
-from DataLogger import DataLogger as DataLogger
-from Timeseries import Timeseries as Timeseries
-from TimeseriesArray import TimeseriesArray as TimeseriesArray
-from TimeseriesStats import TimeseriesStats as TimeseriesStats
-from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
-from Quantile import QuantileArray as QuantileArray
-from Quantile import Quantile as Quantile
+import datalogger4 # to use assertIsInstance for testing
+from datalogger4.DataLogger import DataLogger
+from datalogger4.Timeseries import Timeseries
+from datalogger4.TimeseriesArray import TimeseriesArray
+from datalogger4.TimeseriesStats import TimeseriesStats
+from datalogger4.TimeseriesArrayStats import TimeseriesArrayStats
+from datalogger4.Quantile import QuantileArray
+from datalogger4.Quantile import Quantile
 
 class Test(unittest.TestCase):
 
@@ -59,21 +59,21 @@ class Test(unittest.TestCase):
         assert isinstance(caches, dict)
         tsa = dl["tsa"]
         print(tsa, type(tsa))
-        self.assertIsInstance(tsa, datalogger3.TimeseriesArray)
+        self.assertIsInstance(tsa, datalogger4.TimeseriesArray)
         ts = dl["tsa", ("nagios.tilak.cc",)]
         print(ts)
-        self.assertIsInstance(ts, datalogger3.Timeseries)
+        self.assertIsInstance(ts, datalogger4.Timeseries)
         assert tsa[("nagios.tilak.cc",)] == ts
         tsastats = dl["tsastats"]
         print(tsastats)
-        self.assertIsInstance(tsastats, datalogger3.TimeseriesArrayStats)
+        self.assertIsInstance(tsastats, datalogger4.TimeseriesArrayStats)
         tsstats = dl["tsastats", ("nagios.tilak.cc",)]
         print(tsstats)
-        self.assertIsInstance(tsstats, datalogger3.TimeseriesStats)
+        self.assertIsInstance(tsstats, datalogger4.TimeseriesStats)
         assert tsastats[("nagios.tilak.cc",)] == tsstats
         qa = dl["qa"]
         print(qa)
-        self.assertIsInstance(qa, datalogger3.QuantileArray)
+        self.assertIsInstance(qa, datalogger4.QuantileArray)
         quantile = dl["qa", ("nagios.tilak.cc",)]
         print(quantile)
         assert isinstance(quantile, dict)

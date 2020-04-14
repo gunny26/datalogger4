@@ -11,9 +11,9 @@ import json
 import os
 import logging
 # own modules
-from TimeseriesStats import TimeseriesStats
-from CustomExceptions import *
-from b64 import b64encode, b64decode, b64eval
+from datalogger4.TimeseriesStats import TimeseriesStats
+from datalogger4.CustomExceptions import *
+from datalogger4.b64 import b64encode, b64decode, b64eval
 
 
 class TimeseriesArrayStats(object):

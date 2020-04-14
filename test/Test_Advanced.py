@@ -8,15 +8,15 @@ import gzip
 import json
 import os
 # own modules
-import datalogger3 # for assertIsInstance Testing
-import Advanced
-from DataLogger import DataLogger as DataLogger
-from Timeseries import Timeseries as Timeseries
-from TimeseriesArray import TimeseriesArray as TimeseriesArray
-from TimeseriesStats import TimeseriesStats as TimeseriesStats
-from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
-from Quantile import QuantileArray as QuantileArray
-from Quantile import Quantile as Quantile
+import datalogger4 # for assertIsInstance Testing
+import datalogger4.Advanced as Advanced
+from datalogger4.DataLogger import DataLogger
+from datalogger4.Timeseries import Timeseries
+from datalogger4.TimeseriesArray import TimeseriesArray
+from datalogger4.TimeseriesStats import TimeseriesStats
+from datalogger4.TimeseriesArrayStats import TimeseriesArrayStats
+from datalogger4.Quantile import QuantileArray
+from datalogger4.Quantile import Quantile
 
 class Test(unittest.TestCase):
 
@@ -47,13 +47,13 @@ class Test(unittest.TestCase):
         assert len(tsastats) == 712
         tsastats_grouped = Advanced.tsastats_group_by(tsastats, index_keynames=("hostname",))
         assert len(tsastats_grouped) == 24
-        self.assertIsInstance(tsastats_grouped, datalogger3.TimeseriesArrayStats)
-        self.assertIsInstance(tsastats_grouped[('fcb-sr3-4gb-32',)], datalogger3.TimeseriesStats)
+        self.assertIsInstance(tsastats_grouped, datalogger4.TimeseriesArrayStats)
+        self.assertIsInstance(tsastats_grouped[('fcb-sr3-4gb-32',)], datalogger4.TimeseriesStats)
         print(tsastats_grouped[('fcb-sr3-4gb-32',)])
         tsastats_total = Advanced.tsastats_group_by(tsastats, index_keynames=())
         assert len(tsastats_total) == 1
-        self.assertIsInstance(tsastats_total, datalogger3.TimeseriesArrayStats)
-        self.assertIsInstance(tsastats_total[('__total__',)], datalogger3.TimeseriesStats)
+        self.assertIsInstance(tsastats_total, datalogger4.TimeseriesArrayStats)
+        self.assertIsInstance(tsastats_total[('__total__',)], datalogger4.TimeseriesStats)
         print(tsastats_total[('__total__',)])
 
     def test_get_scatterdata(self):

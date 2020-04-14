@@ -8,11 +8,11 @@ import gzip
 import json
 import os
 # own modules
-import datalogger3
-from Timeseries import Timeseries as Timeseries
-from TimeseriesStats import TimeseriesStats as TimeseriesStats
-from TimeseriesArray import TimeseriesArray as TimeseriesArray
-from TimeseriesArrayStats import TimeseriesArrayStats as TimeseriesArrayStats
+import datalogger4
+from datalogger4.Timeseries import Timeseries
+from datalogger4.TimeseriesStats import TimeseriesStats
+from datalogger4.TimeseriesArray import TimeseriesArray
+from datalogger4.TimeseriesArrayStats import TimeseriesArrayStats
 
 def calllogger(func):
     def wrapper(*args, **kwds):
@@ -130,12 +130,12 @@ class Test(unittest.TestCase):
         assert all([key in [('srvwebsql2.tilak.cc',), ('srvdmzsql1.tilak.cc',), ('srvaporti1.tilak.cc',), ('nagios.tilak.cc',), ('srvazwsql1.tilak.cc',)] for key in self.tsastats.keys()])
 
     def test_values(self):
-        assert all((isinstance(value, datalogger3.TimeseriesStats) for value in self.tsastats.values()))
+        assert all((isinstance(value, datalogger4.TimeseriesStats) for value in self.tsastats.values()))
 
     def test_items(self):
         for key, value in self.tsastats.items():
             assert isinstance(key, tuple)
-            assert isinstance(value, datalogger3.TimeseriesStats)
+            assert isinstance(value, datalogger4.TimeseriesStats)
 
     def test_index_keynames(self):
         assert self.tsastats.index_keynames == ('hostname',)

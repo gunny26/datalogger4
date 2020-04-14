@@ -3,8 +3,8 @@
 """Module for class Timeseries"""
 import logging
 # own modules
-from CustomExceptions import *
-from TimeseriesStats import TimeseriesStats
+from datalogger4.CustomExceptions import *
+from datalogger4.TimeseriesStats import TimeseriesStats
 
 
 def datatype_percent(times, series):

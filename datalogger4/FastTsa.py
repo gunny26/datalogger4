@@ -6,7 +6,7 @@ import time
 import concurrent.futures
 import logging
 # own modules
-from b64 import b64encode
+from datalogger4.b64 import b64encode
 # import datalogger3
 
 def get_ts_writer(ts_keyname, value_keynames):
